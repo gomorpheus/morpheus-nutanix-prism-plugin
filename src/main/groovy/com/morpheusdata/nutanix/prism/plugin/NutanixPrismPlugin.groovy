@@ -38,7 +38,7 @@ class NutanixPrismPlugin extends Plugin {
 
 	def getAuthConfig(Cloud cloud) {
 		log.debug "getAuthConfig: ${cloud}"
-		def rtn = [:]
+		def rtn = [apiUrl: getApiUrl(cloud.serviceUrl), basePath: 'api/nutanix/v3', username: null, password: null]
 
 		if(!cloud.accountCredentialLoaded) {
 			AccountCredential accountCredential
@@ -52,19 +52,30 @@ class NutanixPrismPlugin extends Plugin {
 			cloud.accountCredentialData = accountCredential?.data
 		}
 
-		def username
-		def password
 		if(cloud.accountCredentialData && cloud.accountCredentialData.containsKey('username')) {
-			username = cloud.accountCredentialData['username']
+			rtn.username = cloud.accountCredentialData['username']
 		} else {
-			username = cloud.serviceUsername
+			rtn.username = cloud.serviceUsername
 		}
 		if(cloud.accountCredentialData && cloud.accountCredentialData.containsKey('password')) {
-			password = cloud.accountCredentialData['password']
+			rtn.password = cloud.accountCredentialData['password']
 		} else {
-			password = cloud.servicePassword
+			rtn.password = cloud.servicePassword
 		}
 
 		return rtn
+	}
+
+	static getApiUrl(String apiUrl) {
+		if(apiUrl) {
+			def rtn = apiUrl
+			if(rtn.startsWith('http') == false)
+				rtn = 'https://' + rtn
+
+			if(rtn.endsWith('/') == false)
+				rtn = rtn + '/'
+
+			return rtn
+		}
 	}
 }

@@ -5,6 +5,7 @@ import com.morpheusdata.core.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.core.ProvisioningProvider
+import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerType
@@ -13,6 +14,7 @@ import com.morpheusdata.model.NetworkType
 import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.StorageControllerType
 import com.morpheusdata.model.StorageVolumeType
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
@@ -30,7 +32,52 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Collection<OptionType> getOptionTypes() {
-		[]
+		OptionType apiUrl = new OptionType(
+				name: 'Api Url',
+				code: 'nutanix-prism-plugin-api-url',
+				fieldName: 'serviceUrl',
+				displayOrder: 0,
+				fieldLabel: 'Api Url',
+				required: true,
+				inputType: OptionType.InputType.TEXT,
+				fieldContext: 'domain'
+		)
+		OptionType credentials = new OptionType(
+				code: 'nutanix-prism-plugin-credential',
+				inputType: OptionType.InputType.CREDENTIAL,
+				name: 'Credentials',
+				fieldName: 'type',
+				fieldLabel: 'Credentials',
+				fieldContext: 'credential',
+				required: true,
+				defaultValue: 'local',
+				displayOrder: 10,
+				optionSource: 'credentials',
+				config: '{"credentialTypes":["username-password"]}'
+		)
+		OptionType username = new OptionType(
+				name: 'Username',
+				code: 'nutanix-prism-plugin-username',
+				fieldName: 'serviceUsername',
+				displayOrder: 20,
+				fieldLabel: 'Username',
+				required: true,
+				inputType: OptionType.InputType.TEXT,
+				fieldContext: 'domain',
+				localCredential: true
+		)
+		OptionType password = new OptionType(
+				name: 'Password',
+				code: 'nutanix-prism-plugin-password',
+				fieldName: 'servicePassword',
+				displayOrder: 25,
+				fieldLabel: 'Password',
+				required: true,
+				inputType: OptionType.InputType.PASSWORD,
+				fieldContext: 'domain',
+				localCredential: true
+		)
+		[apiUrl, credentials, username, password]
 	}
 
 	@Override
@@ -73,6 +120,25 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		log.info("validate: {}", cloudInfo)
 		try {
 			if(cloudInfo) {
+				if(cloudInfo.serviceUsername?.length() < 1) {
+					return new ServiceResponse(success: false, msg: 'Enter a username')
+				} else if(cloudInfo.servicePassword?.length() < 1) {
+					return new ServiceResponse(success: false, msg: 'Enter a password')
+				} else if(cloudInfo.serviceUrl?.length() < 1) {
+					return new ServiceResponse(success: false, msg: 'Enter an api url')
+				} else {
+					//test api call
+					def apiUrl = plugin.getApiUrl(cloudInfo.serviceUrl)
+					//get creds
+					Map authConfig = [apiUrl: apiUrl, basePath: 'api/nutanix/v3', username: cloudInfo.serviceUsername, password: cloudInfo.servicePassword]
+					HttpApiClient apiClient = new HttpApiClient()
+					def clusterList = NutanixPrismComputeUtility.listHosts(apiClient, authConfig)
+					if(clusterList.success == true) {
+						return ServiceResponse.success()
+					} else {
+						return new ServiceResponse(success: false, msg: 'Invalid credentials')
+					}
+				}
 			} else {
 				return new ServiceResponse(success: false, msg: 'No cloud found')
 			}
