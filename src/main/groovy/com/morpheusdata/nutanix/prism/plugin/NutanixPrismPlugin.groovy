@@ -66,6 +66,10 @@ class NutanixPrismPlugin extends Plugin {
 		return rtn
 	}
 
+	def NutanixPrismCloudProvider getCloudProvider() {
+		this.getProviderByCode(cloudProviderCode)
+	}
+
 	static getApiUrl(String apiUrl) {
 		if(apiUrl) {
 			def rtn = apiUrl

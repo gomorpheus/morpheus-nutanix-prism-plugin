@@ -5,15 +5,19 @@ import com.morpheusdata.core.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.core.ProvisioningProvider
+import com.morpheusdata.core.util.ConnectionUtils
 import com.morpheusdata.core.util.HttpApiClient
+import com.morpheusdata.model.AccountCredential
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerType
 import com.morpheusdata.model.Icon
+import com.morpheusdata.model.NetworkProxy
 import com.morpheusdata.model.NetworkType
 import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.StorageControllerType
 import com.morpheusdata.model.StorageVolumeType
+import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
@@ -77,7 +81,19 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'domain',
 				localCredential: true
 		)
-		[apiUrl, credentials, username, password]
+
+		OptionType inventoryInstances = new OptionType(
+				name: 'Inventory Existing Instances',
+				code: 'nutanix-prism-plugin-import-existing',
+				fieldName: 'importExisting',
+				displayOrder: 90,
+				fieldLabel: 'Inventory Existing Instances',
+				required: false,
+				inputType: OptionType.InputType.CHECKBOX,
+				fieldContext: 'config'
+		)
+
+		[apiUrl, credentials, username, password, inventoryInstances]
 	}
 
 	@Override
@@ -120,9 +136,23 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		log.info("validate: {}", cloudInfo)
 		try {
 			if(cloudInfo) {
-				if(cloudInfo.serviceUsername?.length() < 1) {
+				def username
+				def password
+				if(validateCloudRequest.credentialType?.toString().isNumber()) {
+					AccountCredential accountCredential = morpheus.accountCredential.get(validateCloudRequest.credentialType.toLong()).blockingGet()
+					password = accountCredential.data.password
+					username = accountCredential.data.username
+				} else if(validateCloudRequest.credentialType == 'username-password') {
+					password = validateCloudRequest.credentialPassword
+					username = validateCloudRequest.credentialUsername
+				} else if(validateCloudRequest.credentialType == 'local') {
+					password = validateCloudRequest.opts?.zone?.servicePassword
+					username = validateCloudRequest.opts?.zone?.serviceUsername
+				}
+
+				if(username?.length() < 1) {
 					return new ServiceResponse(success: false, msg: 'Enter a username')
-				} else if(cloudInfo.servicePassword?.length() < 1) {
+				} else if(password?.length() < 1) {
 					return new ServiceResponse(success: false, msg: 'Enter a password')
 				} else if(cloudInfo.serviceUrl?.length() < 1) {
 					return new ServiceResponse(success: false, msg: 'Enter an api url')
@@ -130,7 +160,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					//test api call
 					def apiUrl = plugin.getApiUrl(cloudInfo.serviceUrl)
 					//get creds
-					Map authConfig = [apiUrl: apiUrl, basePath: 'api/nutanix/v3', username: cloudInfo.serviceUsername, password: cloudInfo.servicePassword]
+					Map authConfig = [apiUrl: apiUrl, basePath: 'api/nutanix/v3', username: username, password: password]
 					HttpApiClient apiClient = new HttpApiClient()
 					def clusterList = NutanixPrismComputeUtility.listHosts(apiClient, authConfig)
 					if(clusterList.success == true) {
@@ -150,7 +180,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	ServiceResponse refresh(Cloud cloudInfo) {
-
+		initializeCloud(cloudInfo)
 	}
 
 	@Override
@@ -165,7 +195,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Boolean hasComputeZonePools() {
-		return false
+		return true
 	}
 
 	@Override
@@ -236,11 +266,46 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		log.info "Initializing Cloud: ${cloud.code}"
 		log.info "config: ${cloud.configMap}"
 
-		try {
+		HttpApiClient client
 
+		try {
+			NetworkProxy proxySettings = cloud.apiProxy
+			client = new HttpApiClient()
+			client.networkProxy = proxySettings
+
+			def authConfig = plugin.getAuthConfig(cloud)
+			def apiUrlObj = new URL(authConfig.apiUrl)
+			def apiHost = apiUrlObj.getHost()
+			def apiPort = apiUrlObj.getPort() > 0 ? apiUrlObj.getPort() : (apiUrlObj?.getProtocol()?.toLowerCase() == 'https' ? 443 : 80)
+			def hostOnline = ConnectionUtils.testHostConnectivity(apiHost, apiPort, true, true, proxySettings)
+			log.debug("nutanix prism central online: {} - {}", apiHost, hostOnline)
+			if(hostOnline) {
+				def testResults = NutanixPrismComputeUtility.testConnection(client, authConfig)
+				if(testResults.success == true) {
+					def doInventory = cloud.getConfigProperty('importExisting')
+					Boolean createNew = false
+					if(doInventory == 'on' || doInventory == 'true' || doInventory == true) {
+						createNew = true
+					}
+
+					(new ClustersSync(this.plugin, cloud, client)).execute()
+
+					rtn = ServiceResponse.success()
+				}
+				else {
+					rtn = ServiceResponse.error(testResults.invalidLogin == true ? 'invalid credentials' : 'error connecting')
+				}
+			} else {
+				rtn = ServiceResponse.error('Nutanix Prism Central is not reachable', null, [status: Cloud.Status.offline])
+			}
 		} catch (e) {
 			log.error("refresh cloud error: ${e}", e)
+		} finally {
+			if(client) {
+				client.shutdownClient()
+			}
 		}
+
 		return rtn
 	}
 }

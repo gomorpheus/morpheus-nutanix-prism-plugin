@@ -8,6 +8,17 @@ import org.apache.http.entity.ContentType
 @Slf4j
 class NutanixPrismComputeUtility {
 
+	static testConnection(HttpApiClient client, Map authConfig) {
+		def rtn = [success:false, invalidLogin:false]
+		try {
+			def listResults = listHosts(client, authConfig)
+			rtn.success = listResults.success
+		} catch(e) {
+			log.error("testConnection to ${authConfig.apiUrl}: ${e}")
+		}
+		return rtn
+	}
+
 	static ServiceResponse listHosts(HttpApiClient client, Map authConfig) {
 		log.debug("listHosts")
 		return callListApi(client, 'cluster', 'clusters/list', authConfig)
