@@ -225,12 +225,9 @@ class HostsSync {
 		def addList = []
 		if(syncLists.addList) {
 			syncLists.addList?.each { cloudDisk ->
-				println "BOBW : HostsSync.groovy:227 : cloudDisk ${cloudDisk}"
 				def cloudDiskDetail = cloudHostDisks.find { it.entity_id == cloudDisk.uuid }?.data
-				println "BOBW : HostsSync.groovy:229 : cloudDiskDetail ${cloudDiskDetail}"
 				if(cloudDiskDetail) {
 					def (maxStorage, usedStorage) = getMaxAndUsedStorage(cloudDiskDetail)
-					println "BOBW : HostsSync.groovy:232 : ${maxStorage} ${usedStorage}"
 					def newVolume = new StorageVolume(
 							[
 									type       : volumeType,
@@ -338,11 +335,7 @@ class HostsSync {
 
 			if(metricsResult.success && metricsResult.data) {
 				def metricGroupData = metricsResult.data.find { it.entity_id == server.externalId }?.data
-				println "BOBW : HostsSync.groovy:341 :metricGroupData ${metricGroupData} "
-				println "BOBW : HostsSync.groovy:341 : server.externalId ${server.externalId}"
-				println "BOBW : HostsSync.groovy:341 : metricsResult.data ${metricsResult.data}"
 				def memoryUsagePPM = NutanixPrismComputeUtility.getGroupEntityValue(metricGroupData, 'hypervisor_memory_usage_ppm')?.toLong()
-				println "BOBW : HostsSync.groovy:343 : memoryUsagePPM ${memoryUsagePPM}"
 				if(memoryUsagePPM) {
 					def usedMemory = server.maxMemory * (memoryUsagePPM / 1000000)
 					if (capacityInfo.usedMemory != usedMemory || server.usedMemory != usedMemory) {

@@ -21,6 +21,7 @@ import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
 import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
 import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
+import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
@@ -135,7 +136,18 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Collection<NetworkType> getNetworkTypes() {
-		return null
+		NetworkType vlanNetwork = new NetworkType([
+				code              : 'nutanix-prism-plugin-network',
+				externalType      : 'VLAN',
+				cidrEditable      : true,
+				dhcpServerEditable: true,
+				dnsEditable       : true,
+				gatewayEditable   : true,
+				vlanIdEditable    : true,
+				canAssignPool     : true,
+				name              : 'Nutanix Prism Plugin VLAN Network'
+		])
+		[vlanNetwork]
 	}
 
 	@Override
@@ -227,7 +239,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Boolean hasNetworks() {
-		return false
+		return true
 	}
 
 	@Override
@@ -322,6 +334,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 					(new ClustersSync(this.plugin, cloud, client)).execute()
 					(new DatastoresSync(this.plugin, cloud, client)).execute()
+					(new NetworksSync(this.plugin, cloud, client)).execute()
 					(new HostsSync(this.plugin, cloud, client)).execute()
 
 					rtn = ServiceResponse.success()
