@@ -28,13 +28,16 @@ class ClustersSync {
 	}
 
 	def execute() {
-		log.debug "execute: ${cloud}"
+		log.debug "BEGIN: execute ClustersSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def listResults = NutanixPrismComputeUtility.listHosts(apiClient, authConfig)
+			def listResults = NutanixPrismComputeUtility.listClusters(apiClient, authConfig)
 			if(listResults.success) {
+				def masterHosts = listResults?.data?.findAll { cloudItem ->
+					cloudItem.status?.resources?.config?.service_list?.contains('AOS')
+				} ?: []
 				Observable<ComputeZonePoolIdentityProjection> domainRecords = morpheusContext.cloud.pool.listSyncProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}")
-				SyncTask<ComputeZonePoolIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, listResults?.data ?: [])
+				SyncTask<ComputeZonePoolIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, masterHosts)
 				syncTask.addMatchFunction { ComputeZonePoolIdentityProjection domainObject, Map apiItem ->
 					domainObject.externalId == apiItem.metadata.uuid
 				}.onDelete { removeItems ->
@@ -54,6 +57,7 @@ class ClustersSync {
 		} catch(e) {
 			log.error "Error in execute : ${e}", e
 		}
+		log.debug "END: execute ClustersSync: ${cloud.id}"
 	}
 
 	def addMissingResourcePools(List addList) {

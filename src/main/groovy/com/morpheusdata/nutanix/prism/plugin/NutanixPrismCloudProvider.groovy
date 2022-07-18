@@ -15,9 +15,12 @@ import com.morpheusdata.model.Icon
 import com.morpheusdata.model.NetworkProxy
 import com.morpheusdata.model.NetworkType
 import com.morpheusdata.model.OptionType
+import com.morpheusdata.model.PlatformType
 import com.morpheusdata.model.StorageControllerType
 import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
+import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
+import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
@@ -98,7 +101,21 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Collection<ComputeServerType> getComputeServerTypes() {
-		return []
+		ComputeServerType hypervisorType = new ComputeServerType()
+		hypervisorType.name = 'Nutanix Prism Plugin Hypervisor'
+		hypervisorType.code = 'nutanix-prism-plugin-hypervisor'
+		hypervisorType.description = 'Nutanix Prism Plugin Hypervisor'
+		hypervisorType.vmHypervisor = true
+		hypervisorType.controlPower = false
+		hypervisorType.reconfigureSupported = false
+		hypervisorType.externalDelete = false
+		hypervisorType.hasAutomation = false
+		hypervisorType.agentType = ComputeServerType.AgentType.none
+		hypervisorType.platform = PlatformType.esxi
+		hypervisorType.managed = false
+		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
+
+		[hypervisorType]
 	}
 
 	@Override
@@ -123,7 +140,17 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Collection<StorageVolumeType> getStorageVolumeTypes() {
-		return null
+		def datastoreVolumeType = new StorageVolumeType([
+				code: 'nutanix-prism-plugin-datastore',
+				name: 'Nutanix Prism Datastore'
+		])
+
+		def hostVolumeType = new StorageVolumeType([
+				code: 'nutanix-prism-plugin-host-disk',
+				name: 'Nutanix Prism Host Disk'
+		])
+
+		return [datastoreVolumeType, hostVolumeType]
 	}
 
 	@Override
@@ -209,6 +236,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
+	Boolean hasDatastores() {
+		return true
+	}
+
+	@Override
 	MorpheusContext getMorpheus() {
 		return this.morpheusContext
 	}
@@ -289,6 +321,8 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					}
 
 					(new ClustersSync(this.plugin, cloud, client)).execute()
+					(new DatastoresSync(this.plugin, cloud, client)).execute()
+					(new HostsSync(this.plugin, cloud, client)).execute()
 
 					rtn = ServiceResponse.success()
 				}
