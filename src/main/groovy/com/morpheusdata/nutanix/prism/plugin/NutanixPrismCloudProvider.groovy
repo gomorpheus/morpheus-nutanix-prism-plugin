@@ -253,6 +253,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
+	Boolean hasBareMetal() {
+		return false
+	}
+
+	@Override
 	MorpheusContext getMorpheus() {
 		return this.morpheusContext
 	}
