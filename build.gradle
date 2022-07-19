@@ -68,7 +68,7 @@ repositories {
 }
 
 dependencies {
-	compileOnly 'com.morpheusdata:morpheus-plugin-api:0.13.3-SNAPSHOT'
+	compileOnly 'com.morpheusdata:morpheus-plugin-api:0.13.4-SNAPSHOT'
 	compileOnly "org.codehaus.groovy:groovy-all:$groovyVersion"
     implementation 'commons-logging:commons-logging:1.1.1'
     testImplementation "org.codehaus.groovy:groovy-all:$groovyVersion"
