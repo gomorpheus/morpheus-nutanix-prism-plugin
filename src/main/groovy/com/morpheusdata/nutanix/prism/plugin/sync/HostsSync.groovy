@@ -333,27 +333,8 @@ class HostsSync {
 				updates = true
 			}
 
-			if(metricsResult.success && metricsResult.data) {
-				def metricGroupData = metricsResult.data.find { it.entity_id == server.externalId }?.data
-				def memoryUsagePPM = NutanixPrismComputeUtility.getGroupEntityValue(metricGroupData, 'hypervisor_memory_usage_ppm')?.toLong()
-				if(memoryUsagePPM) {
-					def usedMemory = server.maxMemory * (memoryUsagePPM / 1000000)
-					if (capacityInfo.usedMemory != usedMemory || server.usedMemory != usedMemory) {
-						capacityInfo.usedMemory = usedMemory
-						server.usedMemory = usedMemory
-						updates = true
-					}
-				}
-
-				def cpuUsagePPM = NutanixPrismComputeUtility.getGroupEntityValue(metricGroupData, 'hypervisor_cpu_usage_ppm')?.toLong()
-				if(cpuUsagePPM) {
-					def cpuUsage = (cpuUsagePPM / 10000)
-					if (capacityInfo.maxCpu != cpuUsage || server.usedCpu != cpuUsage) {
-						capacityInfo.maxCpu = cpuUsage
-						server.usedCpu = cpuUsage
-						updates = true
-					}
-				}
+			if(NutanixPrismSyncUtils.updateMetrics(server, 'hypervisor_memory_usage_ppm', 'hypervisor_cpu_usage_ppm', metricsResult)) {
+				updates = true
 			}
 
 			// How to determine powerstate?!

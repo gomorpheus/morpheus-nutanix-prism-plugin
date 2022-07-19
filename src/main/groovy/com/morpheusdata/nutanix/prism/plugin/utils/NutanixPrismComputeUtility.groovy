@@ -60,6 +60,15 @@ class NutanixPrismComputeUtility {
 		return callGroupApi(client, 'host', 'hypervisor_memory_usage_ppm', groupMemberAttributes, authConfig, appendToBody)
 	}
 
+	static ServiceResponse listVMMetrics(HttpApiClient client, Map authConfig, List<String> vmUUIDs) {
+		log.debug("listVMMetrics")
+		def groupMemberAttributes = ['memory_usage_ppm', 'hypervisor_cpu_usage_ppm', 'controller_user_bytes']
+		def appendToBody = [
+				entity_ids: vmUUIDs
+		]
+		return callGroupApi(client, 'mh_vm', 'memory_usage_ppm', groupMemberAttributes, authConfig, appendToBody)
+	}
+
 	static getGroupEntityValue(List groupData, attributeName) {
 		def values = groupData.find { it.name == attributeName }?.values
 		if(values?.size() > 0 ) {

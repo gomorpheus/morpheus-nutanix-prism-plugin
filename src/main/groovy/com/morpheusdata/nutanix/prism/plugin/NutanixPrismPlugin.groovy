@@ -19,10 +19,12 @@ class NutanixPrismPlugin extends Plugin {
 	@Override
 	void initialize() {
 		this.setName('Nutanix Prism Plugin')
+		def nutanixProvision = new NutanixPrismProvisionProvider(this, this.morpheus)
 		def nutanixPrismCloud = new NutanixPrismCloudProvider(this, this.morpheus)
 		cloudProviderCode = nutanixPrismCloud.code
 		def nutanixPrismOptionSourceProvider = new NutanixPrismOptionSourceProvider(this, morpheus)
 
+		this.pluginProviders.put(nutanixProvision.code, nutanixProvision)
 		this.pluginProviders.put(nutanixPrismCloud.code, nutanixPrismCloud)
 		this.pluginProviders.put(nutanixPrismOptionSourceProvider.code, nutanixPrismOptionSourceProvider)
 	}

@@ -22,6 +22,7 @@ import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
 import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
 import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
+import com.morpheusdata.nutanix.prism.plugin.sync.VirtualMachinesSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
@@ -116,12 +117,23 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		hypervisorType.managed = false
 		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
 
-		[hypervisorType]
+		ComputeServerType serverType = new ComputeServerType()
+		serverType.name = 'Nutanix Prism Plugin Server'
+		serverType.code = 'nutanix-prism-plugin-server'
+		serverType.description = 'Nutanix Prism Plugin Server'
+		serverType.reconfigureSupported = false
+		serverType.hasAutomation = false
+		serverType.supportsConsoleKeymap = true
+		serverType.platform = PlatformType.none
+		serverType.managed = false
+		serverType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
+
+		[hypervisorType, serverType]
 	}
 
 	@Override
 	Collection<ProvisioningProvider> getAvailableProvisioningProviders() {
-		return []
+		return plugin.getProvidersByType(ProvisioningProvider) as Collection<ProvisioningProvider>
 	}
 
 	@Override
@@ -131,7 +143,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	ProvisioningProvider getProvisioningProvider(String providerCode) {
-		return null
+		return getAvailableProvisioningProviders().find { it.code == providerCode }
 	}
 
 	@Override
@@ -162,7 +174,12 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				name: 'Nutanix Prism Host Disk'
 		])
 
-		return [datastoreVolumeType, hostVolumeType]
+		def diskVolumeType = new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk',
+				name: 'Disk'
+		])
+
+		return [datastoreVolumeType, hostVolumeType, diskVolumeType]
 	}
 
 	@Override
@@ -341,6 +358,8 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					(new DatastoresSync(this.plugin, cloud, client)).execute()
 					(new NetworksSync(this.plugin, cloud, client)).execute()
 					(new HostsSync(this.plugin, cloud, client)).execute()
+					(new VirtualMachinesSync(this.plugin, cloud, client, createNew)).execute()
+					// TODO : Sync images
 
 					rtn = ServiceResponse.success()
 				}
