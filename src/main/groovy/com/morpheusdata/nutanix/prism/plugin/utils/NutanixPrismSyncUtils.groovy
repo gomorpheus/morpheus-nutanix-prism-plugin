@@ -107,6 +107,18 @@ class NutanixPrismSyncUtils {
 					existingVolume.maxStorage = volume.maxStorage
 					save = true
 				}
+
+				def deviceName = generateVolumeDeviceName(volume, externalVolumes)
+				if(existingVolume.deviceName != deviceName) {
+					existingVolume.deviceName = deviceName
+					save = true
+				}
+				def rootVolume = deviceName == 'sda'
+				if( rootVolume != existingVolume.rootVolume) {
+					existingVolume.rootVolume = rootVolume
+					save = true
+				}
+
 				if(volume.device_properties?.disk_address?.device_index != null && existingVolume.unitNumber != "${volume.device_properties?.disk_address?.device_index}") {
 					existingVolume.unitNumber = "${volume.device_properties?.disk_address?.device_index}"
 					save = true
@@ -158,20 +170,17 @@ class NutanixPrismSyncUtils {
 		volumes?.eachWithIndex { volume, index ->
 			volume.maxStorage = volume.disk_size_bytes
 			DatastoreIdentityProjection datastore = volume.storage_config?.storage_container_reference?.uuid ? new DatastoreIdentityProjection(cloud.id, volume.storage_config?.storage_container_reference?.uuid) : null
-			def volName = (newIndex + index) == 0 ? 'root' : 'data'
-			if ((newIndex + index) > 0)
-				volName = volName + ' ' + (index + newIndex)
 			def volumeConfig = [
-					name      : volName,
-					size      : volume.maxStorage,
-					rootVolume: (newIndex + index) == 0,
-					deviceName: volume.device_properties?.disk_address?.adapter_type ? volume.device_properties?.disk_address?.adapter_type : null,
-					externalId: volume.uuid,
-					internalId: volume.uuid,
-					unitNumber: "${volume.device_properties?.disk_address?.device_index}",
-					datastore : datastore,
-					displayOrder: (index + newIndex),
+					name        : volume.uuid,
+					size        : volume.maxStorage,
+					deviceName  : generateVolumeDeviceName(volume, volumes),
+					externalId  : volume.uuid,
+					internalId  : volume.uuid,
+					unitNumber  : "${volume.device_properties?.disk_address?.device_index}",
+					datastore   : datastore,
+					displayOrder: volume.device_properties.disk_address.device_index,
 			]
+			volumeConfig.rootVolume = volumeConfig.deviceName == 'sda'
 
 			def newVolume = buildStorageVolume(account ?: cloud.account, locationOrServer, volumeConfig, (index + newIndex))
 
@@ -208,6 +217,33 @@ class NutanixPrismSyncUtils {
 		storageVolume.displayOrder = volume.displayOrder ?: locationOrServer?.volumes?.size() ?: 0
 		storageVolume.diskIndex = index
 		return storageVolume
+	}
+
+	static String generateVolumeDeviceName(diskInfo, List<Map> diskList) {
+		def deviceName = ''
+		if(!diskInfo.device_properties) {
+			if(diskInfo.disk_address.device_bus.toUpperCase() == 'SCSI' || diskInfo.disk_address.device_bus.toUpperCase() == 'SATA') {
+				deviceName += 'sd'
+			} else {
+				deviceName += 'hd'
+			}
+		} else {
+			if(diskInfo.device_properties.disk_address.adapter_type == 'SCSI' || diskInfo.device_properties.disk_address.adapter_type == 'SATA') {
+				deviceName += 'sd'
+			} else {
+				deviceName += 'hd'
+			}
+		}
+
+
+		def letterIndex = ['a','b','c','d','e','f','g','h','i','j','k','l']
+		def indexPos = diskInfo.disk_address?.device_index ?: diskInfo.device_properties?.disk_address?.device_index ?: 0
+		if(diskInfo.disk_address?.device_bus?.toUpperCase() == 'SATA' || diskInfo.device_properties?.disk_address?.adapter_type == 'SATA') {
+			indexPos += diskList.count { it.device_properties?.disk_address?.adapter_type == 'SCSI' || it.disk_address?.device_bus?.toUpperCase() == 'SCSI' }
+		}
+		deviceName += letterIndex[indexPos]
+
+		return deviceName
 	}
 
 	static Boolean syncInterfaces(ComputeServer server, List cloudNics, Map networks, List<ComputeServerInterfaceType> netTypes, MorpheusContext morpheusContext) {
@@ -270,6 +306,13 @@ class NutanixPrismSyncUtils {
 					save = true
 				}
 
+				def nicPosition = cloudNics.indexOf(masterInterface) ?: 0
+				def name = "eth${nicPosition}"
+				if(existingInterface.name != name) {
+					existingInterface.name = name
+					save = true
+				}
+
 				if(save) {
 					saveList << existingInterface
 				}
@@ -289,11 +332,12 @@ class NutanixPrismSyncUtils {
 			def createList = []
 			syncLists.addList?.each { addItem ->
 				NetworkIdentityProjection networkProj = networks[addItem.subnet_reference?.uuid]
+				def nicPosition = cloudNics.indexOf(addItem) ?: 0
 				def newInterface = new ComputeServerInterface([
 						externalId      : addItem.uuid,
 						type            : netTypes.find { it.externalId == addItem.nic_type },
 						macAddress      : addItem.mac_address,
-						name            : addItem.mac_address,
+						name            : "eth${nicPosition}",
 						ipAddress       : addItem.ip_endpoint_list?.getAt(0)?.ip,
 						network         : networkProj ? new Network(id: networkProj.id) : null,
 						displayOrder    : addItem.displayOrder,

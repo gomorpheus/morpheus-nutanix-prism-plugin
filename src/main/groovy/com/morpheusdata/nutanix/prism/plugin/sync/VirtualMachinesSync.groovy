@@ -405,7 +405,7 @@ class VirtualMachinesSync {
 				internalId       : cloudItem.metadata.uuid,
 				powerState       : cloudItem.status.resources.power_state == 'ON' ? ComputeServer.PowerState.on : ComputeServer.PowerState.off,
 				maxMemory        : cloudItem.status.resources.memory_size_mib * ComputeUtility.ONE_MEGABYTE,
-				maxCores         : (cloudItem.status.resources.num_sockets?.toLong() ?: 1) * cloudItem.status.resources.num_vcpus_per_socket?.toLong() ?: 1,
+				maxCores         : (cloudItem.status.resources.num_vcpus_per_socket?.toLong() ?: 0) * (cloudItem.status.resources.num_sockets?.toLong() ?: 0),
 				coresPerSocket   : cloudItem.status.resources.num_vcpus_per_socket?.toLong(),
 				parentServer     : hosts[cloudItem.status.cluster_reference.uuid]
 		]

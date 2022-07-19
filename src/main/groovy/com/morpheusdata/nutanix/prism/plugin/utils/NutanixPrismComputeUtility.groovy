@@ -24,6 +24,11 @@ class NutanixPrismComputeUtility {
 		return callListApi(client, 'subnet', 'subnets/list', authConfig)
 	}
 
+	static ServiceResponse listImages(HttpApiClient client, Map authConfig) {
+		log.debug("listImages")
+		return callListApi(client, 'image', 'images/list', authConfig)
+	}
+
 	static ServiceResponse listDisks(HttpApiClient client, Map authConfig) {
 		log.debug("listDisks")
 		def groupMemberAttributes = ['serial','disk_size_bytes','storage.usage_ppm','node_name', 'cluster', 'state', 'message', 'reason']

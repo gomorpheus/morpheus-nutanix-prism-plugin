@@ -21,12 +21,15 @@ import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
 import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
 import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
+import com.morpheusdata.nutanix.prism.plugin.sync.ImagesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
 import com.morpheusdata.nutanix.prism.plugin.sync.VirtualMachinesSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
+
+import java.security.MessageDigest
 
 @Slf4j
 class NutanixPrismCloudProvider implements CloudProvider {
@@ -353,13 +356,14 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					if(doInventory == 'on' || doInventory == 'true' || doInventory == true) {
 						createNew = true
 					}
+					ensureRegionCode(cloud)
 
 					(new ClustersSync(this.plugin, cloud, client)).execute()
 					(new DatastoresSync(this.plugin, cloud, client)).execute()
 					(new NetworksSync(this.plugin, cloud, client)).execute()
+					(new ImagesSync(this.plugin, cloud, client)).execute()
 					(new HostsSync(this.plugin, cloud, client)).execute()
 					(new VirtualMachinesSync(this.plugin, cloud, client, createNew)).execute()
-					// TODO : Sync images
 
 					rtn = ServiceResponse.success()
 				}
@@ -378,5 +382,19 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		}
 
 		return rtn
+	}
+
+	private ensureRegionCode(Cloud cloud) {
+		def authConfig = plugin.getAuthConfig(cloud)
+		def apiUrl = authConfig.apiUrl
+		def regionString = "${apiUrl}"
+		MessageDigest md = MessageDigest.getInstance("MD5")
+		md.update(regionString.bytes)
+		byte[] checksum = md.digest()
+		def regionCode = checksum.encodeHex().toString()
+		if (cloud.regionCode != regionCode) {
+			cloud.regionCode = regionCode
+			morpheusContext.cloud.save(cloud).blockingGet()
+		}
 	}
 }
