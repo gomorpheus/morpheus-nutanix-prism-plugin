@@ -167,22 +167,47 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Collection<StorageVolumeType> getStorageVolumeTypes() {
-		def datastoreVolumeType = new StorageVolumeType([
+		def volumeTypes = []
+		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-plugin-datastore',
 				name: 'Nutanix Prism Datastore'
 		])
 
-		def hostVolumeType = new StorageVolumeType([
+		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-plugin-host-disk',
 				name: 'Nutanix Prism Host Disk'
 		])
 
-		def diskVolumeType = new StorageVolumeType([
+		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-plugin-disk',
 				name: 'Disk'
 		])
 
-		return [datastoreVolumeType, hostVolumeType, diskVolumeType]
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-scsi',
+				externalId: 'SCSI',
+				name: 'SCSI'
+		])
+
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-pci',
+				externalId: 'PCI',
+				name: 'PCI'
+		])
+
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-ide',
+				externalId: 'IDE',
+				name: 'IDE'
+		])
+
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-sata',
+				externalId: 'SATA',
+				name: 'SATA'
+		])
+
+		volumeTypes
 	}
 
 	@Override

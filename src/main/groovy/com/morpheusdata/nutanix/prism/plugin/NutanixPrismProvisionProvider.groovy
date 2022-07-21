@@ -10,6 +10,7 @@ import com.morpheusdata.model.HostType
 import com.morpheusdata.model.Instance
 import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.ServicePlan
+import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.Workload
 import com.morpheusdata.model.provisioning.WorkloadRequest
@@ -29,7 +30,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Collection<OptionType> getOptionTypes() {
-		return []
+		OptionType imageOption = new OptionType([
+				name : 'virtual image',
+				code : 'nutanix-prism-plugin-provision-image',
+				fieldName : 'virtualImageId',
+				fieldContext : 'config',
+				fieldLabel : 'Image',
+				inputType : OptionType.InputType.SELECT,
+				displayOrder : 100,
+				required : true,
+				optionSource : 'nutanixPrismPluginImage'
+		])
+		[imageOption]
 	}
 
 	@Override
@@ -93,17 +105,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Boolean hasDatastores() {
-		return []
+		true
 	}
 
 	@Override
 	Boolean hasNetworks() {
-		return []
+		true
 	}
 
 	@Override
 	Boolean hasPlanTagMatch() {
-		return []
+		true
 	}
 
 	@Override
@@ -153,7 +165,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	ServiceResponse restartWorkload(Workload workload) {
-		return ServiceResponse.error()
+		log.debug 'restartWorkload'
+		ServiceResponse stopResult = stopWorkload(workload)
+		if (stopResult.success) {
+			return startWorkload(workload)
+		}
+		stopResult
 	}
 
 	@Override
@@ -188,13 +205,24 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Collection<VirtualImage> getVirtualImages() {
-		return []
+		return new ArrayList<VirtualImage>()
 	}
 
 	@Override
 	Collection<ComputeTypeLayout> getComputeTypeLayouts() {
-		return []
+		return new ArrayList<ComputeTypeLayout>()
 	}
+
+	@Override
+	Boolean canAddVolumes() {
+		true
+	}
+
+	@Override
+	Boolean disableRootDatastore() { return true }
+
+	@Override
+	Boolean hasConfigurableSockets() { return true }
 
 	@Override
 	MorpheusContext getMorpheus() {
@@ -204,6 +232,69 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	@Override
 	Plugin getPlugin() {
 		return plugin
+	}
+
+	@Override
+	Boolean canCustomizeRootVolume() {
+		true
+	}
+
+	@Override
+	Boolean canResizeRootVolume() {
+		true
+	}
+
+	@Override
+	Boolean canCustomizeDataVolumes() {
+		true
+	}
+
+	@Override
+	Boolean hasStorageControllers() {
+		false
+	}
+
+	@Override
+	Boolean supportsAutoDatastore() {
+		false
+	}
+
+	@Override
+	Collection<StorageVolumeType> getRootVolumeStorageTypes() {
+		getStorageVolumeTypes()
+	}
+
+	@Override
+	Collection<StorageVolumeType> getDataVolumeStorageTypes() {
+		getStorageVolumeTypes()
+	}
+
+	private getStorageVolumeTypes() {
+		def volumeTypes = []
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-scsi',
+				externalId: 'SCSI',
+				name: 'SCSI'
+		])
+
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-pci',
+				externalId: 'PCI',
+				name: 'PCI'
+		])
+
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-ide',
+				externalId: 'IDE',
+				name: 'IDE'
+		])
+
+		volumeTypes << new StorageVolumeType([
+				code: 'nutanix-prism-plugin-disk-sata',
+				externalId: 'SATA',
+				name: 'SATA'
+		])
+		volumeTypes
 	}
 
 	@Override
