@@ -321,7 +321,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Boolean hasCloudInit() {
-		return false
+		return true
 	}
 
 	@Override
