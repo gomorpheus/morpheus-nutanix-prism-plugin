@@ -11,12 +11,61 @@ class NutanixPrismComputeUtility {
 	static testConnection(HttpApiClient client, Map authConfig) {
 		def rtn = [success:false, invalidLogin:false]
 		try {
-			def listResults = listHosts(client, authConfig)
+			def listResults = listHostsV2(client, authConfig)
 			rtn.success = listResults.success
 		} catch(e) {
 			log.error("testConnection to ${authConfig.apiUrl}: ${e}")
 		}
 		return rtn
+	}
+
+	static ServiceResponse checkImageId(HttpApiClient client, Map authConfig, String imageId) {
+		log.debug("checkImageId")
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		if(results?.success) {
+			return ServiceResponse.success()
+		} else {
+			return ServiceResponse.error()
+		}
+	}
+
+	static ServiceResponse createImage(HttpApiClient client, Map authConfig, String imageName, String imageType, String sourceUri) {
+		log.debug("createImage")
+		def body = [
+				spec: [
+				        name: imageName,
+						resources: [
+						        image_type: imageType,
+						        architecture: 'X86_64'
+						]
+				],
+				metadata: [
+				        kind: 'image'
+				]
+		]
+		if(sourceUri) {
+			body.spec.resources.source_uri = sourceUri
+		}
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error creating image for ${imageName}", null, results.data)
+		}
+	}
+
+	static ServiceResponse uploadImage(HttpApiClient client, Map authConfig, String imageExternalId, InputStream stream) {
+		log.debug("uploadImage: ${imageExternalId}")
+		byte[] body = stream.bytes  // gonna load it all into memory?! :(
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageExternalId}/file", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type': ContentType.APPLICATION_OCTET_STREAM], contentType: ContentType.APPLICATION_OCTET_STREAM, body: body, ignoreSSL: true), 'PUT')
+		if(results?.success) {
+			return ServiceResponse.success()
+		} else {
+			return ServiceResponse.error()
+		}
 	}
 
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
@@ -29,10 +78,9 @@ class NutanixPrismComputeUtility {
 		return callListApi(client, 'image', 'images/list', authConfig)
 	}
 
-	static ServiceResponse listDisks(HttpApiClient client, Map authConfig) {
-		log.debug("listDisks")
-		def groupMemberAttributes = ['serial','disk_size_bytes','storage.usage_ppm','node_name', 'cluster', 'state', 'message', 'reason']
-		return callGroupApi(client, 'disk', 'serial', groupMemberAttributes, authConfig)
+	static ServiceResponse listDisksV2(HttpApiClient client, Map authConfig) {
+		log.debug("listDisksV2")
+		return callListApiV2(client, 'disks', authConfig)
 	}
 
 	static ServiceResponse listDatastores(HttpApiClient client, Map authConfig) {
@@ -42,13 +90,13 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse listClusters(HttpApiClient client, Map authConfig) {
-		log.debug("listHosts")
+		log.debug("listClusters")
 		return callListApi(client, 'cluster', 'clusters/list', authConfig)
 	}
 
-	static ServiceResponse listHosts(HttpApiClient client, Map authConfig) {
-		log.debug("listHosts")
-		return callListApi(client, 'host', 'hosts/list', authConfig)
+	static ServiceResponse listHostsV2(HttpApiClient client, Map authConfig) {
+		log.debug("listHostsV2")
+		return callListApiV2(client, 'hosts', authConfig)
 	}
 
 	static ServiceResponse listVMs(HttpApiClient client, Map authConfig) {
@@ -80,6 +128,16 @@ class NutanixPrismComputeUtility {
 			return values.getAt(0).values?.getAt(0)
 		}
 		null
+	}
+
+	static getDiskName(Map diskData) {
+		String fullName = diskData.mount_path ?: diskData.disk_uuid
+		def lastSlash = fullName.lastIndexOf('/')
+		if(lastSlash > 0) {
+			return fullName.substring(lastSlash + 1)
+		} else {
+			return fullName
+		}
 	}
 
 	private static ServiceResponse callListApi(HttpApiClient client, String kind, String path, Map authConfig) {
@@ -177,6 +235,52 @@ class NutanixPrismComputeUtility {
 			return rtn
 		} catch(e) {
 			log.error "Error in callGroupApi: ${e}", e
+		}
+		return rtn
+	}
+
+	private static ServiceResponse callListApiV2(HttpApiClient client, String path, Map authConfig) {
+		log.debug("callListApiV2: path: ${path}")
+		def rtn = new ServiceResponse(success: false)
+		try {
+			def hasMore = true
+			def maxResults = 250
+			rtn.data = []
+			def page = 1
+			def attempt = 0
+			while(hasMore && attempt < 100) {
+				def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/${path}", authConfig.username, authConfig.password,
+						new HttpApiClient.RequestOptions(
+								headers:['Content-Type':'application/json'],
+								queryParams:[count: maxResults.toString(), page: page.toString()],
+								contentType: ContentType.APPLICATION_JSON,
+								ignoreSSL: true
+						), 'GET')
+				log.debug("callListApiV2 results: ${results.toMap()}")
+				if(results?.success && !results?.hasErrors()) {
+					rtn.success = true
+					def pageResults = results.data
+
+					if(pageResults?.entities?.size() > 0) {
+						rtn.data += pageResults.entities
+						hasMore = pageResults.metadata.end_index < pageResults.metadata.total_entities
+						if(hasMore)
+							page +=1
+					} else {
+						hasMore = false
+					}
+				} else {
+					if(!rtn.success) {
+						rtn.msg = results.data.message_list?.collect { it.message }?.join(' ')
+					}
+					hasMore = false
+				}
+				attempt++
+			}
+
+			return rtn
+		} catch(e) {
+			log.error "Error in callListApiV2: ${e}", e
 		}
 		return rtn
 	}

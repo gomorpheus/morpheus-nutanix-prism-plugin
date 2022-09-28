@@ -56,17 +56,15 @@ class HostsSync {
 
 			def cloudItems = []
 			def listResultSuccess = false
-			def listResults = NutanixPrismComputeUtility.listHosts(apiClient, authConfig)
+			def listResults = NutanixPrismComputeUtility.listHostsV2(apiClient, authConfig) // Need this one for the stats
 			if (listResults.success) {
 				listResultSuccess = true
-				cloudItems = listResults?.data?.findAll { cloudItem ->
-					cloudItem.status?.resources?.hypervisor != null
-				} 
+				cloudItems = listResults?.data
 			}
 
 			if (listResultSuccess) {
 				// Need to fetch all the disks for all Hosts for sync operations
-				def diskResults = NutanixPrismComputeUtility.listDisks(apiClient, authConfig)
+				def diskResults = NutanixPrismComputeUtility.listDisksV2(apiClient, authConfig)
 				if (diskResults.success) {
 					def cloudHostDisks = diskResults?.data
 					
@@ -78,7 +76,7 @@ class HostsSync {
 					}
 					SyncTask<ComputeServerIdentityProjection, Map, ComputeServer> syncTask = new SyncTask<>(domainRecords, cloudItems)
 					syncTask.addMatchFunction { ComputeServerIdentityProjection domainObject, Map cloudItem ->
-						domainObject.externalId == cloudItem?.metadata.uuid
+						domainObject.externalId == cloudItem?.uuid
 					}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ComputeServerIdentityProjection, Map>> updateItems ->
 						Map<Long, SyncTask.UpdateItemDto<ComputeServerIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 						morpheusContext.computeServer.listById(updateItems?.collect { it.existingItem.id }).map { ComputeServer server ->
@@ -108,21 +106,19 @@ class HostsSync {
 		def volumeType = new StorageVolumeType(code: 'nutanix-prism-plugin-host-disk')
 		def serverType = new ComputeServerType(code: 'nutanix-prism-plugin-hypervisor')
 		def serverOs = new OsType(code: 'esxi.6')
-
-		def metricsResult = NutanixPrismComputeUtility.listHostMetrics(apiClient, authConfig, addList?.collect{ it.metadata.uuid } )
 		
 		for(cloudItem in addList) {
 			try {
-				def clusterObj = clusters?.find { pool -> pool.externalId == cloudItem.status?.cluster_reference?.uuid }
+				def clusterObj = clusters?.find { pool -> pool.externalId == cloudItem.cluster_uuid }
 
 				def serverConfig = [
 						account          : cloud.owner,
 						category         : "nutanix.prism.host.${cloud.id}",
 						cloud            : cloud,
-						name             : cloudItem.status.name,
+						name             : cloudItem.name,
 						resourcePool     : clusterObj,
-						externalId       : cloudItem.metadata.uuid,
-						uniqueId         : cloudItem.metadata.uuid,
+						externalId       : cloudItem.uuid,
+						uniqueId         : cloudItem.uuid,
 						sshUsername      : 'root',
 						status           : 'provisioned',
 						provision        : false,
@@ -130,21 +126,25 @@ class HostsSync {
 						computeServerType: serverType,
 						serverOs         : serverOs,
 						osType           : 'esxi',
-						hostname         : cloudItem.status.name,
-						externalIp       : cloudItem.status.controller_vm?.ip,
-						maxCores         : cloudItem.status.resources.num_cpu_cores
+						hostname         : cloudItem.name,
+						externalIp       : cloudItem.hypervisor_address
 				]
 
 				def newServer = new ComputeServer(serverConfig)
-				newServer.maxMemory = cloudItem.status.resources.memory_capacity_mib.toLong() * ComputeUtility.ONE_MEGABYTE
-				newServer.maxStorage = 0
-				newServer.capacityInfo = new ComputeCapacityInfo(maxMemory:newServer.maxMemory)
 				if(!morpheusContext.computeServer.create([newServer]).blockingGet()){
 					log.error "Error in creating host server ${newServer}"
 				}
 
-				def (maxStorage, usedStorage) = syncHostVolumes(newServer, cloudItem, volumeType, cloudHostDisks)
-				updateHostStats(newServer, maxStorage, usedStorage, metricsResult)
+				def (maxStorage, usedStorage) = syncHostVolumes(newServer, volumeType, cloudHostDisks)
+				updateMachineMetrics(
+						newServer,
+						cloudItem.num_cpu_cores?.toLong(),
+						maxStorage?.toLong(),
+						usedStorage?.toLong(),
+						cloudItem.memory_capacity_in_bytes?.toLong(),
+						((cloudItem.memory_capacity_in_bytes ?: 0 ) * (cloudItem.stats.hypervisor_memory_usage_ppm?.toLong() / 1000000.0))?.toLong(),
+						(cloudItem.stats.hypervisor_cpu_usage_ppm?.toLong() / 10000.0)
+				)
 			} catch(e) {
 				log.error "Error in creating host: ${e}", e
 			}
@@ -152,57 +152,52 @@ class HostsSync {
 	}
 
 	private updateMatchedHosts(Cloud cloud, List clusters, List updateList, List cloudHostDisks) {
-		log.debug "updateMatchedHosts: ${cloud} ${updateList.size()}"
+		log.debug "updateMatchedHosts: ${cloud} ${updateList.size()} ${clusters}"
 
 		def volumeType = new StorageVolumeType(code: 'nutanix-prism-plugin-host-disk')
 
 		List<ComputeZonePoolIdentityProjection> zoneClusters = []
-		def clusterExternalIds = updateList.collect{it.masterItem.status?.cluster_reference?.uuid}.unique()
+		def clusterExternalIds = updateList.collect{ it.masterItem.cluster_uuid }.unique()
 		morpheusContext.cloud.pool.listSyncProjections(cloud.id, null).filter {
 			it.type == 'Cluster' && it.externalId in clusterExternalIds
 		}.blockingSubscribe { zoneClusters << it }
-		
-		def metricsResult = NutanixPrismComputeUtility.listHostMetrics(apiClient, authConfig, updateList?.collect{ it.masterItem.metadata.uuid } )
-		
+
 		for(update in updateList) {
 			ComputeServer currentServer = update.existingItem
 			def matchedServer = update.masterItem
 			if(currentServer) {
 				def save = false
-				def clusterObj = zoneClusters?.find { pool -> pool.externalId == update.masterItem.status?.cluster_reference?.uuid }
+				def clusterObj = zoneClusters?.find { pool -> pool.externalId == matchedServer.cluster_uuid }
 				if(currentServer.resourcePool?.id != clusterObj.id) {
 					currentServer.resourcePool = new ComputeZonePool(id: clusterObj.id)
 					save = true
 				}
-				if(currentServer.name != matchedServer.status.name) {
-					currentServer.name = matchedServer.status.name
+				if(currentServer.name != matchedServer.name) {
+					currentServer.name = matchedServer.name
 					currentServer.hostname = currentServer.name
 					save = true
 				}
 
-				def memory = matchedServer.status.resources.memory_capacity_mib.toLong() * ComputeUtility.ONE_MEGABYTE
-				if(currentServer.maxMemory != memory) {
-					currentServer.maxMemory = memory
-					save = true
-				}
-
-				def externalIp = matchedServer.status.controller_vm?.ip
+				def externalIp = matchedServer.hypervisor_address
 				if(currentServer.externalIp != externalIp) {
 					currentServer.externalIp = externalIp
-					save = true
-				}
-
-				def maxCores = matchedServer.status.resources.num_cpu_cores
-				if(currentServer.maxCores != maxCores) {
-					currentServer.maxCores = maxCores
 					save = true
 				}
 
 				if(save) {
 					morpheusContext.computeServer.save([currentServer]).blockingGet()
 				}
-				def (maxStorage,usedStorage) = syncHostVolumes(currentServer, matchedServer, volumeType, cloudHostDisks)
-				updateHostStats(currentServer, maxStorage, usedStorage, metricsResult)
+				def (maxStorage,usedStorage) = syncHostVolumes(currentServer, volumeType, cloudHostDisks)
+
+				updateMachineMetrics(
+						currentServer,
+						matchedServer.num_cpu_cores?.toLong(),
+						maxStorage?.toLong(),
+						usedStorage?.toLong(),
+						matchedServer.memory_capacity_in_bytes?.toLong(),
+						((matchedServer.memory_capacity_in_bytes ?: 0 ) * (matchedServer.stats.hypervisor_memory_usage_ppm?.toLong() / 1000000.0))?.toLong(),
+						(matchedServer.stats.hypervisor_cpu_usage_ppm?.toLong() / 10000.0)
+				)
 			}
 		}
 	}
@@ -212,73 +207,65 @@ class HostsSync {
 		morpheusContext.computeServer.remove(removeList).blockingGet()
 	}
 
-	private syncHostVolumes(ComputeServer server, host, StorageVolumeType volumeType, List cloudHostDisks) {
-		log.debug "syncHostVolumes: ${server?.id} ${host} ${volumeType}"
+	private syncHostVolumes(ComputeServer server, StorageVolumeType volumeType, List cloudHostDisks) {
+		log.debug "syncHostVolumes: ${server?.id} ${volumeType}"
 		
 		def totalMaxStorage = 0l
 		def totalUsedStorage = 0l
 		def matchFunction = { existingItem, masterItem ->
 			existingItem.externalId == masterItem.uuid
 		}
-		def syncLists = NutanixPrismSyncUtils.buildSyncLists(server.volumes, host.status.resources.host_disks_reference_list, matchFunction)
+		
+		def masterItems = cloudHostDisks.findAll { it.node_uuid == server.externalId }
+		def syncLists = NutanixPrismSyncUtils.buildSyncLists(server.volumes, masterItems, matchFunction)
 
 		def addList = []
 		if(syncLists.addList) {
 			syncLists.addList?.each { cloudDisk ->
-				def cloudDiskDetail = cloudHostDisks.find { it.entity_id == cloudDisk.uuid }?.data
-				if(cloudDiskDetail) {
-					def (maxStorage, usedStorage) = getMaxAndUsedStorage(cloudDiskDetail)
-					def newVolume = new StorageVolume(
-							[
-									type       : volumeType,
-									maxStorage : maxStorage,
-									usedStorage: usedStorage,
-									externalId : cloudDisk.uuid,
-									name       : NutanixPrismComputeUtility.getGroupEntityValue(cloudDiskDetail, 'serial')
-							]
-					)
-					addList << newVolume
-					totalMaxStorage += maxStorage
-					totalUsedStorage += usedStorage
-				} else {
-					log.info "No disk detail information for ${cloudDisk.uuid} for host ${host.status.name} - adding"
-				}
+				def (maxStorage, usedStorage) = getMaxAndUsedStorage(cloudDisk)
+				def newVolume = new StorageVolume(
+						[
+								type       : volumeType,
+								maxStorage : maxStorage,
+								usedStorage: usedStorage,
+								externalId : cloudDisk.id,
+								name       : NutanixPrismComputeUtility.getDiskName(cloudDisk)
+						]
+				)
+				addList << newVolume
+				totalMaxStorage += maxStorage
+				totalUsedStorage += usedStorage
 			}
 		}
 		
 		def saveList = []
 		syncLists.updateList?.each { updateMap ->
 			def cloudDisk = updateMap.masterItem
-			def cloudDiskDetail = cloudHostDisks.find { it.entity_id == cloudDisk.uuid }?.data
-			if(cloudDiskDetail) {
-				StorageVolume existingVolume = updateMap.existingItem
-				def save = false
+			StorageVolume existingVolume = updateMap.existingItem
+			def save = false
 
-				def (maxStorage, usedStorage) = getMaxAndUsedStorage(cloudDiskDetail)
-				totalMaxStorage += maxStorage
-				totalUsedStorage += usedStorage
-				
-				if(existingVolume.maxStorage != maxStorage) {
-					existingVolume.maxStorage = maxStorage
-					save = true
-				}
+			def (maxStorage, usedStorage) = getMaxAndUsedStorage(cloudDisk)
+			totalMaxStorage += maxStorage
+			totalUsedStorage += usedStorage
 
-				if(existingVolume.usedStorage != usedStorage) {
-					existingVolume.usedStorage = usedStorage
-					save = true
-				}
+			if(existingVolume.maxStorage != maxStorage) {
+				existingVolume.maxStorage = maxStorage
+				save = true
+			}
 
-				def name = NutanixPrismComputeUtility.getGroupEntityValue(cloudDiskDetail, 'serial')
-				if(existingVolume.name != name) {
-					existingVolume.name = name
-					save = true
-				}
-				
-				if(save) {
-					saveList << existingVolume
-				}
-			} else {
-				log.info "No disk detail information for ${cloudDisk.uuid} for host ${host.status.name} - updating"
+			if(existingVolume.usedStorage != usedStorage) {
+				existingVolume.usedStorage = usedStorage
+				save = true
+			}
+
+			def name = NutanixPrismComputeUtility.getDiskName(cloudDisk)
+			if(existingVolume.name != name) {
+				existingVolume.name = name
+				save = true
+			}
+
+			if(save) {
+				saveList << existingVolume
 			}
 		}
 		
@@ -301,20 +288,22 @@ class HostsSync {
 	}
 
 	private getMaxAndUsedStorage(cloudDiskDetail) {
-		def maxStorage = NutanixPrismComputeUtility.getGroupEntityValue(cloudDiskDetail, 'disk_size_bytes')?.toLong()
-		def usedStorage = 0
-		def percentUsed = NutanixPrismComputeUtility.getGroupEntityValue(cloudDiskDetail, 'storage.usage_ppm')?.toLong()
-		if(percentUsed != null) {
-			usedStorage = maxStorage * (percentUsed / 1000000)
-		}
+		def maxStorage = cloudDiskDetail.disk_size?.toLong()
+		def usedStorage = cloudDiskDetail.usage_stats["storage.usage_bytes"]?.toLong()
 		return [maxStorage, usedStorage]
 	}
 	
-	private updateHostStats(ComputeServer server, maxStorage, usedStorage, ServiceResponse metricsResult) {
-		log.debug "updateHostStats for ${server}"
+	private updateMachineMetrics(ComputeServer server, Long maxCores, Long maxStorage, Long usedStorage, Long maxMemory, Long usedMemory, maxCpu) {
+		log.debug "updateMachineMetrics for ${server}"
 		try {
 			def updates = !server.getComputeCapacityInfo()
 			ComputeCapacityInfo capacityInfo = server.getComputeCapacityInfo() ?: new ComputeCapacityInfo()
+
+			if(capacityInfo.maxCores != maxCores || server.maxCores != maxCores) {
+				capacityInfo.maxCores = maxCores
+				server?.maxCores = maxCores
+				updates = true
+			}
 
 			if(capacityInfo.maxStorage != maxStorage || server.maxStorage != maxStorage) {
 				capacityInfo.maxStorage = maxStorage
@@ -328,18 +317,28 @@ class HostsSync {
 				updates = true
 			}
 			
-			if(capacityInfo.maxMemory != server.maxMemory) {
-				capacityInfo?.maxMemory = server.maxMemory
+			if(capacityInfo.maxMemory != maxMemory || server.maxMemory != maxMemory) {
+				capacityInfo?.maxMemory = maxMemory
+				server?.maxMemory = maxMemory
 				updates = true
 			}
 
-			if(NutanixPrismSyncUtils.updateMetrics(server, 'hypervisor_memory_usage_ppm', 'hypervisor_cpu_usage_ppm', metricsResult)) {
+			if(capacityInfo.usedMemory != usedMemory || server.usedMemory != usedMemory) {
+				capacityInfo?.usedMemory = usedMemory
+				server?.usedMemory = usedMemory
 				updates = true
 			}
 
-			// How to determine powerstate?!
-			if(server.powerState != ComputeServer.PowerState.off) {
-				server.powerState = ComputeServer.PowerState.off
+			if(capacityInfo.maxCpu != maxCpu || server.usedCpu != maxCpu) {
+				capacityInfo?.maxCpu = maxCpu
+				server?.usedCpu = maxCpu
+				updates = true
+			}
+
+			// How to determine powerstate?!.. right now just using the cpu
+			def powerState = capacityInfo.maxCpu > 0 ? ComputeServer.PowerState.on : ComputeServer.PowerState.off
+			if(server.powerState != powerState) {
+				server.powerState = powerState
 				updates = true
 			}
 

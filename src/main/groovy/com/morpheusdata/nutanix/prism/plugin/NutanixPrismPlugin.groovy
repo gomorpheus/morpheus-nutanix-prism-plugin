@@ -40,7 +40,13 @@ class NutanixPrismPlugin extends Plugin {
 
 	def getAuthConfig(Cloud cloud) {
 		log.debug "getAuthConfig: ${cloud}"
-		def rtn = [apiUrl: getApiUrl(cloud.serviceUrl), basePath: 'api/nutanix/v3', username: null, password: null]
+		def rtn = [
+				apiUrl: getApiUrl(cloud.serviceUrl),
+				basePath: 'api/nutanix/v3',
+				v2basePath: 'api/nutanix/v2.0',
+				username: null,
+				password: null
+		]
 
 		if(!cloud.accountCredentialLoaded) {
 			AccountCredential accountCredential

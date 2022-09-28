@@ -13,6 +13,7 @@ import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerType
 import com.morpheusdata.model.Icon
 import com.morpheusdata.model.NetworkProxy
+import com.morpheusdata.model.NetworkSubnetType
 import com.morpheusdata.model.NetworkType
 import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.PlatformType
@@ -166,6 +167,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
+	Collection<NetworkSubnetType> getSubnetTypes() {
+		return null
+	}
+
+	@Override
 	Collection<StorageVolumeType> getStorageVolumeTypes() {
 		def volumeTypes = []
 		volumeTypes << new StorageVolumeType([
@@ -246,7 +252,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					//get creds
 					Map authConfig = [apiUrl: apiUrl, basePath: 'api/nutanix/v3', username: username, password: password]
 					HttpApiClient apiClient = new HttpApiClient()
-					def clusterList = NutanixPrismComputeUtility.listHosts(apiClient, authConfig)
+					def clusterList = NutanixPrismComputeUtility.listHostsV2(apiClient, authConfig)
 					if(clusterList.success == true) {
 						return ServiceResponse.success()
 					} else {
