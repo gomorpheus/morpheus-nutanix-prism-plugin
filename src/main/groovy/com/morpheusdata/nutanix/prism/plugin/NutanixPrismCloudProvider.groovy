@@ -250,7 +250,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					//test api call
 					def apiUrl = plugin.getApiUrl(cloudInfo.serviceUrl)
 					//get creds
-					Map authConfig = [apiUrl: apiUrl, basePath: 'api/nutanix/v3', username: username, password: password]
+					Map authConfig = [apiUrl: apiUrl, basePath: 'api/nutanix/v3', v2basePath: 'api/nutanix/v2.0', username: username, password: password]
 					HttpApiClient apiClient = new HttpApiClient()
 					def clusterList = NutanixPrismComputeUtility.listHostsV2(apiClient, authConfig)
 					if(clusterList.success == true) {
