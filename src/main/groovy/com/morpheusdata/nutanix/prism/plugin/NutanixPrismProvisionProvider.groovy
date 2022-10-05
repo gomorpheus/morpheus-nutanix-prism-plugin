@@ -4,6 +4,7 @@ package com.morpheusdata.nutanix.prism.plugin
 import com.morpheusdata.core.AbstractProvisionProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.ComputeCapacityInfo
@@ -135,17 +136,42 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	ServiceResponse validateWorkload(Map opts) {
+		log.debug("validateWorkload: ${opts}")
+		ServiceResponse rtn = new ServiceResponse(true, null, [:], null)
+		try {
+			Cloud cloud = morpheusContext.cloud.getCloudById(opts.zoneId?.toLong()).blockingGet()
+			def apiInfo = [:]
+			if(opts.hostId) {
+				apiInfo = plugin.getAuthConfig(cloud)
+			}
+
+			def validateTemplate = opts.template != null
+			NutanixPrismOptionSourceProvider optionSourceProvider = plugin.getProviderByCode('nutanix-prism-option-source-plugin')
+			def validationResults = NutanixPrismComputeUtility.validateServerConfig(morpheusContext, apiInfo.apiUrl, apiInfo.apiUsername, apiInfo.apiPassword,
+					[validateTemplate:validateTemplate] + opts)
+			if(!validationResults.success) {
+				validationResults.errors?.each { it ->
+					rtn.addError(it.field, it.msg)
+				}
+			}
+
+		} catch(e) {
+			log.error("validateWorkload error: ${e}", e)
+		}
+		return rtn
 		return ServiceResponse.error()
 	}
 
 	@Override
 	ServiceResponse validateInstance(Instance instance, Map opts) {
-		return ServiceResponse.error()
+		log.debug "validateInstance: ${instance} ${opts}"
+		return ServiceResponse.success()
 	}
 
 	@Override
 	ServiceResponse validateDockerHost(ComputeServer server, Map opts) {
-		return ServiceResponse.error()
+		log.debug "validateDockerHost: ${instance} ${opts}"
+		return ServiceResponse.success()
 	}
 
 	@Override
@@ -153,30 +179,30 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		log.debug "prepareWorkload: ${workload} ${workloadRequest} ${opts}"
 
 		def rtn = [success: false, msg: null]
-//		try {
-//			Long virtualImageId = workload.getConfigProperty('virtualImageId')?.toLong()
-//			if(!virtualImageId) {
-//				rtn.msg = "No virtual image selected"
-//			} else {
-//				VirtualImage virtualImage
-//				try {
-//					virtualImage = morpheusContext.virtualImage.get(virtualImageId).blockingGet()
-//				} catch(e) {
-//					log.error "error in get image: ${e}"
-//				}
-//				if(!virtualImage) {
-//					rtn.msg = "No virtual image found for ${virtualImageId}"
-//				} else {
-//					workload.server.sourceImage = virtualImage
-//					saveAndGet(workload.server)
-//					rtn.success = true
-//				}
-//			}
-//		} catch(e) {
-//			rtn.msg = "Error in PrepareWorkload: ${e}"
-//			log.error "${rtn.msg}, ${e}", e
-//
-//		}
+		try {
+			Long virtualImageId = workload.getConfigProperty('virtualImageId')?.toLong()
+			if(!virtualImageId) {
+				rtn.msg = "No virtual image selected"
+			} else {
+				VirtualImage virtualImage
+				try {
+					virtualImage = morpheusContext.virtualImage.get(virtualImageId).blockingGet()
+				} catch(e) {
+					log.error "error in get image: ${e}"
+				}
+				if(!virtualImage) {
+					rtn.msg = "No virtual image found for ${virtualImageId}"
+				} else {
+					workload.server.sourceImage = virtualImage
+					saveAndGet(workload.server)
+					rtn.success = true
+				}
+			}
+		} catch(e) {
+			rtn.msg = "Error in PrepareWorkload: ${e}"
+			log.error "${rtn.msg}, ${e}", e
+
+		}
 		new ServiceResponse(rtn.success, rtn.msg, null, null)
 	}
 
@@ -501,7 +527,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	ServiceResponse createWorkloadResources(Workload workload, Map opts) {
-		return ServiceResponse.error()
+		return ServiceResponse.success()
 	}
 
 	@Override
@@ -637,5 +663,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId) {
 		// TODO
 		return true
+	}
+
+	private getDataDiskList(Workload workload) {
+		def volumes = workload.getConfigProperty('volumes')
+		def rtn = volumes?.findAll{it.rootVolume == false}?.sort{it.id}
+		return rtn
 	}
 }
