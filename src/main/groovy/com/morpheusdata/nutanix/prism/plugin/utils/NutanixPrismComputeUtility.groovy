@@ -69,6 +69,35 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse createVM(HttpApiClient client, Map authConfig, Map runConfig) {
+		log.debug("createVM")
+		def disks = []
+		def nics = []
+
+		def body = [
+				spec: [
+						name: runConfig.name,
+						resources: [
+								num_sockets: runConfig.numSockets,
+								memory_size_in_mib: runConfig.maxMemory,
+								num_vcpus_per_socket: runConfig.coresPerSocket,
+								disk_list: disks,
+								nic_list: nics
+						]
+				],
+				metadata: [
+						kind: 'vm'
+				]
+		]
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error creating vm for ${runConfig.name}", null, results.data)
+		}
+	}
+
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
 		log.debug("listNetworks")
 		return callListApi(client, 'subnet', 'subnets/list', authConfig)

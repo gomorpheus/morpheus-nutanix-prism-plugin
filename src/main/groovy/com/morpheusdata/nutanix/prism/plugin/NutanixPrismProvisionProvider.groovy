@@ -11,12 +11,17 @@ import com.morpheusdata.model.ComputeCapacityInfo
 import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerInterfaceType
 import com.morpheusdata.model.ComputeTypeLayout
+import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.HostType
 import com.morpheusdata.model.Instance
+import com.morpheusdata.model.Network
 import com.morpheusdata.model.NetworkProxy
 import com.morpheusdata.model.OptionType
+import com.morpheusdata.model.PlatformType
+import com.morpheusdata.model.ProcessEvent
 import com.morpheusdata.model.ProxyConfiguration
 import com.morpheusdata.model.ServicePlan
+import com.morpheusdata.model.StorageVolume
 import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.VirtualImageLocation
@@ -26,6 +31,7 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ResizeRequest
 import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.response.WorkloadResponse
+import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -216,37 +222,41 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		WorkloadResponse workloadResponse = new WorkloadResponse(success: true, installAgent: false)
 		ComputeServer server = workload.server
 		try {
-//			Cloud cloud = server.cloud
-//			VirtualImage virtualImage = server.sourceImage
-//			Map authConfig = plugin.getAuthConfig(cloud)
-//
-//			client = new HttpApiClient()
-//			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
-//
-//			def imageExternalId
-//			def lock
-//			def lockKey = "nutanix.prism.imageupload.${cloud.regionCode}.${virtualImage?.id}".toString()
-//			try {
-//				lock = morpheusContext.acquireLock(lockKey, [timeout: 60l*60l*1000l, ttl: 60l*60l*1000l]) //hold up to a 1 hour lock for image upload
-//				if(virtualImage) {
-//					VirtualImageLocation virtualImageLocation
-//					try {
-//						virtualImageLocation = morpheusContext.virtualImage.location.findVirtualImageLocation(virtualImage.id, cloud.id, cloud.regionCode, null, false).blockingGet()
-//						if(!virtualImageLocation) {
-//							imageExternalId = null
-//						}
-//					} catch(e) {
-//						log.info "Error in findVirtualImageLocation.. could be not found ${e}", e
-//					}
-//
-//					if(imageExternalId) {
-//						ServiceResponse response = NutanixPrismComputeUtility.checkImageId(client, authConfig, imageExternalId)
-//						if(!response.success) {
-//							imageExternalId = null
-//						}
-//					}
-//				}
-//
+			Cloud cloud = server.cloud
+			VirtualImage virtualImage = server.sourceImage
+			Map authConfig = plugin.getAuthConfig(cloud)
+			def runConfig = buildRunConfig(workload, workloadRequest, opts)
+			
+			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload - runConfig - ${runConfig}\u001B[0m"
+
+			client = new HttpApiClient()
+			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
+
+			def imageExternalId
+			def lock
+			def lockKey = "nutanix.prism.imageupload.${cloud.regionCode}.${virtualImage?.id}".toString()
+			try {
+				lock = morpheusContext.acquireLock(lockKey, [timeout: 2l*60l*1000l, ttl: 2l*60l*1000l]).blockingGet() //hold up to a 1 hour lock for image upload
+				if(virtualImage) {
+					VirtualImageLocation virtualImageLocation
+					try {
+						virtualImageLocation = morpheusContext.virtualImage.location.findVirtualImageLocation(virtualImage.id, cloud.id, cloud.regionCode, null, false).blockingGet()
+						if(!virtualImageLocation) {
+							imageExternalId = null
+						} else {
+							imageExternalId = virtualImage.externalId
+						}
+					} catch(e) {
+						log.info "Error in findVirtualImageLocation.. could be not found ${e}", e
+					}
+					if(imageExternalId) {
+						ServiceResponse response = NutanixPrismComputeUtility.checkImageId(client, authConfig, imageExternalId)
+						if(!response.success) {
+							imageExternalId = null
+						}
+					}
+				}
+
 //				if(!imageExternalId) { //If its userUploaded and still needs uploaded
 //					// Create the image
 //					def cloudFiles = morpheusContext.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
@@ -277,193 +287,32 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 //					])
 //					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud ).blockingGet()
 //				}
-//			} finally {
-//				morpheusContext.releaseLock(lockKey, [lock:lock])
-//			}
-//
-//			if(imageExternalId) {
-//				workloadResponse.installAgent = virtualImage ? virtualImage.installAgent : true
-//				opts.installAgent = virtualImage ? virtualImage.installAgent : true
-//				//user config
-//				def createdBy = getInstanceCreateUser(container.instance)
-//				def userGroups = container.instance.userGroups?.toList() ?: []
-//				if (container.instance.userGroup && userGroups.contains(container.instance.userGroup) == false) {
-//					userGroups << container.instance.userGroup
-//				}
-//				opts.userConfig = userGroupService.buildContainerUserGroups(opts.account, virtualImage, userGroups,
-//						createdBy, opts)
-//				opts.server.sshUsername = opts.userConfig.sshUsername
-//				opts.server.sshPassword = opts.userConfig.sshPassword
-//
-//				opts.server.setConfigProperty('publicKeyId', container.getConfigProperty('publicKeyId'))
-//				opts.server.serverOs = opts.server.serverOs ?: virtualImage.osType
-//				opts.server.osType = opts.server.serverOs?.platform ?: opts.server.osType
-//				opts.server.save(flush:true)
-//
-//
-//
-//
-//				def maxMemory = container.maxMemory ?: container.instance.plan.maxMemory
-//				def maxCpu = container.maxCpu ?: container.instance.plan.maxCpu ?: 1
-//				def coresPerSocket = container.coresPerSocket ?: container.instance.plan.coresPerSocket ?: 1
-//				def dataDisks = getContainerDataDiskList(container)
-//				def maxCores = container.maxCores ?: container.instance.plan.maxCores
-//				log.debug("datadisks: ${dataDisks}")
-//				def createOpts = [account:opts.account, name:opts.server.name, maxMemory:maxMemory, maxStorage:maxStorage,
-//				                  coresPerSocket:coresPerSocket, maxCores:maxCores, imageId:imageExternalId, server:opts.server, zone:zoneService.loadFullZone(opts.zone), externalId:opts.server.externalId,
-//				                  uuid:opts.server.apiKey, rootVolume:rootVolume, dataDisks:dataDisks, containerId:datastoreId,
-//				                  platform:opts.server.serverOs?.platform ?: 'linux', isSysprep:virtualImage?.isSysprep, uefi: virtualImage?.uefi, proxySettings: opts.proxySettings]
-//				//network
-//				if(createOpts.platform == 'windows') {
-//					def lockHost
-//					try {
-//						lockHost = lockService.acquireLock("container.nutanix.uniqueHostname".toString(), [timeout: 660l * 1000l])
-//						opts.server.hostname = ComputeUtility.formatHostname(opts.server.hostname,'windows',opts.server.id)
-//						opts.server.save(flush:true)
-//						sleep(1000) //add sleep delay
-//					} catch(e) {
-//						log.error("execContainer error: ${e}", e)
-//					} finally {
-//						if(lockHost) {
-//							lockService.releaseLock("container.nutanix.uniqueHostname".toString(),[lock:lockHost])
-//						}
-//					}
-//				}
-//
-//				createOpts.hostname = createOpts.server.getExternalHostname()
-//				createOpts.domainName = createOpts.server.getExternalDomain()
-//				createOpts.fqdn = createOpts.hostname
-//				if(createOpts.domainName) {
-//					createOpts.fqdn += '.' + createOpts.domainName
-//				}
-//				createOpts.networkConfig = opts.networkConfig
-//				opts.networkConfig = createOpts.networkConfig //needs to be on opts so it gets sent to finalize
-//				log.debug("network Config: {}", createOpts.networkConfig)
-//				if(opts.networkConfig.success) {
-//					createOpts.licenses = licenseService.applyLicense(opts.server.sourceImage, 'ComputeServer', opts.server.id, opts.server.account)?.data?.licenses
-//				}
-//				//clone
-//				if(opts.cloneContainerId) {
-//					def cloneContainer = Container.get(opts.cloneContainerId)
-//					def snapshot = nutanixSnapshotBackupService.getSnapshotForBackupResult(opts.backupSetId, opts.cloneContainerId)
-//					log.info("cloning server from snapshot {}", snapshot.snapshotId)
-//					createOpts.snapshotId = snapshot.snapshotId
-//				}
-//				//cloud init config
-//				def cloudFileResults = [success:true]
-//				if(virtualImage?.isCloudInit) {
-//					log.debug("cloud init detected")
-//					def cloudConfigOpts = buildCloudConfigOpts(opts.zone, opts.server, !opts.noAgent,[doPing: false, sendIp:true, timezone: containerConfig?.timezone])
-//					cloudConfigOpts.licenses = createOpts.licenses
-//					morpheusComputeService.buildCloudNetworkConfig(createOpts.platform, virtualImage, cloudConfigOpts, createOpts.networkConfig)
-//					server.cloudConfigUser = morpheusComputeService.buildCloudUserData(createOpts.platform, opts.userConfig, cloudConfigOpts)
-//					server.cloudConfigMeta = morpheusComputeService.buildCloudMetaData(createOpts.platform, "morpheus-container-${container.id}", cloudConfigOpts.hostname, cloudConfigOpts)
-//					server.cloudConfigNetwork = morpheusComputeService.buildCloudNetworkData(createOpts.platform, cloudConfigOpts)
-//					server.save(flush:true)
-//					opts.installAgent = opts.installAgent && (cloudConfigOpts.installAgent != true) && !opts.noAgent
-//					def insertIso = isCloudInitIso(createOpts)
-//					if(insertIso == true) {
-//						sleep(5000) //sleep to help ensure db propagation
-//						def applianceServerUrl = applianceService.getApplianceUrl(server.zone)
-//						def cloudFileUrl = applianceServerUrl + (applianceServerUrl.endsWith('/') ? '' : '/') + 'api/cloud-config/' + opts.server.apiKey
-//						def cloudFileDiskName = 'morpheus_' + opts.server.id + '.iso'
-//						cloudFileResults = NutanixComputeUtility.insertContainerImage([zone:opts.zone,proxySettings: opts.proxySettings, containerId:datastoreId,
-//						                                                               image:[name:cloudFileDiskName, imageUrl:cloudFileUrl, imageType:'iso_image']])
-//					} else {
-//						//v1 of the api works with cloud config on linux - windows expects sysprep not cloudbase
-//						createOpts.cloudConfig = server.cloudConfigUser
-//						if(cloudConfigOpts.licenseApplied) {
-//							opts.licenseApplied = true
-//						}
-//						opts.unattendCustomized = cloudConfigOpts.unattendCustomized
-//					}
-//				} else {
-//					opts.createUserList = opts.userConfig.createUsers
-//				}
-//				if(cloudFileResults.success == true) {
-//					createOpts.cloudFileId = cloudFileResults.imageDiskId
-//					opts.server.osDevice = '/dev/vda'
-//					opts.server.lvmEnabled = false
-//					opts.server.managed = true
-//					opts.server.osType = (virtualImage?.osType?.platform == 'windows' ? 'windows' : 'linux') ?: virtualImage?.platform
-//					def newType = findVmNodeZoneType(opts.server.zone.zoneType, opts.server.osType)
-//					if(newType && opts.server.computeServerType != newType)
-//						opts.server.computeServerType = newType
-//					opts.server.save(flush:true)
-//					log.debug("create server")
-//					def createResults
-//					if(createOpts.snapshotId) {
-//						//cloning off a snapshot
-//						createResults = NutanixComputeUtility.cloneServer(createOpts)
-//					} else {
-//						//creating off an image
-//						createResults = NutanixComputeUtility.createServer(createOpts)
-//					}
-//					log.info("create server: ${createResults}")
-//					if(createResults.success == true && createResults.results?.uuid) {
-//						opts.server.refresh()
-//						opts.server.externalId = createResults.results.uuid
-//						opts.server.powerState = 'on'
-//						opts.server.save(flush: true)
-//						def vmResults = NutanixComputeUtility.loadVirtualMachine(opts, opts.server.externalId)
-//						def startResults = NutanixComputeUtility.startVm(opts + [timestamp:vmResults?.virtualMachine?.logicalTimestamp ?: 1], opts.server.externalId)
-//						log.debug("start: ${startResults.success}")
-//						if(startResults.success == true) {
-//							if(startResults.error == true) {
-//								opts.server.statusMessage = 'Failed to start server'
-//								//ouch - delet it?
-//							} else {
-//								//good to go
-//								def serverDetail = NutanixComputeUtility.checkServerReady([zone:opts.zone,proxySettings: opts.proxySettings, externalId:opts.server.externalId], opts.server.externalId)
-//								log.debug("serverDetail: ${serverDetail}")
-//								if(serverDetail.success == true) {
-//									def privateIp
-//									def publicIp
-//									if(opts.networkConfig.primaryInterface && !opts.networkConfig.primaryInterface?.doDhcp) {
-//										privateIp = opts.networkConfig.primaryInterface?.ipAddress
-//										publicIp = opts.networkConfig.primaryInterface?.ipAddress
-//									} else {
-//										privateIp = serverDetail.vmDetails?.ipAddresses[0]
-//										publicIp = serverDetail.vmDetails?.ipAddresses[0]
-//									}
-//									if(privateIp)
-//										opts.network = applyComputeServerNetworkIp(opts.server, privateIp, publicIp, null, null, 0)
-//									def vmDisks = NutanixComputeUtility.getVirtualMachineDisks([zone:opts.zone,proxySettings: opts.proxySettings], opts.server.externalId)?.disks
-//									updateVolumes(opts.server, vmDisks)
-//									def vmNics = NutanixComputeUtility.getVirtualMachineNics([zone:opts.zone,proxySettings: opts.proxySettings], opts.server.externalId)?.nics
-//									updateNics(opts.server, vmNics)
-//									opts.server.save()
-//									opts.server.capacityInfo = new ComputeCapacityInfo(server: opts.server, maxCores: 1,
-//											maxMemory: container.maxMemory ?: container.getConfigProperty('maxMemory').toLong(), maxStorage: container.maxStorage ?: container.getConfigProperty('maxStorage').toLong())
-//									opts.server.capacityInfo.save()
-//									opts.server.save(flush: true)
-//									instanceService.updateInstance(container.instance)
-//									rtn.success = true
-//								} else {
-//									opts.server.statusMessage = 'Failed to load server details'
-//								}
-//							}
-//						} else {
-//							opts.server.statusMessage = 'Failed to start server'
-//						}
-//					} else {
-//						opts.server.statusMessage = 'Failed to create server'
-//					}
-//					if(cloudFileResults.imageId) {
-//						NutanixComputeUtility.deleteImage(opts, cloudFileResults.imageId)
-//					}
-//				} else {
-//					log.warn("error on cloud config: ${cloudFileResults}")
-//					opts.server.statusMessage = 'Failed to load cloud config'
-//				}
-//			} else {
-//				opts.server.statusMessage = 'Error on vm image'
-//			}
-//			if (workloadResponse.success != true) {
-//				return new ServiceResponse(success: false, msg: workloadResponse.message ?: 'vm config error', error: workloadResponse.message, data: workloadResponse)
-//			} else {
-//				return new ServiceResponse<WorkloadResponse>(success: true, data: workloadResponse)
-//			}
+			} finally {
+				morpheusContext.releaseLock(lockKey, [lock:lock]).blockingGet()
+			}
+			runConfig.imageExternalId = imageExternalId
+			runConfig.virtualImageId = server.sourceImage?.id
+			runConfig.userConfig = workloadRequest.usersConfiguration
+			if(imageExternalId) {
+
+				server.sshUsername = runConfig.userConfig.sshUsername
+				server.sshPassword = runConfig.userConfig.sshPassword
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload 1 - ${opts}\u001B[0m"
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload 1 - ${runConfig}\u001B[0m"
+				workloadResponse.createUsers = runConfig.userConfig.createUsers
+
+				runVirtualMachine(cloud, workloadRequest, runConfig, workloadResponse, opts)
+
+			} else {
+				server.statusMessage = 'Error on vm image'
+			}
+
+			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload- ${workloadResponse}\u001B[0m"
+			if (workloadResponse.success != true) {
+				return new ServiceResponse(success: false, msg: workloadResponse.message ?: 'vm config error', error: workloadResponse.message, data: workloadResponse)
+			} else {
+				return new ServiceResponse<WorkloadResponse>(success: false, data: workloadResponse)
+			}
 		} catch(e) {
 			log.error "runWorkload: ${e}", e
 			workloadResponse.setError(e.message)
@@ -670,4 +519,204 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		def rtn = volumes?.findAll{it.rootVolume == false}?.sort{it.id}
 		return rtn
 	}
+
+	private buildRunConfig(Workload workload, WorkloadRequest workloadRequest, Map opts) {
+		log.debug "buildRunConfig: ${workload} ${workloadRequest}"
+
+		ComputeServer server = workload.server
+		Cloud cloud = server.cloud
+
+		def maxMemory = workload.maxMemory?.div(ComputeUtility.ONE_MEGABYTE) ?: workload.instance.plan.maxMemory.div(ComputeUtility.ONE_MEGABYTE) //MB
+		def maxCores = workload.maxCores ?: workload.instance.plan.maxCores ?: 1
+		def coresPerSocket = workload.coresPerSocket ?: workload.instance.plan.coresPerSocket ?: 1
+		if(coresPerSocket == 0) {
+			coresPerSocket = 1
+		}
+		def maxStorage = this.getRootSize(workload)
+		def numSockets = maxCores / coresPerSocket
+		
+		def config = new JsonSlurper().parseText(workload.configs)
+		// datastore
+		StorageVolume rootVolume = workload.server.volumes?.find{it.rootVolume == true}
+		def rootVolumeConfig = config?.volumes?.find { 
+			it.rootVolume == true
+		}
+		def datastoreId = rootVolumeConfig.datastoreId
+		def datastore
+		morpheusContext.cloud.datastore.listById([datastoreId.toLong()]).blockingSubscribe { Datastore ds ->
+			datastore = ds
+		}
+		if(!datastore) {
+			log.error("buildRunConfig error: Datastore option is invalid for selected host")
+			throw new Exception("There are no available datastores to use based on provisioning options for the target host.")
+		}
+
+		if(rootVolume) {
+			rootVolume.datastore = datastore
+			morpheusContext.storageVolume.save([rootVolume]).blockingGet()
+		}
+
+		// Network stuff
+		def primaryInterface = workloadRequest.networkConfiguration.primaryInterface
+		Network network = primaryInterface?.network
+		def networkId = network?.externalId
+		def networkBackingType = network && network.externalType != 'string' ? network.externalType : 'Network'
+
+		//server.name = stripSpecialCharacters(server.name)
+
+		//set hostname and fqdn
+		def hostname = server.getExternalHostname()
+		def domainName = server.getExternalDomain()
+		def fqdn = hostname
+		if (domainName)
+			fqdn += '.' + domainName
+		//storage type
+		StorageVolume rootDisk = this.getRootDisk(workload)
+		def storageType
+		if (rootDisk?.type?.code && rootDisk?.type?.code != 'vmware-plugin-standard') {
+			storageType = rootDisk.type.externalId //handle thin/thick clone
+		} else {
+			storageType = cloud.getConfigProperty('diskStorageType')
+		}
+
+		def runConfig = [:] + opts
+		runConfig += [
+				workloadId        : workload.id,
+				accountId         : workload.account.id,
+				name              : server.name,
+				maxMemory         : maxMemory,
+				maxStorage        : maxStorage,
+				cpuCount          : maxCores,
+				maxCores          : maxCores,
+				coresPerSocket    : coresPerSocket,
+				numSockets		  : numSockets,
+				serverId          : server.id,
+				cloudId           : cloud.id,
+				datastoreId       : datastoreId,
+				networkId         : networkId,
+				networkBackingType: networkBackingType,
+				platform          : server.osType,
+				networkType       : workload.getConfigProperty('networkType'),
+				containerId       : workload.id,
+				workloadConfig    : workload.getConfigMap(),
+				timezone          : (workload.getConfigProperty('timezone') ?: cloud.timezone),
+				proxySettings     : workloadRequest.proxyConfiguration,
+				hostname		  : hostname,
+				domainName		  : domainName,
+				fqdn		      : fqdn,
+				storageType		  : storageType,
+				volumes			  : config.volumes,
+				networkInterfaces : config.networkInterfaces,
+				skipNetworkWait   : false
+		]
+		return runConfig
+	}
+
+	private void runVirtualMachine(Cloud cloud, WorkloadRequest workloadRequest, Map runConfig, WorkloadResponse workloadResponse, Map opts = [:]) {
+		log.debug "runVirtualMachine: ${runConfig}"
+		try {
+
+			runConfig.template = runConfig.imageId
+			insertVm(cloud, workloadRequest, runConfig, workloadResponse)
+			if(workloadResponse.success) {
+				finalizeVm(runConfig, workloadResponse)
+			}
+
+		} catch(e) {
+			log.error("runVirtualMachine error:${e}", e)
+			workloadResponse.setError('failed to upload image file')
+		}
+	}
+
+	def insertVm(Cloud cloud, WorkloadRequest workloadRequest, Map runConfig, WorkloadResponse workloadResponse) {
+		log.debug "insertVm: ${runConfig}"
+
+		Map authConfig = plugin.getAuthConfig(cloud)
+		try {
+			//prep for insert
+			morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionConfig), 'configuring')
+
+			ComputeServer server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
+			Workload workload = morpheusContext.cloud.getWorkloadById(runConfig.workloadId).blockingGet()
+			PlatformType platformType = PlatformType.valueOf(runConfig.platform)
+			VirtualImage virtualImage
+			if(runConfig.virtualImageId) {
+				try {
+					virtualImage = morpheusContext.virtualImage.get(runConfig.virtualImageId).blockingGet()
+				} catch(e) {
+					log.debug "Error in getting virtualImage ${runConfig.virtualImageId}, ${e}"
+				}
+			}
+			runConfig.serverOs = server.serverOs ?: virtualImage?.osType
+			runConfig.osType = (runConfig.serverOs?.platform == PlatformType.windows ? 'windows' : 'linux') ?: virtualImage?.platform
+			runConfig.platform = runConfig.osType
+
+			//update server
+			server.sshUsername = runConfig.userConfig.sshUsername
+			server.sshPassword = runConfig.userConfig.sshPassword
+			server.sourceImage = virtualImage
+			server.serverOs = runConfig.serverOs
+			server.osType = runConfig.osType
+			server.osDevice = '/dev/vda'
+			server.lvmEnabled = false
+
+
+			def newType = findVmNodeServerTypeForCloud(server.cloud.id, server.osType, 'nutanix-prism-provision-provider-plugin')
+			if(newType && server.computeServerType != newType) {
+				server.computeServerType = newType
+			}
+
+			server.name = runConfig.name
+			server = saveAndGet(server)
+
+			log.debug("create server")
+
+			morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionDeploy), 'deploying vm')
+
+			Map cloudConfigOpts = workloadRequest.cloudConfigOpts
+
+			// Inform Morpheus to not install the agent if we are doing it via cloudInit
+			workloadResponse.installAgent = runConfig.installAgent && (cloudConfigOpts.installAgent != true) && !runConfig.noAgent
+			workloadResponse.noAgent = runConfig.noAgent
+
+			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, workloadResponse.installAgent: ${workloadResponse.installAgent}, workloadResponse.noAgent: ${workloadResponse.noAgent}"
+
+			//main create or clone
+			log.debug("create server: ${runConfig}")
+			def createResults
+
+			HttpApiClient client = new HttpApiClient()
+			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
+
+			if(virtualImage) {
+				createResults = NutanixPrismComputeUtility.createVm(client, authConfig, runConfig)
+				log.info("create server: ${createResults}")
+			}
+
+		} catch (e) {
+			log.error("runException: ${e}", e)
+			workloadResponse.setError('Error running vm')
+		}
+	}
+
+	def finalizeVm(Map runConfig, WorkloadResponse workloadResponse) {
+		log.debug("runTask onComplete: runConfig:${runConfig}, workloadResponse: ${workloadResponse}")
+		ComputeServer server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
+		Workload workload = morpheusContext.cloud.getWorkloadById(runConfig.workloadId).blockingGet()
+		try {
+			if(workloadResponse.success == true) {
+				server.statusDate = new Date()
+				server.osDevice = '/dev/vda'
+				server.dataDevice = '/dev/vda'
+				server.lvmEnabled = false
+				server.capacityInfo = new ComputeCapacityInfo(maxCores:runConfig.maxCores, maxMemory:workload.maxMemory,
+						maxStorage:getContainerVolumeSize(workload))
+				saveAndGet(server)
+			}
+		} catch(e) {
+			log.error("finalizeVm error: ${e}", e)
+			workloadResponse.setError('failed to run server: ' + e)
+		}
+	}
+
 }
