@@ -69,20 +69,18 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse createVM(HttpApiClient client, Map authConfig, Map runConfig) {
+	static ServiceResponse createVm(HttpApiClient client, Map authConfig, Map runConfig) {
 		log.debug("createVM")
-		def disks = []
-		def nics = []
 
 		def body = [
 				spec: [
 						name: runConfig.name,
 						resources: [
 								num_sockets: runConfig.numSockets,
-								memory_size_in_mib: runConfig.maxMemory,
+								memory_size_mib: runConfig.maxMemory,
 								num_vcpus_per_socket: runConfig.coresPerSocket,
-								disk_list: disks,
-								nic_list: nics
+								disk_list: runConfig.diskList,
+								nic_list: runConfig.nicList,
 						]
 				],
 				metadata: [
@@ -95,6 +93,39 @@ class NutanixPrismComputeUtility {
 			return ServiceResponse.success(results.data)
 		} else {
 			return ServiceResponse.error("Error creating vm for ${runConfig.name}", null, results.data)
+		}
+	}
+
+	static ServiceResponse getVm(HttpApiClient client, Map authConfig, String uuid) {
+		log.debug("getVm")
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error getting vm ${uuid}", null, results.data)
+		}
+	}
+
+	static ServiceResponse startVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		log.debug("startVm")
+		vmBody.remove('status')
+		if(vmBody?.spec?.resources?.power_state) {
+			vmBody.spec.resources.power_state = 'ON'
+		}
+		vmBody.metadata.remove('spec_hash')
+		println "\u001B[33mAC Log - NutanixPrismComputeUtility:startVm- ${vmBody}\u001B[0m"
+		return updateVm(client, authConfig, uuid, vmBody)
+	}
+
+	static ServiceResponse updateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		log.debug("updateVm")
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error starting vm ${uuid}", null, results.data)
 		}
 	}
 

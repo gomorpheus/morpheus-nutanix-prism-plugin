@@ -9,10 +9,13 @@ import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.ComputeCapacityInfo
 import com.morpheusdata.model.ComputeServer
+import com.morpheusdata.model.ComputeServerInterface
 import com.morpheusdata.model.ComputeServerInterfaceType
 import com.morpheusdata.model.ComputeTypeLayout
+import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.HostType
+import com.morpheusdata.model.ImageType
 import com.morpheusdata.model.Instance
 import com.morpheusdata.model.Network
 import com.morpheusdata.model.NetworkProxy
@@ -26,6 +29,8 @@ import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.VirtualImageLocation
 import com.morpheusdata.model.Workload
+import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
+import com.morpheusdata.model.projection.DatastoreIdentityProjection
 import com.morpheusdata.model.provisioning.WorkloadRequest
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ResizeRequest
@@ -311,7 +316,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			if (workloadResponse.success != true) {
 				return new ServiceResponse(success: false, msg: workloadResponse.message ?: 'vm config error', error: workloadResponse.message, data: workloadResponse)
 			} else {
-				return new ServiceResponse<WorkloadResponse>(success: false, data: workloadResponse)
+				return new ServiceResponse<WorkloadResponse>(success: true, data: workloadResponse)
 			}
 		} catch(e) {
 			log.error "runWorkload: ${e}", e
@@ -361,7 +366,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	ServiceResponse<WorkloadResponse> getServerDetails(ComputeServer server) {
-		return ServiceResponse.error()
+		return ServiceResponse.success()
 	}
 
 	@Override
@@ -525,6 +530,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		ComputeServer server = workload.server
 		Cloud cloud = server.cloud
+		VirtualImage virtualImage = server.sourceImage
 
 		def maxMemory = workload.maxMemory?.div(ComputeUtility.ONE_MEGABYTE) ?: workload.instance.plan.maxMemory.div(ComputeUtility.ONE_MEGABYTE) //MB
 		def maxCores = workload.maxCores ?: workload.instance.plan.maxCores ?: 1
@@ -542,17 +548,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			it.rootVolume == true
 		}
 		def datastoreId = rootVolumeConfig.datastoreId
-		def datastore
+		def rootDatastore
 		morpheusContext.cloud.datastore.listById([datastoreId.toLong()]).blockingSubscribe { Datastore ds ->
-			datastore = ds
+			rootDatastore = ds
 		}
-		if(!datastore) {
+		if(!rootDatastore) {
 			log.error("buildRunConfig error: Datastore option is invalid for selected host")
 			throw new Exception("There are no available datastores to use based on provisioning options for the target host.")
 		}
 
 		if(rootVolume) {
-			rootVolume.datastore = datastore
+			rootVolume.datastore = rootDatastore
 			morpheusContext.storageVolume.save([rootVolume]).blockingGet()
 		}
 
@@ -577,6 +583,77 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			storageType = rootDisk.type.externalId //handle thin/thick clone
 		} else {
 			storageType = cloud.getConfigProperty('diskStorageType')
+		}
+
+		def diskList = []
+		def datastoreIds = []
+		def storageVolumeTypes = [:]
+		config.volumes.each { volume ->
+			datastoreIds << volume.datastoreId.toLong()
+			def storageVolumeTypeId = volume.storageType.toLong()
+			if(!storageVolumeTypes[storageVolumeTypeId]) {
+				storageVolumeTypes[storageVolumeTypeId] = morpheusContext.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
+			}
+
+		}
+		datastoreIds = datastoreIds.unique()
+		def datastores = [:]
+		morpheusContext.cloud.datastore.listById(datastoreIds).blockingSubscribe {
+			datastores[it.id.toLong()] = it
+		}
+		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${datastores} ${storageVolumeTypes}\u001B[0m"
+		config.volumes?.eachWithIndex { volume, index ->
+			def storageVolumeType = storageVolumeTypes[volume.storageType.toLong()]
+			def datastore = datastores[volume.datastoreId.toLong()]
+			def diskConfig = [
+				device_properties: [
+					device_type: "DISK",
+					disk_address: [
+						adapter_type: storageVolumeType.name,
+						device_index: index
+					],
+				],
+				disk_size_bytes: volume.maxStorage,
+				storage_config: [
+					storage_container_reference: [
+						uuid: datastore.externalId,
+						name: datastore.name,
+						kind: "storage_container",
+					]
+				]
+			]
+			if(virtualImage && volume.rootVolume) {
+				diskConfig['data_source_reference'] = [
+					uuid: virtualImage.externalId,
+					name: virtualImage.name,
+					kind: "image"
+				]
+			}
+			diskList << diskConfig
+		}
+
+		def nicList = []
+		def networkIds = config.networkInterfaces.collect {
+			it.network?.id?.toLong()
+		}
+		networkIds = networkIds.unique()
+		def networks = [:]
+		morpheusContext.network.listById(networkIds).blockingSubscribe {
+			networks[it.id.toLong()] = it
+		}
+		config.networkInterfaces?.each { networkInterface ->
+			def net = networks[networkInterface.network.id.toLong()]
+			if(net) {
+				def networkConfig = [
+						is_connected    : true,
+						subnet_reference: [
+								uuid: net.externalId,
+								name: net.name,
+								kind: "subnet"
+						]
+				]
+				nicList << networkConfig
+			}
 		}
 
 		def runConfig = [:] + opts
@@ -605,8 +682,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				domainName		  : domainName,
 				fqdn		      : fqdn,
 				storageType		  : storageType,
-				volumes			  : config.volumes,
-				networkInterfaces : config.networkInterfaces,
+				diskList	      : diskList,
+				nicList			  : nicList,
 				skipNetworkWait   : false
 		]
 		return runConfig
@@ -683,6 +760,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			//main create or clone
 			log.debug("create server: ${runConfig}")
+			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- create server: ${runConfig}\u001B[0m"
 			def createResults
 
 			HttpApiClient client = new HttpApiClient()
@@ -691,6 +769,99 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			if(virtualImage) {
 				createResults = NutanixPrismComputeUtility.createVm(client, authConfig, runConfig)
 				log.info("create server: ${createResults}")
+			}
+
+			//check success
+			if(createResults.success == true && createResults.data?.metadata?.uuid) {
+
+				server = morpheusContext.computeServer.get(server.id).blockingGet()
+				workload = morpheusContext.cloud.getWorkloadById(workload.id).blockingGet()
+				if(virtualImage) {
+					virtualImage = morpheusContext.virtualImage.get(virtualImage.id).blockingGet()
+				}
+				//update server ids
+				server.externalId = createResults.data.metadata.uuid
+				workloadResponse.externalId = server.externalId
+				server.internalId = server.externalId
+				server = saveAndGet(server)
+					
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${server.externalId}\u001B[0m"
+				//TODO tagging
+				//applyTags(workload, client)
+
+				morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
+
+				def vmResource = waitForPowerState(client, authConfig, server.externalId)
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${vmResource}\u001B[0m"
+				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${startResults}\u001B[0m"
+				log.debug("start: ${startResults.success}")
+				if(startResults.success == true) {
+					if(startResults.error == true) {
+						server.statusMessage = 'Failed to start server'
+						server = saveAndGet(server)
+					} else {
+						//good to go
+						def serverDetail = checkServerReady(client, authConfig, server.externalId)
+						log.debug("serverDetail: ${serverDetail}")
+						if(serverDetail.success == true) {
+
+							println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- Opt network config ${workloadRequest.networkConfiguration}\u001B[0m"
+	//						if(workloadRequest.networkConfiguration.primaryInterface && !workloadRequest.networkConfiguration.primaryInterface?.doDhcp) {
+	//							workloadResponse.privateIp = workloadRequest.networkConfiguration.primaryInterface?.ipAddress
+	//							workloadResponse.publicIp = workloadRequest.networkConfiguration.primaryInterface?.ipAddress
+	//							workloadResponse.poolId = createResults.results.server?.networkPoolId
+	//							workloadResponse.hostname = workloadResponse.customized ? runConfig.desiredHostname : createResults.results.server?.hostname
+	//						} else {
+	//							workloadResponse.privateIp = serverDetail.results?.server?.ipAddress
+	//							workloadResponse.publicIp = serverDetail.results?.server?.ipAddress
+	//							workloadResponse.poolId = createResults.results.server?.networkPoolId
+	//							workloadResponse.hostname = createResults.results.server?.hostname
+	//						}
+
+							def privateIp = serverDetail.ipAddress
+							def publicIp = serverDetail.ipAddress
+							server.internalIp = privateIp
+							server.externalIp = publicIp
+//							setNetworkInfo(server.interfaces, vmResource.data.spec.resource.nic_list)
+//							setVolumeInfo(server.volumes, vmResource.data.spec.resource.disk_list)
+//							if(serverDetail.results?.server.ipList) {
+//								def interfacesToSave = []
+//								serverDetail.results?.server.ipList?.each {ipEntry ->
+//									def curInterface = server.interfaces?.find{it.macAddress == ipEntry.macAddress}
+//									def saveInterface = false
+//									if(curInterface && ipEntry.mode == 'ipv4') {
+//										curInterface.ipAddress = ipEntry.ipAddress
+//										interfacesToSave << curInterface
+//									} else if(curInterface && ipEntry.mode == 'ipv6') {
+//										curInterface.ipv6Address = ipEntry.ipAddress
+//										interfacesToSave << curInterface
+//									}
+//								}
+//								if(interfacesToSave?.size()) {
+//									morpheusContext.computeServer.computeServerInterface.save(interfacesToSave).blockingGet()
+//								}
+//							}
+							server = saveAndGet(server)
+							workloadResponse.success = true
+						} else {
+							server.statusMessage = 'Failed to load server details'
+							server = saveAndGet(server)
+						}
+					}
+				} else {
+					server.statusMessage = 'Failed to start server'
+					server = saveAndGet(server)
+				}
+
+			} else {
+				if(createResults.results?.server?.id) {
+					server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
+					server.externalId = createResults.results.server.id
+					server.internalId = createResults.results.server.instanceUuid
+					server = saveAndGet(server)
+				}
+				workloadResponse.setError('Failed to create server')
 			}
 
 		} catch (e) {
@@ -719,4 +890,207 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		}
 	}
 
+	def getContainerVolumeSize(Workload workload) {
+		def rtn = workload.maxStorage ?: workload.instance.plan?.maxStorage
+		if(workload.server?.volumes?.size() > 0) {
+			def newMaxStorage = workload.server.volumes.sum{it.maxStorage ?: 0}
+			if(newMaxStorage > rtn)
+				rtn = newMaxStorage
+		}
+		return rtn
+	}
+
+	def waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
+		def rtn = [success:false]
+		try {
+			def pending = true
+			def attempts = 0
+			while(pending) {
+				sleep(1000l * 20l)
+				def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
+				log.debug("serverDetail: ${serverDetail}")
+				def serverResource = serverDetail?.data?.spec?.resources
+				if(serverDetail.success == true && serverResource.power_state) {
+					rtn.success = true
+					rtn.data = serverDetail.data
+					pending = false
+				}
+				attempts ++
+				if(attempts > 60)
+					pending = false
+			}
+		} catch(e) {
+			log.error("An Exception Has Occurred: ${e.message}",e)
+		}
+		return rtn
+	}
+
+	def checkServerReady(HttpApiClient client, Map authConfig, String vmId) {
+		def rtn = [success:false]
+		try {
+			def pending = true
+			def attempts = 0
+			while(pending) {
+				sleep(1000l * 20l)
+				def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
+				log.debug("serverDetail: ${serverDetail}")
+				def serverResource = serverDetail?.data?.spec?.resources
+				if(serverDetail.success == true && serverResource.power_state == 'ON' && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)} ) {
+					rtn.success = true
+					rtn.virtualMachine = serverDetail.data
+					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
+					pending = false
+				}
+				attempts ++
+				if(attempts > 60)
+					pending = false
+			}
+		} catch(e) {
+			log.error("An Exception Has Occurred: ${e.message}",e)
+		}
+		return rtn
+	}
+
+
+	static checkIpv4Ip(ipAddress) {
+		def rtn = false
+		if(ipAddress) {
+			if(ipAddress.indexOf('.') > 0 && !ipAddress.startsWith('169'))
+				rtn = true
+		}
+		return rtn
+	}
+
+//	def setVolumeInfo(List<StorageVolume> serverVolumes, externalVolumes, Cloud cloud) {
+//		log.debug("volumes: ${externalVolumes}")
+//		try {
+//			def maxCount = externalVolumes?.size()
+//
+//			// Build up a map of datastores we might be using based on the externalVolumes
+//			Map datastoreMap = [:]
+//			def datastoreExternalIds = externalVolumes?.collect { it.datastore }?.findAll { it != null}?.unique()
+//			morpheusContext.cloud.datastore.listSyncProjections(cloud.id).filter { DatastoreIdentityProjection proj ->
+//				proj.externalId in datastoreExternalIds
+//			}.blockingSubscribe { DatastoreIdentityProjection proj ->
+//				datastoreMap[proj.externalId] = proj
+//			}
+//			serverVolumes.sort{it.displayOrder}.eachWithIndex { StorageVolume volume, index ->
+//				if(index < maxCount) {
+//					if(volume.externalId) {
+//						//check for changes?
+//						log.debug("volume already assigned: ${volume.externalId}")
+//					} else {
+//						def unitFound = false
+//						log.debug("finding volume: ${volume.id} ${volume.controller?.controllerKey ?: '-'}:${volume.unitNumber}")
+//						externalVolumes.each { externalVolume ->
+//							def externalUnitNumber = externalVolume.unitNumber != null ? "${externalVolume.unitNumber}".toString() : null
+//							def externalControllerKey = externalVolume.controllerKey != null ? "${externalVolume.controllerKey}".toString() : null
+//							log.debug("external volume: ${externalControllerKey}:${externalUnitNumber} - ")
+//							if(volume.controller?.controllerKey && volume.unitNumber && externalUnitNumber &&
+//									externalUnitNumber == volume.unitNumber && volume.controller.controllerKey == externalControllerKey) {
+//								log.debug("found matching disk: ${externalControllerKey}:${externalUnitNumber}")
+//								unitFound = true
+//								if(volume.controllerKey == null && externalVolume.controllerKey != null)
+//									volume.controllerKey = "${externalVolume.controllerKey}".toString()
+//								volume.externalId = externalVolume.key
+//								volume.internalId = externalVolume.fileName
+//								if(externalVolume.datastore) {
+//									volume.datastore = datastoreMap[externalVolume.datastore]
+//								}
+//								morpheusContext.storageVolume.save([volume]).blockingGet()
+//							}
+//						}
+//						if(unitFound != true) {
+//							externalVolumes.each { externalVolume ->
+//								def externalUnitNumber = externalVolume.unitNumber != null ? "${externalVolume.unitNumber}".toString() : null
+//								if(volume.unitNumber && externalUnitNumber && externalUnitNumber == volume.unitNumber) {
+//									log.debug("found matching disk: ${externalUnitNumber}")
+//									unitFound = true
+//									if(volume.controllerKey == null && externalVolume.controllerKey != null)
+//										volume.controllerKey = "${externalVolume.controllerKey}".toString()
+//									volume.externalId = externalVolume.key
+//									volume.internalId = externalVolume.fileName
+//									if(externalVolume.datastore) {
+//										volume.datastore = datastoreMap[externalVolume.datastore]
+//									}
+//									morpheusContext.storageVolume.save([volume]).blockingGet()
+//								}
+//							}
+//						}
+//						if(unitFound != true) {
+//							def sizeRange = [min:(volume.maxStorage - ComputeUtility.ONE_GIGABYTE), max:(volume.maxStorage + ComputeUtility.ONE_GIGABYTE)]
+//							externalVolumes.each { externalVolume ->
+//								def sizeCheck = externalVolume.size * ComputeUtility.ONE_KILOBYTE
+//								def externalKey = externalVolume.key != null ? "${externalVolume.key}".toString() : null
+//								log.debug("volume size check - ${externalKey}: ${sizeCheck} between ${sizeRange.min} and ${sizeRange.max}")
+//								if(unitFound != true && sizeCheck > sizeRange.min && sizeCheck < sizeRange.max) {
+//									def dupeCheck = serverVolumes.find{it.externalId == externalKey}
+//									if(!dupeCheck) {
+//										//assign a match to the volume
+//										unitFound = true
+//										if(volume.controllerKey == null && externalVolume.controllerKey != null) {
+//											volume.controllerKey = "${externalVolume.controllerKey}".toString()
+//										}
+//										if(externalVolume.datastore) {
+//											volume.datastore = datastoreMap[externalVolume.datastore]
+//										}
+//										volume.externalId = externalVolume.key
+//										volume.internalId = externalVolume.fileName
+//										morpheusContext.storageVolume.save([volume]).blockingGet()
+//									} else {
+//										log.debug("found dupe volume")
+//									}
+//								}
+//							}
+//						}
+//					}
+//				}
+//			}
+//		} catch(e) {
+//			log.error("setVolumeInfo error: ${e}", e)
+//		}
+//	}
+//
+//	def setNetworkInfo(List<ComputeServerInterface> serverInterfaces, externalNetworks, newInterface = null, NetworkConfiguration networkConfig=null) {
+//		log.info("networks: ${externalNetworks}")
+//		try {
+//			if(externalNetworks?.size() > 0) {
+//				serverInterfaces?.eachWithIndex { ComputeServerInterface networkInterface, index ->
+//					if(networkInterface.externalId) {
+//						//check for changes?
+//					} else {
+//						def matchNetwork = externalNetworks.find{networkInterface.type?.code == it.type && networkInterface.externalId == "${it.key}"}
+//						if(!matchNetwork)
+//							matchNetwork = externalNetworks.find{(networkInterface.type?.code == it.type || networkInterface.type == null) && it.row == networkInterface.displayOrder}
+//						if(matchNetwork) {
+//							networkInterface.externalId = "${matchNetwork.key}"
+//							networkInterface.internalId = "${matchNetwork.unitNumber}"
+//							if(matchNetwork.macAddress && matchNetwork.macAddress != networkInterface.macAddress) {
+//								log.debug("setting mac address: ${matchNetwork.macAddress}")
+//								networkInterface.macAddress = matchNetwork.macAddress
+//							}
+//							if(networkInterface.type == null) {
+//								networkInterface.type = new ComputeServerInterfaceType(code: matchNetwork.type)
+//							}
+//							if(matchNetwork.macAddress && networkConfig) {
+//								if(networkConfig.primaryInterface.id == networkInterface.id) {
+//									networkConfig.primaryInterface.macAddress = matchNetwork.macAddress
+//								} else {
+//									def matchedNetwork = networkConfig.extraInterfaces?.find{it.id == networkInterface.id}
+//									if(matchedNetwork) {
+//										matchedNetwork.macAddress = matchNetwork.macAddress
+//									}
+//								}
+//							}
+//							//networkInterface.name = matchNetwork.name
+//							//networkInterface.description = matchNetwork.description
+//							morpheusContext.computeServer.computeServerInterface.save([networkInterface]).blockingGet()
+//						}
+//					}
+//				}
+//			}
+//		} catch(e) {
+//			log.error("setNetworkInfo error: ${e}", e)
+//		}
+//	}
 }
