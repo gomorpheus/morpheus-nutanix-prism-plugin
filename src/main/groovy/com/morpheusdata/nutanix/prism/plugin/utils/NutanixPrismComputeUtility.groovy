@@ -87,6 +87,14 @@ class NutanixPrismComputeUtility {
 						kind: 'vm'
 				]
 		]
+		if(runConfig.cloudInitUserData) {
+			body.spec.resources['guest_customization'] = [
+					"cloud_init": [
+					        "user_data": runConfig.cloudInitUserData
+					]
+			]
+		}
+
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
 		if(results?.success) {
@@ -114,7 +122,6 @@ class NutanixPrismComputeUtility {
 			vmBody.spec.resources.power_state = 'ON'
 		}
 		vmBody.metadata.remove('spec_hash')
-		println "\u001B[33mAC Log - NutanixPrismComputeUtility:startVm- ${vmBody}\u001B[0m"
 		return updateVm(client, authConfig, uuid, vmBody)
 	}
 

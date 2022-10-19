@@ -231,8 +231,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			VirtualImage virtualImage = server.sourceImage
 			Map authConfig = plugin.getAuthConfig(cloud)
 			def runConfig = buildRunConfig(workload, workloadRequest, opts)
-			
-			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload - runConfig - ${runConfig}\u001B[0m"
 
 			client = new HttpApiClient()
 			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
@@ -302,8 +300,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 				server.sshUsername = runConfig.userConfig.sshUsername
 				server.sshPassword = runConfig.userConfig.sshPassword
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload 1 - ${opts}\u001B[0m"
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload 1 - ${runConfig}\u001B[0m"
 				workloadResponse.createUsers = runConfig.userConfig.createUsers
 
 				runVirtualMachine(cloud, workloadRequest, runConfig, workloadResponse, opts)
@@ -312,7 +308,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				server.statusMessage = 'Error on vm image'
 			}
 
-			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload- ${workloadResponse}\u001B[0m"
 			if (workloadResponse.success != true) {
 				return new ServiceResponse(success: false, msg: workloadResponse.message ?: 'vm config error', error: workloadResponse.message, data: workloadResponse)
 			} else {
@@ -327,6 +322,45 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				client.shutdownClient()
 			}
 		}
+	}
+
+	@Override
+	ServiceResponse finalizeWorkload(Workload workload) {
+		def rtn = [success: true, msg: null]
+		log.debug "finalizeWorkload: ${workload?.id}"
+		try {
+			ComputeServer server = workload.server
+			Cloud cloud = server.cloud
+
+			def authConfig = plugin.getAuthConfig(cloud)
+//			if(server.sourceImage?.isCloudInit || (server.sourceImage?.isSysprep && !server.sourceImage?.isForceCustomization)) {
+//				def cdRemoveResults = VmwareComputeUtility.ejectVmCdRom(authConfig.apiUrl, authConfig.apiUsername, authConfig.apiPassword,
+//						[externalId:server.externalId, fileName:'config.iso'])
+//				if(cdRemoveResults.success == true) {
+//					def cdDeleteResults = VmwareComputeUtility.removeVmFile(authConfig.apiUrl, authConfig.apiUsername, authConfig.apiPassword,
+//							[externalId:server.externalId, datacenter:datacenterId, datastoreId:datastoreId, fileName:'config.iso'])
+//				}
+//			}
+			def vmId = server.externalId
+			HttpApiClient client = new HttpApiClient()
+			def serverDetails = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
+			//check if ip changed and update
+			def privateIp = serverDetails.ipAddress
+			def publicIp = serverDetails.ipAddress
+			if(server.internalIp != privateIp) {
+				if(server.sshHost == server.privateIp) {
+					server.sshHost = privateIp
+				}
+				server.internalIp = privateIp
+				server.externalIp = publicIp
+				morpheusContext.computeServer.save([server]).blockingGet()
+			}
+		} catch(e) {
+			rtn.success = false
+			rtn.msg = "Error in finalizing server: ${e.message}"
+			log.error "Error in finalizeWorkload: ${e}", e
+		}
+		return new ServiceResponse(rtn.success, rtn.msg, null, null)
 	}
 
 	@Override
@@ -601,7 +635,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		morpheusContext.cloud.datastore.listById(datastoreIds).blockingSubscribe {
 			datastores[it.id.toLong()] = it
 		}
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${datastores} ${storageVolumeTypes}\u001B[0m"
 		config.volumes?.eachWithIndex { volume, index ->
 			def storageVolumeType = storageVolumeTypes[volume.storageType.toLong()]
 			def datastore = datastores[volume.datastoreId.toLong()]
@@ -757,10 +790,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			workloadResponse.noAgent = runConfig.noAgent
 
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, workloadResponse.installAgent: ${workloadResponse.installAgent}, workloadResponse.noAgent: ${workloadResponse.noAgent}"
+			//cloud_init
+			if(virtualImage?.isCloudInit && server.cloudConfigUser) {
+				log.debug "VirtualImage ${virtualImage} isCloudInit"
+				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
+			}
 
 			//main create or clone
 			log.debug("create server: ${runConfig}")
-			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- create server: ${runConfig}\u001B[0m"
 			def createResults
 
 			HttpApiClient client = new HttpApiClient()
@@ -785,16 +822,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				server.internalId = server.externalId
 				server = saveAndGet(server)
 					
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${server.externalId}\u001B[0m"
 				//TODO tagging
 				//applyTags(workload, client)
 
 				morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
 				def vmResource = waitForPowerState(client, authConfig, server.externalId)
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${vmResource}\u001B[0m"
 				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${startResults}\u001B[0m"
 				log.debug("start: ${startResults.success}")
 				if(startResults.success == true) {
 					if(startResults.error == true) {
@@ -806,7 +840,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						log.debug("serverDetail: ${serverDetail}")
 						if(serverDetail.success == true) {
 
-							println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- Opt network config ${workloadRequest.networkConfiguration}\u001B[0m"
 	//						if(workloadRequest.networkConfiguration.primaryInterface && !workloadRequest.networkConfiguration.primaryInterface?.doDhcp) {
 	//							workloadResponse.privateIp = workloadRequest.networkConfiguration.primaryInterface?.ipAddress
 	//							workloadResponse.publicIp = workloadRequest.networkConfiguration.primaryInterface?.ipAddress
