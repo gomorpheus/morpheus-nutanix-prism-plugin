@@ -72,28 +72,36 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse createVm(HttpApiClient client, Map authConfig, Map runConfig) {
 		log.debug("createVM")
 
-		def body = [
-				spec: [
-						name: runConfig.name,
-						resources: [
-								num_sockets: runConfig.numSockets,
-								memory_size_mib: runConfig.maxMemory,
-								num_vcpus_per_socket: runConfig.coresPerSocket,
-								disk_list: runConfig.diskList,
-								nic_list: runConfig.nicList,
-						]
-				],
-				metadata: [
-						kind: 'vm'
-				]
+		def resources =  [
+				num_sockets: runConfig.numSockets,
+				memory_size_mib: runConfig.maxMemory,
+				num_vcpus_per_socket: runConfig.coresPerSocket,
+				disk_list: runConfig.diskList,
+				nic_list: runConfig.nicList,
 		]
+
 		if(runConfig.cloudInitUserData) {
-			body.spec.resources['guest_customization'] = [
+			resources['guest_customization'] = [
 					"cloud_init": [
 					        "user_data": runConfig.cloudInitUserData
 					]
 			]
 		}
+		if(runConfig.uefi) {
+			resources['machine_type'] = "Q35"
+			resources['boot_config'] = [
+			        "boot_type": "SECURE_BOOT"
+			]
+		}
+		def body = [
+				spec: [
+						name: runConfig.name,
+						resources: resources
+				],
+				metadata: [
+						kind: 'vm'
+				]
+		]
 
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
@@ -125,6 +133,16 @@ class NutanixPrismComputeUtility {
 		return updateVm(client, authConfig, uuid, vmBody)
 	}
 
+	static ServiceResponse stopVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		log.debug("startVm")
+		vmBody.remove('status')
+		if(vmBody?.spec?.resources?.power_state) {
+			vmBody.spec.resources.power_state = 'OFF'
+		}
+		vmBody.metadata.remove('spec_hash')
+		return updateVm(client, authConfig, uuid, vmBody)
+	}
+
 	static ServiceResponse updateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
 		log.debug("updateVm")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
@@ -132,7 +150,18 @@ class NutanixPrismComputeUtility {
 		if(results?.success) {
 			return ServiceResponse.success(results.data)
 		} else {
-			return ServiceResponse.error("Error starting vm ${uuid}", null, results.data)
+			return ServiceResponse.error("Error updating vm ${uuid}", null, results.data)
+		}
+	}
+
+	static ServiceResponse destroyVm(HttpApiClient client, Map authConfig, String uuid) {
+		log.debug("updateVm")
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'DELETE')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error deleting vm ${uuid}", null, results.data)
 		}
 	}
 

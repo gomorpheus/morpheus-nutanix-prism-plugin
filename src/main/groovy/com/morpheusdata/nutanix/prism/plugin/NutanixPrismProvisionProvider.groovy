@@ -343,6 +343,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 //			}
 			def vmId = server.externalId
 			HttpApiClient client = new HttpApiClient()
+			client.networkProxy = cloud.apiProxy
 			def serverDetails = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
 			//check if ip changed and update
 			def privateIp = serverDetails.ipAddress
@@ -365,23 +366,119 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	ServiceResponse stopWorkload(Workload workload) {
-		return ServiceResponse.error()
+		log.debug "stopWorkload: ${workload}"
+		if(workload.server?.externalId) {
+			ComputeServer server = workload.server
+			Cloud cloud = server.cloud
+			HttpApiClient client = new HttpApiClient()
+			client.networkProxy = cloud.apiProxy
+			def authConfig = plugin.getAuthConfig(cloud)
+			def vmResource = waitForPowerState(client, authConfig, server.externalId)
+			def stopResults =NutanixPrismComputeUtility.stopVm(client, authConfig, server.externalId, vmResource.data)
+			log.info("stopResults: ${stopResults}")
+			if(stopResults.success == true) {
+				return ServiceResponse.success()
+			} else {
+				return ServiceResponse.error(stopResults.msg ?: 'Error stopping VM')
+			}
+		} else {
+			ServiceResponse.error('vm not found')
+		}
 	}
 
 	@Override
 	ServiceResponse startWorkload(Workload workload) {
-		return ServiceResponse.error()
-	}
-
-	@Override
-	ServiceResponse stopServer(ComputeServer computeServer) {
-		return ServiceResponse.error()
+		log.debug "startWorkload: ${workload}"
+		if(workload.server?.externalId) {
+			ComputeServer server = workload.server
+			Cloud cloud = server.cloud
+			HttpApiClient client = new HttpApiClient()
+			client.networkProxy = cloud.apiProxy
+			def authConfig = plugin.getAuthConfig(cloud)
+			def vmResource = waitForPowerState(client, authConfig, server.externalId)
+			def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
+			log.info("startResults: ${startResults}")
+			if(startResults.success == true) {
+				return ServiceResponse.success()
+			} else {
+				return ServiceResponse.error(startResults.msg ?: 'Error starting VM')
+			}
+		} else {
+			ServiceResponse.error('vm not found')
+		}
 	}
 
 	@Override
 	ServiceResponse startServer(ComputeServer computeServer) {
-		return ServiceResponse.error()
+		log.debug("startServer: ${computeServer}")
+		def rtn = [success:false]
+		try {
+			if(computeServer.managed == true || computeServer.computeServerType?.controlPower) {
+				Cloud cloud = computeServer.cloud
+				HttpApiClient client = new HttpApiClient()
+				client.networkProxy = cloud.apiProxy
+				def authConfig = plugin.getAuthConfig(cloud)
+				def vmResource = waitForPowerState(client, authConfig, computeServer.externalId)
+				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, computeServer.externalId, vmResource.data)
+				if(startResults.success == true) {
+					rtn.success = true
+				}
+			} else {
+				log.info("startServer - ignoring request for unmanaged instance")
+			}
+		} catch(e) {
+			rtn.msg = "Error starting server: ${e.message}"
+			log.error("startServer error: ${e}", e)
+		}
+		return new ServiceResponse(rtn)
 	}
+
+	@Override
+	ServiceResponse stopServer(ComputeServer computeServer) {
+		log.debug("stopServer: ${computeServer}")
+		def rtn = [success:false]
+		try {
+			if(computeServer.managed == true || computeServer.computeServerType?.controlPower) {
+				Cloud cloud = computeServer.cloud
+				HttpApiClient client = new HttpApiClient()
+				client.networkProxy = cloud.apiProxy
+				def authConfig = plugin.getAuthConfig(cloud)
+				def vmResource = waitForPowerState(client, authConfig, computeServer.externalId)
+				def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, computeServer.externalId, vmResource.data)
+				if(stopResults.success == true) {
+					rtn.success = true
+				}
+			} else {
+				log.info("stopServer - ignoring request for unmanaged instance")
+			}
+		} catch(e) {
+			rtn.msg = "Error stopping server: ${e.message}"
+			log.error("stopServer error: ${e}", e)
+		}
+		return new ServiceResponse(rtn)
+	}
+
+	@Override
+	ServiceResponse removeWorkload(Workload workload, Map opts){
+		log.debug "removeWorkload: ${workload} ${opts}"
+		if(workload.server?.externalId) {
+			stopWorkload(workload)
+			ComputeServer server = workload.server
+			Cloud cloud = server.cloud
+			HttpApiClient client = new HttpApiClient()
+			client.networkProxy = cloud.apiProxy
+			def authConfig = plugin.getAuthConfig(cloud)
+			def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, server.externalId)
+			if(removeResults.success == true) {
+				return ServiceResponse.success()
+			} else {
+				return ServiceResponse.error('Failed to remove vm')
+			}
+		} else {
+			return ServiceResponse.success()
+		}
+	}
+
 
 	@Override
 	ServiceResponse restartWorkload(Workload workload) {
@@ -393,10 +490,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		stopResult
 	}
 
-	@Override
-	ServiceResponse removeWorkload(Workload workload, Map opts) {
-		return ServiceResponse.error()
-	}
 
 	@Override
 	ServiceResponse<WorkloadResponse> getServerDetails(ComputeServer server) {
@@ -601,6 +694,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		Network network = primaryInterface?.network
 		def networkId = network?.externalId
 		def networkBackingType = network && network.externalType != 'string' ? network.externalType : 'Network'
+		
+		//uefi
+		def uefi = false
+//		if(virtualImage.uefi) {
+//			uefi = virtualImage.uefi
+//		}
 
 		//server.name = stripSpecialCharacters(server.name)
 
@@ -664,14 +763,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			}
 			diskList << diskConfig
 		}
-
+		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${workloadRequest.networkConfiguration.primaryInterface}\u001B[0m"
 		def nicList = []
 		def networkIds = config.networkInterfaces.collect {
 			it.network?.id?.toLong()
 		}
 		networkIds = networkIds.unique()
 		def networks = [:]
-		morpheusContext.network.listById(networkIds).blockingSubscribe {
+		morpheusContext.network.listById(networkIds).blockingSubscribe { Network it ->
 			networks[it.id.toLong()] = it
 		}
 		config.networkInterfaces?.each { networkInterface ->
@@ -685,6 +784,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 								kind: "subnet"
 						]
 				]
+				if(networkInterface.ipAddress) {
+					networkConfig["ip_endpoint_list"] =  [
+					        "ip": networkInterface.ipAddress
+					]
+				}
 				nicList << networkConfig
 			}
 		}
@@ -717,7 +821,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				storageType		  : storageType,
 				diskList	      : diskList,
 				nicList			  : nicList,
-				skipNetworkWait   : false
+				skipNetworkWait   : false,
+				uefi              : uefi
 		]
 		return runConfig
 	}
@@ -942,6 +1047,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				sleep(1000l * 20l)
 				def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
 				log.debug("serverDetail: ${serverDetail}")
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:waitForPowerState- ${serverDetail.data.code} ${serverDetail.data.code == "404"} ${serverDetail.data.code == 404}\u001B[0m"
+				if(!serverDetail.success && serverDetail.data.code == 404 ) {
+					pending = false
+				}
 				def serverResource = serverDetail?.data?.spec?.resources
 				if(serverDetail.success == true && serverResource.power_state) {
 					rtn.success = true

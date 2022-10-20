@@ -351,14 +351,34 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	ServiceResponse startServer(ComputeServer computeServer) {
+		log.debug("startServer: ${computeServer}")
+		def rtn = [success:false]
+		try {
+			return nutanixPrismProvisionProvider().startServer(computeServer)
+		} catch(e) {
+			rtn.msg = "Error starting server: ${e.message}"
+			log.error("startServer error: ${e}", e)
+		}
+		return ServiceResponse.create(rtn)
 	}
 
 	@Override
 	ServiceResponse stopServer(ComputeServer computeServer) {
+		log.debug("stopServer: ${computeServer}")
+		def rtn = [success:false]
+		try {
+			return nutanixPrismProvisionProvider().stopServer(computeServer)
+		} catch(e) {
+			rtn.msg = "Error stoping server: ${e.message}"
+			log.error("stopServer error: ${e}", e)
+		}
+		return ServiceResponse.create(rtn)
 	}
 
 	@Override
 	ServiceResponse deleteServer(ComputeServer computeServer) {
+		// TODO : Implement
+		return ServiceResponse.success()
 	}
 
 	@Override
@@ -438,5 +458,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 			cloud.regionCode = regionCode
 			morpheusContext.cloud.save(cloud).blockingGet()
 		}
+	}
+
+	NutanixPrismProvisionProvider nutanixPrismProvisionProvider() {
+		this.plugin.getProviderByCode('nutanix-prism-provision-provider-plugin')
 	}
 }
