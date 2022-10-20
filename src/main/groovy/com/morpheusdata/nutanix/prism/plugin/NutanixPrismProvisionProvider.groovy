@@ -1047,7 +1047,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				sleep(1000l * 20l)
 				def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
 				log.debug("serverDetail: ${serverDetail}")
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:waitForPowerState- ${serverDetail.data.code} ${serverDetail.data.code == "404"} ${serverDetail.data.code == 404}\u001B[0m"
 				if(!serverDetail.success && serverDetail.data.code == 404 ) {
 					pending = false
 				}
