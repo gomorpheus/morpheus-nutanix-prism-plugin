@@ -80,6 +80,15 @@ class NutanixPrismComputeUtility {
 				nic_list: runConfig.nicList,
 		]
 
+		if(runConfig.uefi) {
+			resources['machine_type'] = "Q35"
+			if(runConfig.secureBoot) {
+				resources['boot_config'] = [
+						boot_type: "SECURE_BOOT"
+				]
+			}
+		}
+
 		if(runConfig.cloudInitUserData) {
 			resources['guest_customization'] = [
 					"cloud_init": [
@@ -87,12 +96,7 @@ class NutanixPrismComputeUtility {
 					]
 			]
 		}
-		if(runConfig.uefi) {
-			resources['machine_type'] = "Q35"
-			resources['boot_config'] = [
-			        "boot_type": "SECURE_BOOT"
-			]
-		}
+
 		def body = [
 				spec: [
 						name: runConfig.name,

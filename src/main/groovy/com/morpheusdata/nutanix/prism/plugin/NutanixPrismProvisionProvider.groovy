@@ -63,7 +63,29 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				required : true,
 				optionSource : 'nutanixPrismPluginImage'
 		])
-		[imageOption]
+		OptionType uefi = new OptionType([
+				name : 'uefi',
+				code : 'nutanix-prism-plugin-provision-uefi',
+				fieldName : 'uefi',
+				fieldContext : 'config',
+				fieldLabel : 'UEFI',
+				inputType : OptionType.InputType.CHECKBOX,
+				displayOrder : 101,
+				fieldGroup: 'Nutanix Prism Boot Options'
+		])
+		OptionType secureBoot = new OptionType([
+				name : 'secure boot',
+				code : 'nutanix-prism-plugin-provision-secure-boot',
+				fieldName : 'secureBoot',
+				fieldContext : 'config',
+				fieldLabel : 'Secure Boot',
+				inputType : OptionType.InputType.CHECKBOX,
+				displayOrder : 102,
+				visibleOnCode: 'nutanix-prism-plugin-provision-uefi:on',
+				fieldGroup: 'Nutanix Prism Boot Options'
+
+		])
+		[imageOption, uefi, secureBoot]
 	}
 
 	@Override
@@ -333,25 +355,19 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			Cloud cloud = server.cloud
 
 			def authConfig = plugin.getAuthConfig(cloud)
-//			if(server.sourceImage?.isCloudInit || (server.sourceImage?.isSysprep && !server.sourceImage?.isForceCustomization)) {
-//				def cdRemoveResults = VmwareComputeUtility.ejectVmCdRom(authConfig.apiUrl, authConfig.apiUsername, authConfig.apiPassword,
-//						[externalId:server.externalId, fileName:'config.iso'])
-//				if(cdRemoveResults.success == true) {
-//					def cdDeleteResults = VmwareComputeUtility.removeVmFile(authConfig.apiUrl, authConfig.apiUsername, authConfig.apiPassword,
-//							[externalId:server.externalId, datacenter:datacenterId, datastoreId:datastoreId, fileName:'config.iso'])
-//				}
-//			}
 			def vmId = server.externalId
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def serverDetails = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
 			//check if ip changed and update
-			def privateIp = serverDetails.ipAddress
-			def publicIp = serverDetails.ipAddress
+			def serverResource = serverDetails?.data?.spec?.resources
+			def ipAddress = null
+			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)} ) {
+				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
+			}
+			def privateIp = ipAddress
+			def publicIp = ipAddress
 			if(server.internalIp != privateIp) {
-				if(server.sshHost == server.privateIp) {
-					server.sshHost = privateIp
-				}
 				server.internalIp = privateIp
 				server.externalIp = publicIp
 				morpheusContext.computeServer.save([server]).blockingGet()
@@ -374,8 +390,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
 			def vmResource = waitForPowerState(client, authConfig, server.externalId)
-			def stopResults =NutanixPrismComputeUtility.stopVm(client, authConfig, server.externalId, vmResource.data)
-			log.info("stopResults: ${stopResults}")
+			def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, server.externalId, vmResource.data)
+			log.debug("stopResults: ${stopResults}")
 			if(stopResults.success == true) {
 				return ServiceResponse.success()
 			} else {
@@ -397,7 +413,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			def authConfig = plugin.getAuthConfig(cloud)
 			def vmResource = waitForPowerState(client, authConfig, server.externalId)
 			def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
-			log.info("startResults: ${startResults}")
+			log.debug("startResults: ${startResults}")
 			if(startResults.success == true) {
 				return ServiceResponse.success()
 			} else {
@@ -468,6 +484,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
+			def vmResource = waitForPowerState(client, authConfig, server.externalId)
 			def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, server.externalId)
 			if(removeResults.success == true) {
 				return ServiceResponse.success()
@@ -694,12 +711,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		Network network = primaryInterface?.network
 		def networkId = network?.externalId
 		def networkBackingType = network && network.externalType != 'string' ? network.externalType : 'Network'
-		
-		//uefi
-		def uefi = false
-//		if(virtualImage.uefi) {
-//			uefi = virtualImage.uefi
-//		}
 
 		//server.name = stripSpecialCharacters(server.name)
 
@@ -822,8 +833,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				diskList	      : diskList,
 				nicList			  : nicList,
 				skipNetworkWait   : false,
-				uefi              : uefi
+				uefi              : workload.getConfigProperty('uefi'),
+				secureBoot              : workload.getConfigProperty('secureBoot')
 		]
+		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${runConfig}\u001B[0m"
 		return runConfig
 	}
 
@@ -1054,6 +1067,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				if(serverDetail.success == true && serverResource.power_state) {
 					rtn.success = true
 					rtn.data = serverDetail.data
+					rtn.powerState = serverResource.power_state
 					pending = false
 				}
 				attempts ++
