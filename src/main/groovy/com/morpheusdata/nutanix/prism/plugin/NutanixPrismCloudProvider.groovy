@@ -377,8 +377,15 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	ServiceResponse deleteServer(ComputeServer computeServer) {
-		// TODO : Implement
-		return ServiceResponse.success()
+		log.debug("deleteServer: ${computeServer}")
+		def rtn = [success:false]
+		try {
+			return nutanixPrismProvisionProvider().deleteServer(computeServer)
+		} catch(e) {
+			rtn.msg = "Error deleting server: ${e.message}"
+			log.error("deleteServer error: ${e}", e)
+		}
+		return ServiceResponse.create(rtn)
 	}
 
 	@Override

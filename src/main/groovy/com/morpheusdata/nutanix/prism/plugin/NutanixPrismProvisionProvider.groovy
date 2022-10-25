@@ -474,6 +474,30 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return new ServiceResponse(rtn)
 	}
 
+	ServiceResponse deleteServer(ComputeServer computeServer) {
+		log.debug("deleteServer: ${computeServer}")
+		def rtn = [success:false]
+		try {
+			if(computeServer.managed == true || computeServer.computeServerType?.controlPower) {
+				Cloud cloud = computeServer.cloud
+				HttpApiClient client = new HttpApiClient()
+				client.networkProxy = cloud.apiProxy
+				def authConfig = plugin.getAuthConfig(cloud)
+				def vmResource = waitForPowerState(client, authConfig, computeServer.externalId)
+				def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, computeServer.externalId)
+				if(removeResults.success == true) {
+					rtn.success = true
+				}
+			} else {
+				log.info("deleteServer - ignoring request for unmanaged instance")
+			}
+		} catch(e) {
+			rtn.msg = "Error deleting server: ${e.message}"
+			log.error("deleteServer error: ${e}", e)
+		}
+		return new ServiceResponse(rtn)
+	}
+
 	@Override
 	ServiceResponse removeWorkload(Workload workload, Map opts){
 		log.debug "removeWorkload: ${workload} ${opts}"
@@ -940,7 +964,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				server.internalId = server.externalId
 				server = saveAndGet(server)
 					
-				//TODO tagging
+				//TODO tagging? No direct mapping
 				//applyTags(workload, client)
 
 				morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
@@ -958,41 +982,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						log.debug("serverDetail: ${serverDetail}")
 						if(serverDetail.success == true) {
 
-	//						if(workloadRequest.networkConfiguration.primaryInterface && !workloadRequest.networkConfiguration.primaryInterface?.doDhcp) {
-	//							workloadResponse.privateIp = workloadRequest.networkConfiguration.primaryInterface?.ipAddress
-	//							workloadResponse.publicIp = workloadRequest.networkConfiguration.primaryInterface?.ipAddress
-	//							workloadResponse.poolId = createResults.results.server?.networkPoolId
-	//							workloadResponse.hostname = workloadResponse.customized ? runConfig.desiredHostname : createResults.results.server?.hostname
-	//						} else {
-	//							workloadResponse.privateIp = serverDetail.results?.server?.ipAddress
-	//							workloadResponse.publicIp = serverDetail.results?.server?.ipAddress
-	//							workloadResponse.poolId = createResults.results.server?.networkPoolId
-	//							workloadResponse.hostname = createResults.results.server?.hostname
-	//						}
-
 							def privateIp = serverDetail.ipAddress
 							def publicIp = serverDetail.ipAddress
 							server.internalIp = privateIp
 							server.externalIp = publicIp
-//							setNetworkInfo(server.interfaces, vmResource.data.spec.resource.nic_list)
-//							setVolumeInfo(server.volumes, vmResource.data.spec.resource.disk_list)
-//							if(serverDetail.results?.server.ipList) {
-//								def interfacesToSave = []
-//								serverDetail.results?.server.ipList?.each {ipEntry ->
-//									def curInterface = server.interfaces?.find{it.macAddress == ipEntry.macAddress}
-//									def saveInterface = false
-//									if(curInterface && ipEntry.mode == 'ipv4') {
-//										curInterface.ipAddress = ipEntry.ipAddress
-//										interfacesToSave << curInterface
-//									} else if(curInterface && ipEntry.mode == 'ipv6') {
-//										curInterface.ipv6Address = ipEntry.ipAddress
-//										interfacesToSave << curInterface
-//									}
-//								}
-//								if(interfacesToSave?.size()) {
-//									morpheusContext.computeServer.computeServerInterface.save(interfacesToSave).blockingGet()
-//								}
-//							}
 							server = saveAndGet(server)
 							workloadResponse.success = true
 						} else {
@@ -1116,136 +1109,4 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return rtn
 	}
 
-//	def setVolumeInfo(List<StorageVolume> serverVolumes, externalVolumes, Cloud cloud) {
-//		log.debug("volumes: ${externalVolumes}")
-//		try {
-//			def maxCount = externalVolumes?.size()
-//
-//			// Build up a map of datastores we might be using based on the externalVolumes
-//			Map datastoreMap = [:]
-//			def datastoreExternalIds = externalVolumes?.collect { it.datastore }?.findAll { it != null}?.unique()
-//			morpheusContext.cloud.datastore.listSyncProjections(cloud.id).filter { DatastoreIdentityProjection proj ->
-//				proj.externalId in datastoreExternalIds
-//			}.blockingSubscribe { DatastoreIdentityProjection proj ->
-//				datastoreMap[proj.externalId] = proj
-//			}
-//			serverVolumes.sort{it.displayOrder}.eachWithIndex { StorageVolume volume, index ->
-//				if(index < maxCount) {
-//					if(volume.externalId) {
-//						//check for changes?
-//						log.debug("volume already assigned: ${volume.externalId}")
-//					} else {
-//						def unitFound = false
-//						log.debug("finding volume: ${volume.id} ${volume.controller?.controllerKey ?: '-'}:${volume.unitNumber}")
-//						externalVolumes.each { externalVolume ->
-//							def externalUnitNumber = externalVolume.unitNumber != null ? "${externalVolume.unitNumber}".toString() : null
-//							def externalControllerKey = externalVolume.controllerKey != null ? "${externalVolume.controllerKey}".toString() : null
-//							log.debug("external volume: ${externalControllerKey}:${externalUnitNumber} - ")
-//							if(volume.controller?.controllerKey && volume.unitNumber && externalUnitNumber &&
-//									externalUnitNumber == volume.unitNumber && volume.controller.controllerKey == externalControllerKey) {
-//								log.debug("found matching disk: ${externalControllerKey}:${externalUnitNumber}")
-//								unitFound = true
-//								if(volume.controllerKey == null && externalVolume.controllerKey != null)
-//									volume.controllerKey = "${externalVolume.controllerKey}".toString()
-//								volume.externalId = externalVolume.key
-//								volume.internalId = externalVolume.fileName
-//								if(externalVolume.datastore) {
-//									volume.datastore = datastoreMap[externalVolume.datastore]
-//								}
-//								morpheusContext.storageVolume.save([volume]).blockingGet()
-//							}
-//						}
-//						if(unitFound != true) {
-//							externalVolumes.each { externalVolume ->
-//								def externalUnitNumber = externalVolume.unitNumber != null ? "${externalVolume.unitNumber}".toString() : null
-//								if(volume.unitNumber && externalUnitNumber && externalUnitNumber == volume.unitNumber) {
-//									log.debug("found matching disk: ${externalUnitNumber}")
-//									unitFound = true
-//									if(volume.controllerKey == null && externalVolume.controllerKey != null)
-//										volume.controllerKey = "${externalVolume.controllerKey}".toString()
-//									volume.externalId = externalVolume.key
-//									volume.internalId = externalVolume.fileName
-//									if(externalVolume.datastore) {
-//										volume.datastore = datastoreMap[externalVolume.datastore]
-//									}
-//									morpheusContext.storageVolume.save([volume]).blockingGet()
-//								}
-//							}
-//						}
-//						if(unitFound != true) {
-//							def sizeRange = [min:(volume.maxStorage - ComputeUtility.ONE_GIGABYTE), max:(volume.maxStorage + ComputeUtility.ONE_GIGABYTE)]
-//							externalVolumes.each { externalVolume ->
-//								def sizeCheck = externalVolume.size * ComputeUtility.ONE_KILOBYTE
-//								def externalKey = externalVolume.key != null ? "${externalVolume.key}".toString() : null
-//								log.debug("volume size check - ${externalKey}: ${sizeCheck} between ${sizeRange.min} and ${sizeRange.max}")
-//								if(unitFound != true && sizeCheck > sizeRange.min && sizeCheck < sizeRange.max) {
-//									def dupeCheck = serverVolumes.find{it.externalId == externalKey}
-//									if(!dupeCheck) {
-//										//assign a match to the volume
-//										unitFound = true
-//										if(volume.controllerKey == null && externalVolume.controllerKey != null) {
-//											volume.controllerKey = "${externalVolume.controllerKey}".toString()
-//										}
-//										if(externalVolume.datastore) {
-//											volume.datastore = datastoreMap[externalVolume.datastore]
-//										}
-//										volume.externalId = externalVolume.key
-//										volume.internalId = externalVolume.fileName
-//										morpheusContext.storageVolume.save([volume]).blockingGet()
-//									} else {
-//										log.debug("found dupe volume")
-//									}
-//								}
-//							}
-//						}
-//					}
-//				}
-//			}
-//		} catch(e) {
-//			log.error("setVolumeInfo error: ${e}", e)
-//		}
-//	}
-//
-//	def setNetworkInfo(List<ComputeServerInterface> serverInterfaces, externalNetworks, newInterface = null, NetworkConfiguration networkConfig=null) {
-//		log.info("networks: ${externalNetworks}")
-//		try {
-//			if(externalNetworks?.size() > 0) {
-//				serverInterfaces?.eachWithIndex { ComputeServerInterface networkInterface, index ->
-//					if(networkInterface.externalId) {
-//						//check for changes?
-//					} else {
-//						def matchNetwork = externalNetworks.find{networkInterface.type?.code == it.type && networkInterface.externalId == "${it.key}"}
-//						if(!matchNetwork)
-//							matchNetwork = externalNetworks.find{(networkInterface.type?.code == it.type || networkInterface.type == null) && it.row == networkInterface.displayOrder}
-//						if(matchNetwork) {
-//							networkInterface.externalId = "${matchNetwork.key}"
-//							networkInterface.internalId = "${matchNetwork.unitNumber}"
-//							if(matchNetwork.macAddress && matchNetwork.macAddress != networkInterface.macAddress) {
-//								log.debug("setting mac address: ${matchNetwork.macAddress}")
-//								networkInterface.macAddress = matchNetwork.macAddress
-//							}
-//							if(networkInterface.type == null) {
-//								networkInterface.type = new ComputeServerInterfaceType(code: matchNetwork.type)
-//							}
-//							if(matchNetwork.macAddress && networkConfig) {
-//								if(networkConfig.primaryInterface.id == networkInterface.id) {
-//									networkConfig.primaryInterface.macAddress = matchNetwork.macAddress
-//								} else {
-//									def matchedNetwork = networkConfig.extraInterfaces?.find{it.id == networkInterface.id}
-//									if(matchedNetwork) {
-//										matchedNetwork.macAddress = matchNetwork.macAddress
-//									}
-//								}
-//							}
-//							//networkInterface.name = matchNetwork.name
-//							//networkInterface.description = matchNetwork.description
-//							morpheusContext.computeServer.computeServerInterface.save([networkInterface]).blockingGet()
-//						}
-//					}
-//				}
-//			}
-//		} catch(e) {
-//			log.error("setNetworkInfo error: ${e}", e)
-//		}
-//	}
 }
