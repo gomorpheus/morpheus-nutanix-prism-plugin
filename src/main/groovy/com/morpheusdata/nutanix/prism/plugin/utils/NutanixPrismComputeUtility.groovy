@@ -190,6 +190,16 @@ class NutanixPrismComputeUtility {
 		return callGroupApi(client, 'storage_container', 'serial', groupMemberAttributes, authConfig)
 	}
 
+	static ServiceResponse listCategories(HttpApiClient client, Map authConfig) {
+		log.debug("listCategories")
+		return callListApi(client, 'category', 'categories/list', authConfig)
+	}
+
+	static ServiceResponse listCategoryValues(HttpApiClient client, Map authConfig, String categoryName) {
+		log.debug("listCategoryValues")
+		return callListApi(client, 'category', "categories/${categoryName}/list", authConfig)
+	}
+
 	static ServiceResponse listClusters(HttpApiClient client, Map authConfig) {
 		log.debug("listClusters")
 		return callListApi(client, 'cluster', 'clusters/list', authConfig)

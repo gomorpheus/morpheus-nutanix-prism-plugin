@@ -19,6 +19,7 @@ import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.PlatformType
 import com.morpheusdata.model.StorageControllerType
 import com.morpheusdata.model.StorageVolumeType
+import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
 import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
 import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
@@ -427,6 +428,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					}
 					ensureRegionCode(cloud)
 
+					(new CategoriesSync(this.plugin, cloud, client)).execute()
 					(new ClustersSync(this.plugin, cloud, client)).execute()
 					(new DatastoresSync(this.plugin, cloud, client)).execute()
 					(new NetworksSync(this.plugin, cloud, client)).execute()
