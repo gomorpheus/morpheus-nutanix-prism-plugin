@@ -4,7 +4,6 @@ import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Cloud
-import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.ReferenceData
 import com.morpheusdata.model.projection.ReferenceDataSyncProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
@@ -28,13 +27,17 @@ class CategoriesSync {
 		this.apiClient = apiClient
 	}
 
+	public static getCategory(Cloud cloud) {
+		return "nutanix.prism.categories.${cloud.id}"
+	}
+
 	def execute() {
 		log.debug "BEGIN: execute Categories: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
 			def masterData = getCategoriesAndValues(authConfig)
 			if(masterData.success) {
-				Observable<ReferenceDataSyncProjection> domainRecords = morpheusContext.cloud.listReferenceDataByCategory(cloud, getCategory())
+				Observable<ReferenceDataSyncProjection> domainRecords = morpheusContext.cloud.listReferenceDataByCategory(cloud, getCategory(cloud))
 				SyncTask<ReferenceDataSyncProjection, Map, com.morpheusdata.model.ReferenceData> syncTask = new SyncTask<>(domainRecords, masterData.data)
 				syncTask.addMatchFunction { ReferenceDataSyncProjection domainObject, Map data ->
 					domainObject.externalId == data.display
@@ -65,7 +68,7 @@ class CategoriesSync {
 		for(Map data in addList) {
 			Map props = [
 					code      : "nutanix.prism.categories.${cloud.id}.${data.display}",
-					category  : getCategory(),
+					category  : getCategory(cloud),
 					name      : data.name,
 					keyValue  : data.value,
 					externalId: data.display,
@@ -77,17 +80,13 @@ class CategoriesSync {
 		}
 
 		if(adds) {
-			morpheusContext.cloud.create(adds, cloud, getCategory()).blockingGet()
+			morpheusContext.cloud.create(adds, cloud, getCategory(cloud)).blockingGet()
 		}
 	}
 
 	private removeMissingCategories(List<ReferenceData> removeList) {
 		log.debug "removeMissingCategories: ${removeList?.size}"
 		morpheusContext.cloud.remove(removeList).blockingGet()
-	}
-
-	private getCategory() {
-		return "nutanix.prism.categories.${cloud.id}"
 	}
 	
 	private getCategoriesAndValues(authConfig) {

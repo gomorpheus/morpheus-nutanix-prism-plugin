@@ -3,6 +3,8 @@ package com.morpheusdata.nutanix.prism.plugin.utils
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.response.ServiceResponse
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
 import org.apache.http.entity.ContentType
 
@@ -106,6 +108,21 @@ class NutanixPrismComputeUtility {
 						kind: 'vm'
 				]
 		]
+
+		if(runConfig.categories) {
+			body.metadata.use_categories_mapping = true
+			body.metadata.categories_mapping = [:]
+			def categories = runConfig.categories.replace('[','').replace(']','').tokenize(',')
+			categories.each { categoryString ->
+				def categoryData = categoryString.trim().split(':')
+				def key = categoryData[0]
+				def value = categoryData[1]
+				if(!body.metadata.categories_mapping[key]) {
+					body.metadata.categories_mapping[key] = []
+				}
+				body.metadata.categories_mapping[key] << value
+			}
+		}
 
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')

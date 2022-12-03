@@ -85,7 +85,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				fieldGroup: 'Nutanix Prism Boot Options'
 
 		])
-		[imageOption, uefi, secureBoot]
+		OptionType categories = new OptionType([
+				name : 'categories',
+				code : 'nutanix-prism-plugin-provision-categories',
+				fieldName : 'categories',
+				fieldContext : 'config',
+				fieldLabel : 'Categories',
+				inputType : OptionType.InputType.MULTI_SELECT,
+				displayOrder : 103,
+				optionSource: 'nutanixPrismPluginCategories'
+
+		])
+		[imageOption, uefi, secureBoot, categories]
 	}
 
 	@Override
@@ -317,6 +328,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			}
 			runConfig.imageExternalId = imageExternalId
 			runConfig.virtualImageId = server.sourceImage?.id
+			runConfig.categories = workload.getConfigProperty('categories')
 			runConfig.userConfig = workloadRequest.usersConfiguration
 			if(imageExternalId) {
 

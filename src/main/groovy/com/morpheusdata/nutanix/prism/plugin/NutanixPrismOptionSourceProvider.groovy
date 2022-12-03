@@ -5,6 +5,7 @@ import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.model.*
 import com.morpheusdata.model.projection.VirtualImageIdentityProjection
+import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -40,7 +41,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismPluginImage'])
+		return new ArrayList<String>(['nutanixPrismPluginImage', 'nutanixPrismPluginCategories'])
 	}
 
 	def nutanixPrismPluginImage(args) {
@@ -86,5 +87,16 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 		options
 
+	}
+
+	def nutanixPrismPluginCategories(args){
+		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
+		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
+		def options = []
+		morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).blockingSubscribe { options << [name: it.externalId, value: it.externalId] }
+		if(options?.size() > 0) {
+			options = options.sort { it.name }
+		}
+		options
 	}
 }
