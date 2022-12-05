@@ -96,7 +96,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				optionSource: 'nutanixPrismPluginCategories'
 
 		])
-		[imageOption, uefi, secureBoot, categories]
+		OptionType vpc = new OptionType([
+				name : 'vpc',
+				code : 'nutanix-prism-plugin-provision-vpc',
+				fieldName : 'vpc',
+				fieldContext : 'config',
+				fieldLabel : 'VPC',
+				inputType : OptionType.InputType.SELECT,
+				displayOrder : 15,
+				optionSource: 'nutanixPrismPluginVPC'
+
+		])
+		[imageOption, uefi, secureBoot, categories, vpc]
 	}
 
 	@Override
@@ -810,7 +821,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			}
 			diskList << diskConfig
 		}
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${workloadRequest.networkConfiguration.primaryInterface}\u001B[0m"
 		def nicList = []
 		def networkIds = config.networkInterfaces.collect {
 			it.network?.id?.toLong()
@@ -872,7 +882,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				uefi              : workload.getConfigProperty('uefi'),
 				secureBoot              : workload.getConfigProperty('secureBoot')
 		]
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${runConfig}\u001B[0m"
 		return runConfig
 	}
 
