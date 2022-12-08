@@ -6,46 +6,48 @@ import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
-import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
 import io.reactivex.Observable
 
 @Slf4j
-class ClustersSync {
+class VirtualPrivateCloudSync {
 
 	private Cloud cloud
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
 
-	public ClustersSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
+	public VirtualPrivateCloudSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
 	}
 
+	public static getVPC(Cloud cloud) {
+		return "nutanix.prism.vpc.${cloud.id}"
+	}
+
 	def execute() {
-		log.debug "BEGIN: execute ClustersSync: ${cloud.id}"
+		log.debug "BEGIN: execute VirtualPrivateCloudSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def listResults = NutanixPrismComputeUtility.listClusters(apiClient, authConfig)
-			if(listResults.success) {
-				def masterHosts = listResults?.data?.findAll { cloudItem ->
-					cloudItem.status?.resources?.config?.service_list?.contains('AOS')
-				} ?: []
-				Observable<ComputeZonePoolIdentityProjection> domainRecords = morpheusContext.cloud.pool.listSyncProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}")
-				SyncTask<ComputeZonePoolIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, masterHosts)
+			def masterData = getVPCs(authConfig)
+			if(masterData.success) {
+
+				Observable<ComputeZonePoolIdentityProjection> domainRecords = morpheusContext.cloud.pool.listSyncProjections(cloud.id, getVPC(cloud))
+				SyncTask<ComputeZonePoolIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, masterData.data)
 				syncTask.addMatchFunction { ComputeZonePoolIdentityProjection domainObject, Map apiItem ->
-					domainObject.externalId == apiItem.metadata.uuid
+					domainObject.externalId == apiItem.externalId
 				}.onDelete { removeItems ->
-					removeMissingResourcePools(removeItems)
+					removeMissingVPCs(removeItems)
 				}.onUpdate { List<SyncTask.UpdateItem<ComputeZonePool, Map>> updateItems ->
-					updateMatchedResourcePools(updateItems)
+					updateMatchedVPCs(updateItems)
 				}.onAdd { itemsToAdd ->
-					addMissingResourcePools(itemsToAdd)
+					addMissingVPCs(itemsToAdd)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ComputeZonePoolIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<ComputeZonePoolIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
 					morpheusContext.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {ComputeZonePool computeZonePool ->
@@ -57,30 +59,27 @@ class ClustersSync {
 		} catch(e) {
 			log.error "Error in execute : ${e}", e
 		}
-		log.debug "END: execute ClustersSync: ${cloud.id}"
+		log.debug "END: execute VirtualPrivateCloudSync: ${cloud.id}"
 	}
 
-	def addMissingResourcePools(List addList) {
-		log.debug "addMissingResourcePools ${cloud} ${addList.size()}"
+	def addMissingVPCs(List addList) {
+		log.debug "addMissingVPCs ${cloud} ${addList.size()}"
 		def adds = []
 
 		for(cloudItem in addList) {
-			def clusterData = cloudItem.status
 			def poolConfig = [
 					owner     : cloud.owner,
-					type      : 'Cluster',
-					name      : clusterData.name,
-					externalId: cloudItem.metadata.uuid,
-					uniqueId  : cloudItem.metadata.uuid,
-					internalId: clusterData.name,
+					type      : 'VPC',
+					name      : cloudItem.name,
+					externalId: cloudItem.externalId,
+					uniqueId  : cloudItem.externalId,
+					internalId: cloudItem.name,
 					refType   : 'ComputeZone',
 					refId     : cloud.id,
 					cloud     : cloud,
-					category  : "nutanix.prism.cluster.${cloud.id}",
-					code      : "nutanix.prism.cluster.${cloud.id}.${cloudItem.metadata.uuid}",
-					readOnly  : true
+					category  : getVPC(cloud),
+					code      : "${getVPC(cloud)}.${cloudItem.externalId}"
 			]
-
 			def add = new ComputeZonePool(poolConfig)
 			adds << add
 		}
@@ -90,17 +89,17 @@ class ClustersSync {
 		}
 	}
 
-	private updateMatchedResourcePools(List updateList) {
-		log.debug "updateMatchedResourcePools: ${cloud} ${updateList.size()}"
+	private updateMatchedVPCs(List updateList) {
+		log.debug "updateMatchedVPCs: ${cloud} ${updateList.size()}"
 		def updates = []
-		
+
 		for(update in updateList) {
 			def matchItem = update.masterItem
 			def existing = update.existingItem
 			Boolean save = false
 
-			if(existing.name != matchItem.status.name) {
-				existing.name = matchItem.status.name
+			if(existing.name != matchItem.name) {
+				existing.name = matchItem.name
 				save = true
 			}
 			if(save) {
@@ -112,8 +111,26 @@ class ClustersSync {
 		}
 	}
 
-	private removeMissingResourcePools(List<ComputeZonePoolIdentityProjection> removeList) {
-		log.debug "removeMissingResourcePools: ${removeList?.size()}"
+	private removeMissingVPCs(List<ComputeZonePoolIdentityProjection> removeList) {
+		log.debug "removeMissingVPCs: ${removeList?.size()}"
 		morpheusContext.cloud.pool.remove(removeList).blockingGet()
+	}
+
+
+	private getVPCs(authConfig) {
+		log.debug "getVPCs"
+		def rtn = [success: true, data: []]
+		try {
+			ServiceResponse listResult = NutanixPrismComputeUtility.listVPCs(apiClient, authConfig)
+			if (listResult.success) {
+				rtn.data = listResult.data?.collect { [name: it.spec?.name, externalId: it.metadata?.uuid]}
+			} else {
+				log.warn "Error getting list of vpcs: ${listResult.msg}"
+			}
+		} catch(e) {
+			rtn.success = false
+			log.error "Error in getting vpcs: ${e}", e
+		}
+		rtn
 	}
 }

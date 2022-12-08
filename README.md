@@ -15,6 +15,6 @@ The following options are required when setting up a Morpheus Cloud to a Nutanix
 3. Password
 
 #### Features
-Cloud sync: Clusters, datastores, networks, images, hosts, and virtual machines are fetched from Nutanix and inventoried in Morpheus. Any additions, updates, and removals to these objects are reflected in Morpheus.
+Cloud sync: Clusters, categories, datastores, networks, virtual private clouds, images, hosts, and virtual machines are fetched from Nutanix and inventoried in Morpheus. Any additions, updates, and removals to these objects are reflected in Morpheus.
 
 Provisioning: Virtual machines can be provisioned from Morpheus via this plugin.

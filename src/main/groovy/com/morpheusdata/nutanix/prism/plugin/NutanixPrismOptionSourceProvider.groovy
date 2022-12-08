@@ -41,7 +41,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismPluginImage', 'nutanixPrismPluginCategories'])
+		return new ArrayList<String>(['nutanixPrismPluginImage', 'nutanixPrismPluginCategories', 'nutanixPrismPluginCluster' ])
 	}
 
 	def nutanixPrismPluginImage(args) {
@@ -94,6 +94,19 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
 		def options = []
 		morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).blockingSubscribe { options << [name: it.externalId, value: it.externalId] }
+		if(options?.size() > 0) {
+			options = options.sort { it.name }
+		}
+		options
+	}
+
+	def nutanixPrismPluginCluster(args){
+		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
+		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
+		def options = []
+		morpheusContext.cloud.pool.listSyncProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}").blockingSubscribe {
+			options << [name: it.name, value: it.externalId]
+		}
 		if(options?.size() > 0) {
 			options = options.sort { it.name }
 		}

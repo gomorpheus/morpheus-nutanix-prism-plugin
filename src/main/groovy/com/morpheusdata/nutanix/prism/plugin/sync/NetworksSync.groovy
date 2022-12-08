@@ -39,6 +39,11 @@ class NetworksSync {
 				return projection.type == 'Cluster' && projection.internalId != null
 			}.blockingSubscribe { clusters << it }
 
+			def vpcs = []
+			morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
+				return projection.type == 'VPC' && projection.internalId != null
+			}.blockingSubscribe { vpcs << it }
+
 			def authConfig = plugin.getAuthConfig(cloud)
 			def listResults = NutanixPrismComputeUtility.listNetworks(apiClient, authConfig)
 			if (listResults.success) {
@@ -54,10 +59,12 @@ class NetworksSync {
 						return new SyncTask.UpdateItem<NetworkIdentityProjection, Map>(existingItem: network, masterItem: matchItem.masterItem)
 					}
 				}.onAdd { itemsToAdd ->
-					def adds = []
+					def networkAdds = []
 					itemsToAdd?.each { cloudItem ->
 						def clusterId = clusters?.find { it.externalId == cloudItem.status?.cluster_reference?.uuid}?.id
-						def networkType = networkTypes?.find { it.externalType == cloudItem.status.resources.subnet_type }
+						def vpcId = vpcs?.find { it.externalId == cloudItem.spec?.resources?.vpc_reference?.uuid}?.id
+						def networkTypeString = cloudItem.status.resources.subnet_type
+						def networkType = networkTypes?.find { it.externalType == networkTypeString }
 						def networkConfig = [
 								owner       : new Account(id: cloud.owner.id),
 								category    : "nutanix.prism.network.${cloud.id}",
@@ -67,19 +74,25 @@ class NetworksSync {
 								uniqueId    : cloudItem.metadata.uuid,
 								externalId  : cloudItem.metadata.uuid,
 								dhcpServer  : true,
-								externalType: cloudItem.status.resources.subnet_type,
+								externalType: networkTypeString,
 								type        : networkType,
 								refType     : 'ComputeZone',
 								refId       : cloud.id,
-								zonePoolId  : clusterId,
+								zonePoolId  : vpcId ?: clusterId,
 								active      : true
 						]
-						Network add = new Network(networkConfig)
-						networkConfig.assignedZonePools = [new ComputeZonePool(id: clusterId)]
-						adds << add
+						if(networkTypeString == 'OVERLAY') {
+							networkConfig.config = [vpc: cloudItem.spec.resources.vpc_reference.uuid]
+						}
 
+						Network networkAdd = new Network(networkConfig)
+						if(clusterId) {
+							networkConfig.assignedZonePools = [new ComputeZonePool(id: clusterId)]
+						}
+						networkAdds << networkAdd
 					}
-					morpheusContext.cloud.network.create(adds).blockingGet()
+					//create networks
+					morpheusContext.cloud.network.create(networkAdds).blockingGet()
 				}.onUpdate { List<SyncTask.UpdateItem<Network, Map>> updateItems ->
 					List<Network> itemsToUpdate = []
 					for (item in updateItems) {
@@ -106,7 +119,7 @@ class NetworksSync {
 								existingItem.type = networkTypes?.find { it.externalType == networkType }
 								save = true
 							}
-							if (!existingItem.assignedZonePools?.find { it.id == clusterId }) {
+							if (clusterId && !existingItem.assignedZonePools?.find { it.id == clusterId }) {
 								existingItem.assignedZonePools += new ComputeZonePool(id: clusterId)
 								save = true
 							}

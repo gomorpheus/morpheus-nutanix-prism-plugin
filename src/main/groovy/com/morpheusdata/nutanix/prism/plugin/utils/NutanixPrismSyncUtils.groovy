@@ -279,7 +279,7 @@ class NutanixPrismSyncUtils {
 
 				def network = networks[masterInterface.subnet_reference?.uuid]
 				if(existingInterface.network?.id != network?.id) {
-					existingInterface.network = new Network(network?.id)
+					existingInterface.network = new Network(id: network?.id)
 					save = true
 				}
 

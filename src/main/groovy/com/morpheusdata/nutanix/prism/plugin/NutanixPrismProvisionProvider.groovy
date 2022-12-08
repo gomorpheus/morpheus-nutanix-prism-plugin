@@ -52,6 +52,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Collection<OptionType> getOptionTypes() {
+		OptionType cluster = new OptionType([
+				name : 'cluster',
+				code : 'nutanix-prism-plugin-provision-cluster',
+				fieldName : 'cluster',
+				fieldContext : 'config',
+				fieldLabel : 'Cluster',
+				required : true,
+				inputType : OptionType.InputType.SELECT,
+				displayOrder : 101,
+				optionSource: 'nutanixPrismPluginCluster'
+
+		])
 		OptionType imageOption = new OptionType([
 				name : 'virtual image',
 				code : 'nutanix-prism-plugin-provision-image',
@@ -59,7 +71,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				fieldContext : 'config',
 				fieldLabel : 'Image',
 				inputType : OptionType.InputType.SELECT,
-				displayOrder : 100,
+				displayOrder : 102,
 				required : true,
 				optionSource : 'nutanixPrismPluginImage'
 		])
@@ -70,7 +82,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				fieldContext : 'config',
 				fieldLabel : 'UEFI',
 				inputType : OptionType.InputType.CHECKBOX,
-				displayOrder : 101,
+				displayOrder : 103,
 				fieldGroup: 'Nutanix Prism Boot Options'
 		])
 		OptionType secureBoot = new OptionType([
@@ -80,7 +92,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				fieldContext : 'config',
 				fieldLabel : 'Secure Boot',
 				inputType : OptionType.InputType.CHECKBOX,
-				displayOrder : 102,
+				displayOrder : 104,
 				visibleOnCode: 'nutanix-prism-plugin-provision-uefi:on',
 				fieldGroup: 'Nutanix Prism Boot Options'
 
@@ -92,22 +104,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				fieldContext : 'config',
 				fieldLabel : 'Categories',
 				inputType : OptionType.InputType.MULTI_SELECT,
-				displayOrder : 103,
+				displayOrder : 105,
 				optionSource: 'nutanixPrismPluginCategories'
 
 		])
-		OptionType vpc = new OptionType([
-				name : 'vpc',
-				code : 'nutanix-prism-plugin-provision-vpc',
-				fieldName : 'vpc',
-				fieldContext : 'config',
-				fieldLabel : 'VPC',
-				inputType : OptionType.InputType.SELECT,
-				displayOrder : 15,
-				optionSource: 'nutanixPrismPluginVPC'
 
-		])
-		[imageOption, uefi, secureBoot, categories, vpc]
+		[cluster, imageOption, uefi, secureBoot, categories]
 	}
 
 	@Override
@@ -171,22 +173,27 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Boolean hasDatastores() {
-		true
+		return true
 	}
 
 	@Override
 	Boolean hasNetworks() {
-		true
+		return true
 	}
 
 	@Override
 	Boolean hasPlanTagMatch() {
-		true
+		return true
 	}
 
 	@Override
 	Integer getMaxNetworks() {
 		return null
+	}
+
+	@Override
+	Boolean networksScopedToPools() {
+		return true
 	}
 
 	@Override
@@ -577,7 +584,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	HostType getHostType() {
-		return null
+		HostType.vm
 	}
 
 	@Override
@@ -613,17 +620,22 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Boolean canCustomizeRootVolume() {
-		true
+		return true
 	}
 
 	@Override
 	Boolean canResizeRootVolume() {
-		true
+		return true
 	}
 
 	@Override
 	Boolean canCustomizeDataVolumes() {
-		true
+		return true
+	}
+
+	@Override
+	Boolean hasComputeZonePools() {
+		return true
 	}
 
 	@Override
@@ -770,7 +782,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		//storage type
 		StorageVolume rootDisk = this.getRootDisk(workload)
 		def storageType
-		if (rootDisk?.type?.code && rootDisk?.type?.code != 'vmware-plugin-standard') {
+		if (rootDisk?.type?.code && rootDisk?.type?.code != 'nutanix-prism-plugin-standard') {
 			storageType = rootDisk.type.externalId //handle thin/thick clone
 		} else {
 			storageType = cloud.getConfigProperty('diskStorageType')
@@ -792,6 +804,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		morpheusContext.cloud.datastore.listById(datastoreIds).blockingSubscribe {
 			datastores[it.id.toLong()] = it
 		}
+
 		config.volumes?.eachWithIndex { volume, index ->
 			def storageVolumeType = storageVolumeTypes[volume.storageType.toLong()]
 			def datastore = datastores[volume.datastoreId.toLong()]
@@ -850,6 +863,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			}
 		}
 
+		def clusterReference = [
+				kind: "cluster",
+				uuid: config.cluster
+		]
+
 		def runConfig = [:] + opts
 		runConfig += [
 				workloadId        : workload.id,
@@ -880,7 +898,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				nicList			  : nicList,
 				skipNetworkWait   : false,
 				uefi              : workload.getConfigProperty('uefi'),
-				secureBoot              : workload.getConfigProperty('secureBoot')
+				secureBoot        : workload.getConfigProperty('secureBoot'),
+				clusterReference  : clusterReference
+
 		]
 		return runConfig
 	}

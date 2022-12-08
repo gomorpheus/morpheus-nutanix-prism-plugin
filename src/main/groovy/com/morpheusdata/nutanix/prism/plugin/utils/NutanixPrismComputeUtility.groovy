@@ -102,14 +102,15 @@ class NutanixPrismComputeUtility {
 		def body = [
 				spec: [
 						name: runConfig.name,
-						resources: resources
+						resources: resources,
+						cluster_reference: runConfig.clusterReference
 				],
 				metadata: [
 						kind: 'vm'
 				]
 		]
 
-		if(runConfig.categories) {
+		if(runConfig.categories && runConfig.categories instanceof String) {
 			body.metadata.use_categories_mapping = true
 			body.metadata.categories_mapping = [:]
 			def categories = runConfig.categories.replace('[','').replace(']','').tokenize(',')
@@ -220,6 +221,11 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse listClusters(HttpApiClient client, Map authConfig) {
 		log.debug("listClusters")
 		return callListApi(client, 'cluster', 'clusters/list', authConfig)
+	}
+
+	static ServiceResponse listVPCs(HttpApiClient client, Map authConfig) {
+		log.debug("listVPCs")
+		return callListApi(client, 'vpc', 'vpcs/list', authConfig)
 	}
 
 	static ServiceResponse listHostsV2(HttpApiClient client, Map authConfig) {

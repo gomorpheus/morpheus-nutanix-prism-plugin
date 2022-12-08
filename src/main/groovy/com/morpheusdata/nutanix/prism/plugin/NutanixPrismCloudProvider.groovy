@@ -26,6 +26,7 @@ import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.ImagesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
 import com.morpheusdata.nutanix.prism.plugin.sync.VirtualMachinesSync
+import com.morpheusdata.nutanix.prism.plugin.sync.VirtualPrivateCloudSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
@@ -165,7 +166,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	@Override
 	Collection<NetworkType> getNetworkTypes() {
 		NetworkType vlanNetwork = new NetworkType([
-				code              : 'nutanix-prism-plugin-network',
+				code              : 'nutanix-prism-plugin-vlan-network',
 				externalType      : 'VLAN',
 				cidrEditable      : true,
 				dhcpServerEditable: true,
@@ -175,7 +176,18 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				canAssignPool     : true,
 				name              : 'Nutanix Prism Plugin VLAN Network'
 		])
-		[vlanNetwork]
+		NetworkType overlayNetwork = new NetworkType([
+				code              : 'nutanix-prism-plugin-overlay-network',
+				externalType      : 'OVERLAY',
+				cidrEditable      : true,
+				dhcpServerEditable: true,
+				dnsEditable       : true,
+				gatewayEditable   : true,
+				vlanIdEditable    : true,
+				canAssignPool     : true,
+				name              : 'Nutanix Prism Plugin Overlay Network'
+		])
+		[vlanNetwork, overlayNetwork]
 	}
 
 	@Override
@@ -429,6 +441,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					ensureRegionCode(cloud)
 
 					(new CategoriesSync(this.plugin, cloud, client)).execute()
+					(new VirtualPrivateCloudSync(this.plugin, cloud, client)).execute()
 					(new ClustersSync(this.plugin, cloud, client)).execute()
 					(new DatastoresSync(this.plugin, cloud, client)).execute()
 					(new NetworksSync(this.plugin, cloud, client)).execute()
