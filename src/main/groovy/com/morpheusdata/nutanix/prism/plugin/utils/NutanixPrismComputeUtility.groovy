@@ -110,11 +110,10 @@ class NutanixPrismComputeUtility {
 				]
 		]
 
-		if(runConfig.categories && runConfig.categories instanceof String) {
+		if(runConfig.categories && runConfig.categories instanceof List) {
 			body.metadata.use_categories_mapping = true
 			body.metadata.categories_mapping = [:]
-			def categories = runConfig.categories.replace('[','').replace(']','').tokenize(',')
-			categories.each { categoryString ->
+			runConfig.categories.each { categoryString ->
 				def categoryData = categoryString.trim().split(':')
 				def key = categoryData[0]
 				def value = categoryData[1]

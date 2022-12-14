@@ -36,7 +36,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	String getName() {
-		return 'Nutanix Prism Option Source Plugin'
+		return 'Nutanix Prism Option Source'
 	}
 
 	@Override
@@ -69,14 +69,15 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 							(img.refType == 'ComputeZone' && img.refId == cloudId ) ||
 							img.imageLocations.any { it.refId == cloudId && it.refType == 'ComputeZone' }) {
 						options << [name: img.name, value: img.id]
-					} else if(regionCode &&
-							(img.imageRegion == regionCode ||
-									img.userUploaded ||
-									img.imageLocations.any { it.imageRegion == regionCode }
-							)
-					) {
-						options << [name: img.name, value: img.id]
 					}
+//					else if(regionCode &&
+//							(img.imageRegion == regionCode ||
+//									img.userUploaded ||
+//									img.imageLocations.any { it.imageRegion == regionCode }
+//							)
+//					) {
+//						options << [name: img.name, value: img.id]
+//					}
 				}
 			}
 		}

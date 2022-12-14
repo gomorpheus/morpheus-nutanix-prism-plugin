@@ -110,9 +110,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	@Override
 	Collection<ComputeServerType> getComputeServerTypes() {
 		ComputeServerType hypervisorType = new ComputeServerType()
-		hypervisorType.name = 'Nutanix Prism Plugin Hypervisor'
+		hypervisorType.name = 'Nutanix Prism Hypervisor'
 		hypervisorType.code = 'nutanix-prism-plugin-hypervisor'
-		hypervisorType.description = 'Nutanix Prism Plugin Hypervisor'
+		hypervisorType.description = 'Nutanix Prism Hypervisor'
 		hypervisorType.vmHypervisor = true
 		hypervisorType.controlPower = false
 		hypervisorType.reconfigureSupported = false
@@ -124,9 +124,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
 
 		ComputeServerType serverType = new ComputeServerType()
-		serverType.name = 'Nutanix Prism Plugin Server'
+		serverType.name = 'Nutanix Prism Server'
 		serverType.code = 'nutanix-prism-plugin-server'
-		serverType.description = 'Nutanix Prism Plugin Server'
+		serverType.description = 'Nutanix Prism Server'
 		serverType.reconfigureSupported = false
 		serverType.hasAutomation = false
 		serverType.supportsConsoleKeymap = true
@@ -135,9 +135,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		serverType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
 
 		ComputeServerType vmType = new ComputeServerType()
-		vmType.name = 'Nutanix Prism Plugin Linux VM'
+		vmType.name = 'Nutanix Prism Linux VM'
 		vmType.code = 'nutanix-prism-plugin-vm'
-		vmType.description = 'Nutanix Prism Plugin Linux VM'
+		vmType.description = 'Nutanix Prism Linux VM'
 		vmType.reconfigureSupported = false
 		vmType.hasAutomation = true
 		vmType.supportsConsoleKeymap = true
@@ -174,7 +174,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				gatewayEditable   : true,
 				vlanIdEditable    : true,
 				canAssignPool     : true,
-				name              : 'Nutanix Prism Plugin VLAN Network'
+				name              : 'Nutanix Prism VLAN Network'
 		])
 		NetworkType overlayNetwork = new NetworkType([
 				code              : 'nutanix-prism-plugin-overlay-network',
@@ -185,7 +185,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				gatewayEditable   : true,
 				vlanIdEditable    : true,
 				canAssignPool     : true,
-				name              : 'Nutanix Prism Plugin Overlay Network'
+				name              : 'Nutanix Prism Overlay Network'
 		])
 		[vlanNetwork, overlayNetwork]
 	}
@@ -257,11 +257,15 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					password = accountCredential.data.password
 					username = accountCredential.data.username
 				} else if(validateCloudRequest.credentialType == 'username-password') {
-					password = validateCloudRequest.credentialPassword
-					username = validateCloudRequest.credentialUsername
+					password = validateCloudRequest.credentialPassword ?: cloudInfo.servicePassword
+					username = validateCloudRequest.credentialUsername ?: cloudInfo.serviceUsername
 				} else if(validateCloudRequest.credentialType == 'local') {
-					password = validateCloudRequest.opts?.zone?.servicePassword
-					username = validateCloudRequest.opts?.zone?.serviceUsername
+					if(validateCloudRequest.opts?.zone?.servicePassword && validateCloudRequest.opts?.zone?.servicePassword != '************') {
+						password = validateCloudRequest.opts?.zone?.servicePassword
+					} else {
+						password = cloudInfo.servicePassword
+					}
+					username = validateCloudRequest.opts?.zone?.serviceUsername ?: cloudInfo.serviceUsername
 				}
 
 				if(username?.length() < 1) {
@@ -359,7 +363,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	String getDescription() {
-		return 'Nutanix Prism Central plugin'
+		return 'Nutanix Prism Central'
 	}
 
 	@Override

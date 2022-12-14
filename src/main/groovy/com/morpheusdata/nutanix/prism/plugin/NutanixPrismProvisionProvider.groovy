@@ -346,7 +346,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			}
 			runConfig.imageExternalId = imageExternalId
 			runConfig.virtualImageId = server.sourceImage?.id
-			runConfig.categories = workload.getConfigProperty('categories')
 			runConfig.userConfig = workloadRequest.usersConfiguration
 			if(imageExternalId) {
 
@@ -804,6 +803,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		morpheusContext.cloud.datastore.listById(datastoreIds).blockingSubscribe {
 			datastores[it.id.toLong()] = it
 		}
+		//categories
+		def categories = config.categories?.collect {it.value}
 
 		config.volumes?.eachWithIndex { volume, index ->
 			def storageVolumeType = storageVolumeTypes[volume.storageType.toLong()]
@@ -899,7 +900,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				skipNetworkWait   : false,
 				uefi              : workload.getConfigProperty('uefi'),
 				secureBoot        : workload.getConfigProperty('secureBoot'),
-				clusterReference  : clusterReference
+				clusterReference  : clusterReference,
+				categories        : categories
 
 		]
 		return runConfig

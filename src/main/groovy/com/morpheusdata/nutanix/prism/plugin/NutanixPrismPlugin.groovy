@@ -18,7 +18,7 @@ class NutanixPrismPlugin extends Plugin {
 
 	@Override
 	void initialize() {
-		this.setName('Nutanix Prism Plugin')
+		this.setName('Nutanix Prism')
 		def nutanixProvision = new NutanixPrismProvisionProvider(this, this.morpheus)
 		def nutanixPrismCloud = new NutanixPrismCloudProvider(this, this.morpheus)
 		cloudProviderCode = nutanixPrismCloud.code
