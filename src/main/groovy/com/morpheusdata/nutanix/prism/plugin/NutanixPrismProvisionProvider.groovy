@@ -114,7 +114,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Collection<OptionType> getNodeOptionTypes() {
-		return []
+		OptionType imageOption = new OptionType([
+				name : 'image',
+				code : 'nutanix-prism-node-image',
+				fieldName : 'containerType.virtualImage.id',
+				fieldContext : null,
+				fieldLabel : 'Image',
+				inputType : OptionType.InputType.SELECT,
+				displayOrder : 100,
+				required : true,
+				optionSource : 'nutanixPrismNodeImage'
+		])
+		return [imageOption]
 	}
 
 	@Override

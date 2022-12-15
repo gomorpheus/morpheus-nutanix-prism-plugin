@@ -41,7 +41,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismPluginImage', 'nutanixPrismPluginCategories', 'nutanixPrismPluginCluster' ])
+		return new ArrayList<String>(['nutanixPrismPluginImage', 'nutanixPrismPluginCategories', 'nutanixPrismPluginCluster', 'nutanixPrismNodeImage'])
 	}
 
 	def nutanixPrismPluginImage(args) {
@@ -88,6 +88,37 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 		options
 
+	}
+
+	def nutanixPrismNodeImage(args) {
+		log.debug "nutanixPrismNodeImage: ${args}"
+		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
+
+		// Grab the projections.. doing a filter pass first
+		def virtualImageIds = []
+		ImageType[] imageTypes =  [ImageType.qcow2, ImageType.ova]
+		morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { VirtualImageIdentityProjection proj ->
+			return (proj.deleted == false)
+		}.blockingSubscribe{virtualImageIds << it.id }
+
+		List options = []
+		if(virtualImageIds.size() > 0) {
+			def invalidStatus = ['Saving', 'Failed', 'Converting']
+			morpheusContext.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
+				if (!(img.status in invalidStatus) &&
+						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
+					if(img.category.startsWith('nutanix.prism.image')) {
+						options << [name: img.name, value: img.id]
+					}
+				}
+			}
+		}
+
+		if(options.size() > 0) {
+			options = options.sort { it.name }
+		}
+
+		options
 	}
 
 	def nutanixPrismPluginCategories(args){
