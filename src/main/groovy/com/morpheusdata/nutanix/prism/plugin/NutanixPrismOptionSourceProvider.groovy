@@ -31,7 +31,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	String getCode() {
-		return 'nutanix-prism-option-source-plugin'
+		return 'nutanix-prism-option-source'
 	}
 
 	@Override
@@ -41,11 +41,11 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismPluginImage', 'nutanixPrismPluginCategories', 'nutanixPrismPluginCluster', 'nutanixPrismNodeImage'])
+		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage'])
 	}
 
-	def nutanixPrismPluginImage(args) {
-		log.debug "nutanixPrismPluginImage: ${args}"
+	def nutanixPrismProvisionImage(args) {
+		log.debug "nutanixPrismProvisionImage: ${args}"
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
@@ -121,7 +121,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		options
 	}
 
-	def nutanixPrismPluginCategories(args){
+	def nutanixPrismCategories(args){
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
 		def options = []
@@ -132,7 +132,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		options
 	}
 
-	def nutanixPrismPluginCluster(args){
+	def nutanixPrismCluster(args){
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
 		def options = []

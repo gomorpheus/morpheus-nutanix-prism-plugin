@@ -54,30 +54,30 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	Collection<OptionType> getOptionTypes() {
 		OptionType cluster = new OptionType([
 				name : 'cluster',
-				code : 'nutanix-prism-plugin-provision-cluster',
+				code : 'nutanix-prism-provision-cluster',
 				fieldName : 'cluster',
 				fieldContext : 'config',
 				fieldLabel : 'Cluster',
 				required : true,
 				inputType : OptionType.InputType.SELECT,
 				displayOrder : 101,
-				optionSource: 'nutanixPrismPluginCluster'
+				optionSource: 'nutanixPrismCluster'
 
 		])
 		OptionType imageOption = new OptionType([
 				name : 'virtual image',
-				code : 'nutanix-prism-plugin-provision-image',
+				code : 'nutanix-prism-provision-image',
 				fieldName : 'virtualImageId',
 				fieldContext : 'config',
 				fieldLabel : 'Image',
 				inputType : OptionType.InputType.SELECT,
 				displayOrder : 102,
 				required : true,
-				optionSource : 'nutanixPrismPluginImage'
+				optionSource : 'nutanixPrismProvisionImage'
 		])
 		OptionType uefi = new OptionType([
 				name : 'uefi',
-				code : 'nutanix-prism-plugin-provision-uefi',
+				code : 'nutanix-prism-provision-uefi',
 				fieldName : 'uefi',
 				fieldContext : 'config',
 				fieldLabel : 'UEFI',
@@ -87,25 +87,25 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		])
 		OptionType secureBoot = new OptionType([
 				name : 'secure boot',
-				code : 'nutanix-prism-plugin-provision-secure-boot',
+				code : 'nutanix-prism-provision-secure-boot',
 				fieldName : 'secureBoot',
 				fieldContext : 'config',
 				fieldLabel : 'Secure Boot',
 				inputType : OptionType.InputType.CHECKBOX,
 				displayOrder : 104,
-				visibleOnCode: 'nutanix-prism-plugin-provision-uefi:on',
+				visibleOnCode: 'nutanix-prism-provision-uefi:on',
 				fieldGroup: 'Nutanix Prism Boot Options'
 
 		])
 		OptionType categories = new OptionType([
 				name : 'categories',
-				code : 'nutanix-prism-plugin-provision-categories',
+				code : 'nutanix-prism-provision-categories',
 				fieldName : 'categories',
 				fieldContext : 'config',
 				fieldLabel : 'Categories',
 				inputType : OptionType.InputType.MULTI_SELECT,
 				displayOrder : 105,
-				optionSource: 'nutanixPrismPluginCategories'
+				optionSource: 'nutanixPrismCategories'
 
 		])
 
@@ -131,39 +131,39 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	@Override
 	Collection<ServicePlan> getServicePlans() {
 		def servicePlans = []
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-512', name:'1 vCPU, 512MB Memory', description:'1 vCPU, 512MB Memory', sortOrder:0,
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-512', name:'1 vCPU, 512MB Memory', description:'1 vCPU, 512MB Memory', sortOrder:0,
 				maxStorage:10l * 1024l * 1024l * 1024l, maxMemory: 1l * 512l * 1024l * 1024l, maxCores:1, 
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-1024', name:'1 vCPU, 1GB Memory', description:'1 vCPU, 1GB Memory', sortOrder:1,
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-1024', name:'1 vCPU, 1GB Memory', description:'1 vCPU, 1GB Memory', sortOrder:1,
 				maxStorage: 10l * 1024l * 1024l * 1024l, maxMemory: 1l * 1024l * 1024l * 1024l, maxCores:1, 
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-2048', name:'1 vCPU, 2GB Memory', description:'1 vCPU, 2GB Memory', sortOrder:2,
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-2048', name:'1 vCPU, 2GB Memory', description:'1 vCPU, 2GB Memory', sortOrder:2,
 				maxStorage: 20l * 1024l * 1024l * 1024l, maxMemory: 2l * 1024l * 1024l * 1024l, maxCores:1, 
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-4096', name:'1 vCPU, 4GB Memory', description:'1 vCPU, 4GB Memory', sortOrder:3,
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-4096', name:'1 vCPU, 4GB Memory', description:'1 vCPU, 4GB Memory', sortOrder:3,
 				maxStorage: 40l * 1024l * 1024l * 1024l, maxMemory: 4l * 1024l * 1024l * 1024l, maxCores:1, 
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-8192', name:'2 vCPU, 8GB Memory', description:'2 vCPU, 8GB Memory', sortOrder:4,
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-8192', name:'2 vCPU, 8GB Memory', description:'2 vCPU, 8GB Memory', sortOrder:4,
 				maxStorage: 80l * 1024l * 1024l * 1024l, maxMemory: 8l * 1024l * 1024l * 1024l, maxCores:2, 
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-16384', name:'2 vCPU, 16GB Memory', description:'2 vCPU, 16GB Memory', sortOrder:5,
-				maxStorage: 160l * 1024l * 1024l * 1024l, maxMemory: 16l * 1024l * 1024l * 1024l, maxCores:2, 
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-16384', name:'2 vCPU, 16GB Memory', description:'2 vCPU, 16GB Memory', sortOrder:5,
+				maxStorage: 160l * 1024l * 1024l * 1024l, maxMemory: 16l * 1024l * 1024l * 1024l, maxCores:2,
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-24576', name:'4 vCPU, 24GB Memory', description:'4 vCPU, 24GB Memory', sortOrder:6,
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-24576', name:'4 vCPU, 24GB Memory', description:'4 vCPU, 24GB Memory', sortOrder:6,
 				maxStorage: 240l * 1024l * 1024l * 1024l, maxMemory: 24l * 1024l * 1024l * 1024l, maxCores:4, 
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-vm-32768', name:'4 vCPU, 32GB Memory', description:'4 vCPU, 32GB Memory', sortOrder:7,
+		servicePlans << new ServicePlan([code:'nutanix-prism-vm-32768', name:'4 vCPU, 32GB Memory', description:'4 vCPU, 32GB Memory', sortOrder:7,
 				maxStorage: 320l * 1024l * 1024l * 1024l, maxMemory: 32l * 1024l * 1024l * 1024l, maxCores:4, 
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true])
 
-		servicePlans << new ServicePlan([code:'nutanix-prism-plugin-internal-custom', editable:false, name:'Nutanix Custom', description:'Nutanix Custom', sortOrder:0,
+		servicePlans << new ServicePlan([code:'nutanix-prism-internal-custom', editable:false, name:'Nutanix Custom', description:'Nutanix Custom', sortOrder:0,
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true, customCpu: true, customCores: true, customMaxMemory: true, deletable: false, provisionable: false,
 				maxStorage:0l, maxMemory: 0l,  maxCpu:0])
 		servicePlans
@@ -172,9 +172,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	@Override
 	Collection<ComputeServerInterfaceType> getComputeServerInterfaceTypes() {
 		ComputeServerInterfaceType computeServerInterface = new ComputeServerInterfaceType([
-				code:'nutanix-prism-plugin-normal-nic',
+				code:'nutanix-prism-normal-nic',
 				externalId:'NORMAL_NIC',
-				name:'Nutanix Prism Plugin Normal NIC',
+				name:'Nutanix Prism Normal NIC',
 				defaultType: true,
 				enabled: true,
 				displayOrder:1
@@ -219,7 +219,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			}
 
 			def validateTemplate = opts.template != null
-			NutanixPrismOptionSourceProvider optionSourceProvider = plugin.getProviderByCode('nutanix-prism-option-source-plugin')
+			NutanixPrismOptionSourceProvider optionSourceProvider = plugin.getProviderByCode('nutanix-prism-option-source')
 			def validationResults = NutanixPrismComputeUtility.validateServerConfig(morpheusContext, apiInfo.apiUrl, apiInfo.apiUsername, apiInfo.apiPassword,
 					[validateTemplate:validateTemplate] + opts)
 			if(!validationResults.success) {
@@ -671,25 +671,25 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	private getStorageVolumeTypes() {
 		def volumeTypes = []
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-scsi',
+				code: 'nutanix-prism-disk-scsi',
 				externalId: 'SCSI',
 				name: 'SCSI'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-pci',
+				code: 'nutanix-prism-disk-pci',
 				externalId: 'PCI',
 				name: 'PCI'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-ide',
+				code: 'nutanix-prism-disk-ide',
 				externalId: 'IDE',
 				name: 'IDE'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-sata',
+				code: 'nutanix-prism-disk-sata',
 				externalId: 'SATA',
 				name: 'SATA'
 		])
@@ -698,7 +698,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	String getCode() {
-		return 'nutanix-prism-provision-provider-plugin'
+		return 'nutanix-prism-provision-provider'
 	}
 
 	@Override
@@ -792,7 +792,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		//storage type
 		StorageVolume rootDisk = this.getRootDisk(workload)
 		def storageType
-		if (rootDisk?.type?.code && rootDisk?.type?.code != 'nutanix-prism-plugin-standard') {
+		if (rootDisk?.type?.code && rootDisk?.type?.code != 'nutanix-prism-standard') {
 			storageType = rootDisk.type.externalId //handle thin/thick clone
 		} else {
 			storageType = cloud.getConfigProperty('diskStorageType')
@@ -967,7 +967,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			server.lvmEnabled = false
 
 
-			def newType = findVmNodeServerTypeForCloud(server.cloud.id, server.osType, 'nutanix-prism-provision-provider-plugin')
+			def newType = findVmNodeServerTypeForCloud(server.cloud.id, server.osType, 'nutanix-prism-provision-provider')
 			if(newType && server.computeServerType != newType) {
 				server.computeServerType = newType
 			}

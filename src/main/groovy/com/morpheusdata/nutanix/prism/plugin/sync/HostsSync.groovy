@@ -44,7 +44,7 @@ class HostsSync {
 			this.authConfig = plugin.getAuthConfig(cloud)
 			
 			def queryResults = [:]
-			queryResults.serverType = new ComputeServerType(code: 'nutanix-prism-plugin-hypervisor')
+			queryResults.serverType = new ComputeServerType(code: 'nutanix-prism-hypervisor')
 			queryResults.serverOs = new OsType(code: 'esxi.6')
 
 			def poolListProjections = []
@@ -103,8 +103,8 @@ class HostsSync {
 	private addMissingHosts(Cloud cloud, List clusters, List addList, List cloudHostDisks) {
 		log.debug "addMissingHosts: ${cloud} ${addList.size()}"
 
-		def volumeType = new StorageVolumeType(code: 'nutanix-prism-plugin-host-disk')
-		def serverType = new ComputeServerType(code: 'nutanix-prism-plugin-hypervisor')
+		def volumeType = new StorageVolumeType(code: 'nutanix-prism-host-disk')
+		def serverType = new ComputeServerType(code: 'nutanix-prism-hypervisor')
 		def serverOs = new OsType(code: 'esxi.6')
 		
 		for(cloudItem in addList) {
@@ -154,7 +154,7 @@ class HostsSync {
 	private updateMatchedHosts(Cloud cloud, List clusters, List updateList, List cloudHostDisks) {
 		log.debug "updateMatchedHosts: ${cloud} ${updateList.size()} ${clusters}"
 
-		def volumeType = new StorageVolumeType(code: 'nutanix-prism-plugin-host-disk')
+		def volumeType = new StorageVolumeType(code: 'nutanix-prism-host-disk')
 
 		List<ComputeZonePoolIdentityProjection> zoneClusters = []
 		def clusterExternalIds = updateList.collect{ it.masterItem.cluster_uuid }.unique()

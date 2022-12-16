@@ -30,7 +30,7 @@ class VirtualMachinesSync {
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
 		this.createNew = createNew
-		this.netTypes = nutanixPrismPlugin.getCloudProvider().getProvisioningProvider('nutanix-prism-provision-provider-plugin').getComputeServerInterfaceTypes()
+		this.netTypes = nutanixPrismPlugin.getCloudProvider().getProvisioningProvider('nutanix-prism-provision-provider').getComputeServerInterfaceTypes()
 	}
 
 	def execute() {
@@ -42,7 +42,7 @@ class VirtualMachinesSync {
 			def listResults = NutanixPrismComputeUtility.listVMs(apiClient, authConfig)
 			if(listResults.success) {
 				def domainRecords = morpheusContext.computeServer.listSyncProjections(cloud.id).filter { ComputeServerIdentityProjection projection ->
-					projection.computeServerTypeCode != 'nutanix-prism-plugin-hypervisor'
+					projection.computeServerTypeCode != 'nutanix-prism-hypervisor'
 				}
 				def blackListedNames = []
 				domainRecords.blockingSubscribe { ComputeServerIdentityProjection server ->
@@ -52,7 +52,7 @@ class VirtualMachinesSync {
 				}
 
 				// To be used throughout the sync
-				def defaultServerType = new ComputeServerType(code: 'nutanix-prism-plugin-server')
+				def defaultServerType = new ComputeServerType(code: 'nutanix-prism-server')
 				Map hosts = getAllHosts()
 				Map resourcePools = getAllResourcePools()
 				Map networks = getAllNetworks()
@@ -102,7 +102,7 @@ class VirtualMachinesSync {
 			return
 
 		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, addList?.collect{ it.metadata.uuid } )
-		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-plugin-internal-custom')
+		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
 
 		for(cloudItem in addList) {
 			try {
@@ -136,7 +136,7 @@ class VirtualMachinesSync {
 	protected updateMatchedVirtualMachines(Cloud cloud, List plans, Map hosts, Map resourcePools, Map networks, Map osTypes, List updateList, Map usageLists) {
 		log.debug "updateMatchedVirtualMachines: ${cloud} ${updateList?.size()}"
 
-		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-plugin-internal-custom')
+		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
 		List<ComputeServer> servers = updateList.collect { it.existingItem }
 
 		// Gather up all the Workloads that may pertain to the servers we are sync'ing
@@ -282,7 +282,7 @@ class VirtualMachinesSync {
 		log.debug "getAllHosts: ${cloud}"
 		def hostIdentitiesMap = [:]
 		morpheusContext.computeServer.listSyncProjections(cloud.id).blockingSubscribe {
-			if(it.computeServerTypeCode == 'nutanix-prism-plugin-hypervisor') {
+			if(it.computeServerTypeCode == 'nutanix-prism-hypervisor') {
 				hostIdentitiesMap[it.externalId] = it.id
 			}
 		}
@@ -315,7 +315,7 @@ class VirtualMachinesSync {
 	private List getAllServicePlans() {
 		log.debug "getAllServicePlans: ${cloud}"
 		def servicePlanProjections = []
-		def provisionType = new ProvisionType(code: 'nutanix-prism-provision-provider-plugin')
+		def provisionType = new ProvisionType(code: 'nutanix-prism-provision-provider')
 		morpheusContext.servicePlan.listSyncProjections(provisionType).blockingSubscribe { servicePlanProjections << it }
 		def plans = []
 		morpheusContext.servicePlan.listById(servicePlanProjections.collect { it.id }).blockingSubscribe {

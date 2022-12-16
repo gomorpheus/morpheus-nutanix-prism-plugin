@@ -13,7 +13,7 @@ class NutanixPrismPlugin extends Plugin {
 
 	@Override
 	String getCode() {
-		return 'morpheus-nutanix-prism-plugin'
+		return 'morpheus-nutanix-prism'
 	}
 
 	@Override

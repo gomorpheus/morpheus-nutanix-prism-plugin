@@ -199,7 +199,7 @@ class NutanixPrismSyncUtils {
 		if(volume.storageType)
 			storageVolume.type = new StorageVolumeType(id: volume.storageType?.toLong())
 		else
-			storageVolume.type = new StorageVolumeType(code: 'nutanix-prism-plugin-disk')
+			storageVolume.type = new StorageVolumeType(code: 'nutanix-prism-disk')
 		if(volume.externalId)
 			storageVolume.externalId = volume.externalId
 		if(volume.internalId)

@@ -49,7 +49,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	Collection<OptionType> getOptionTypes() {
 		OptionType apiUrl = new OptionType(
 				name: 'Api Url',
-				code: 'nutanix-prism-plugin-api-url',
+				code: 'nutanix-prism-api-url',
 				fieldName: 'serviceUrl',
 				displayOrder: 0,
 				fieldLabel: 'Api Url',
@@ -58,7 +58,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'domain'
 		)
 		OptionType credentials = new OptionType(
-				code: 'nutanix-prism-plugin-credential',
+				code: 'nutanix-prism-credential',
 				inputType: OptionType.InputType.CREDENTIAL,
 				name: 'Credentials',
 				fieldName: 'type',
@@ -72,7 +72,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		)
 		OptionType username = new OptionType(
 				name: 'Username',
-				code: 'nutanix-prism-plugin-username',
+				code: 'nutanix-prism-username',
 				fieldName: 'serviceUsername',
 				displayOrder: 20,
 				fieldLabel: 'Username',
@@ -83,7 +83,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		)
 		OptionType password = new OptionType(
 				name: 'Password',
-				code: 'nutanix-prism-plugin-password',
+				code: 'nutanix-prism-password',
 				fieldName: 'servicePassword',
 				displayOrder: 25,
 				fieldLabel: 'Password',
@@ -95,7 +95,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 		OptionType inventoryInstances = new OptionType(
 				name: 'Inventory Existing Instances',
-				code: 'nutanix-prism-plugin-import-existing',
+				code: 'nutanix-prism-import-existing',
 				fieldName: 'importExisting',
 				displayOrder: 90,
 				fieldLabel: 'Inventory Existing Instances',
@@ -111,7 +111,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	Collection<ComputeServerType> getComputeServerTypes() {
 		ComputeServerType hypervisorType = new ComputeServerType()
 		hypervisorType.name = 'Nutanix Prism Hypervisor'
-		hypervisorType.code = 'nutanix-prism-plugin-hypervisor'
+		hypervisorType.code = 'nutanix-prism-hypervisor'
 		hypervisorType.description = 'Nutanix Prism Hypervisor'
 		hypervisorType.vmHypervisor = true
 		hypervisorType.controlPower = false
@@ -121,29 +121,29 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		hypervisorType.agentType = ComputeServerType.AgentType.none
 		hypervisorType.platform = PlatformType.esxi
 		hypervisorType.managed = false
-		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
+		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider'
 
 		ComputeServerType serverType = new ComputeServerType()
 		serverType.name = 'Nutanix Prism Server'
-		serverType.code = 'nutanix-prism-plugin-server'
+		serverType.code = 'nutanix-prism-server'
 		serverType.description = 'Nutanix Prism Server'
 		serverType.reconfigureSupported = false
 		serverType.hasAutomation = false
 		serverType.supportsConsoleKeymap = true
 		serverType.platform = PlatformType.none
 		serverType.managed = false
-		serverType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
+		serverType.provisionTypeCode = 'nutanix-prism-provision-provider'
 
 		ComputeServerType vmType = new ComputeServerType()
 		vmType.name = 'Nutanix Prism Linux VM'
-		vmType.code = 'nutanix-prism-plugin-vm'
+		vmType.code = 'nutanix-prism-vm'
 		vmType.description = 'Nutanix Prism Linux VM'
 		vmType.reconfigureSupported = false
 		vmType.hasAutomation = true
 		vmType.supportsConsoleKeymap = true
 		vmType.platform = PlatformType.linux
 		vmType.managed = true
-		vmType.provisionTypeCode = 'nutanix-prism-provision-provider-plugin'
+		vmType.provisionTypeCode = 'nutanix-prism-provision-provider'
 
 		[hypervisorType, serverType, vmType]
 	}
@@ -166,7 +166,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	@Override
 	Collection<NetworkType> getNetworkTypes() {
 		NetworkType vlanNetwork = new NetworkType([
-				code              : 'nutanix-prism-plugin-vlan-network',
+				code              : 'nutanix-prism-vlan-network',
 				externalType      : 'VLAN',
 				cidrEditable      : true,
 				dhcpServerEditable: true,
@@ -177,7 +177,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				name              : 'Nutanix Prism VLAN Network'
 		])
 		NetworkType overlayNetwork = new NetworkType([
-				code              : 'nutanix-prism-plugin-overlay-network',
+				code              : 'nutanix-prism-overlay-network',
 				externalType      : 'OVERLAY',
 				cidrEditable      : true,
 				dhcpServerEditable: true,
@@ -199,40 +199,40 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	Collection<StorageVolumeType> getStorageVolumeTypes() {
 		def volumeTypes = []
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-datastore',
+				code: 'nutanix-prism-datastore',
 				name: 'Nutanix Prism Datastore'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-host-disk',
+				code: 'nutanix-prism-host-disk',
 				name: 'Nutanix Prism Host Disk'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk',
+				code: 'nutanix-prism-disk',
 				name: 'Disk'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-scsi',
+				code: 'nutanix-prism-disk-scsi',
 				externalId: 'SCSI',
 				name: 'SCSI'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-pci',
+				code: 'nutanix-prism-disk-pci',
 				externalId: 'PCI',
 				name: 'PCI'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-ide',
+				code: 'nutanix-prism-disk-ide',
 				externalId: 'IDE',
 				name: 'IDE'
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-plugin-disk-sata',
+				code: 'nutanix-prism-disk-sata',
 				externalId: 'SATA',
 				name: 'SATA'
 		])
@@ -348,12 +348,12 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	String getCode() {
-		return 'nutanix-prism-plugin-cloud'
+		return 'nutanix-prism-cloud'
 	}
 
 	@Override
 	Icon getIcon() {
-		return new Icon(path:"nutanix-prism-plugin.svg", darkPath: "nutanix-prism-plugin-dark.svg")
+		return new Icon(path:"nutanix-prism.svg", darkPath: "nutanix-prism-dark.svg")
 	}
 
 	@Override
@@ -487,6 +487,6 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	NutanixPrismProvisionProvider nutanixPrismProvisionProvider() {
-		this.plugin.getProviderByCode('nutanix-prism-provision-provider-plugin')
+		this.plugin.getProviderByCode('nutanix-prism-provision-provider')
 	}
 }
