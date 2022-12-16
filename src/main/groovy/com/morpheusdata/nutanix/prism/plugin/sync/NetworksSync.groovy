@@ -61,7 +61,8 @@ class NetworksSync {
 				}.onAdd { itemsToAdd ->
 					def networkAdds = []
 					itemsToAdd?.each { cloudItem ->
-						def clusterId = clusters?.find { it.externalId == cloudItem.status?.cluster_reference?.uuid}?.id
+						def cluster = clusters?.find { it.externalId == cloudItem.status?.cluster_reference?.uuid}
+						def clusterId = cluster?.id
 						def vpcId = vpcs?.find { it.externalId == cloudItem.spec?.resources?.vpc_reference?.uuid}?.id
 						def networkTypeString = cloudItem.status.resources.subnet_type
 						def networkType = networkTypes?.find { it.externalType == networkTypeString }
@@ -84,6 +85,9 @@ class NetworksSync {
 						if(networkTypeString == 'OVERLAY') {
 							networkConfig.config = [vpc: cloudItem.spec.resources.vpc_reference.uuid]
 						}
+						if(clusterId) {
+							networkConfig.displayName = "${cloudItem.status.name} (${cluster.name})"
+						}
 
 						Network networkAdd = new Network(networkConfig)
 						if(clusterId) {
@@ -98,7 +102,8 @@ class NetworksSync {
 					for (item in updateItems) {
 						def masterItem = item.masterItem
 						Network existingItem = item.existingItem
-						def clusterId = clusters?.find { it.externalId == masterItem.status?.cluster_reference?.uuid}?.id
+						def cluster = clusters?.find { it.externalId == masterItem.status?.cluster_reference?.uuid}
+						def clusterId = cluster?.id
 						def save = false
 						if (existingItem) {
 							if (existingItem.zonePoolId != clusterId) {
@@ -108,6 +113,11 @@ class NetworksSync {
 							def name = masterItem.status.name
 							if (existingItem.name != name) {
 								existingItem.name = name
+								if(clusterId) {
+									existingItem.displayName = "${name} ${cluster.name}"
+								} else {
+									existingItem.displayName = name
+								}
 								save = true
 							}
 							def networkType = masterItem.status.resources.subnet_type
