@@ -868,7 +868,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				]
 				if(networkInterface.ipAddress) {
 					networkConfig["ip_endpoint_list"] =  [
-					        "ip": networkInterface.ipAddress
+					        "ip": networkInterface.ipAddress,
+							"ip_type": "Static"
 					]
 				}
 				nicList << networkConfig
