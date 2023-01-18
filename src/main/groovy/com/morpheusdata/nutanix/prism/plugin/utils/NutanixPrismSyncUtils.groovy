@@ -179,6 +179,7 @@ class NutanixPrismSyncUtils {
 					unitNumber  : "${volume.device_properties?.disk_address?.device_index}",
 					datastore   : datastore,
 					displayOrder: volume.device_properties.disk_address.device_index,
+					storageType : volume.device_properties.disk_address.adapter_type,
 			]
 			volumeConfig.rootVolume = volumeConfig.deviceName == 'sda'
 
@@ -196,9 +197,10 @@ class NutanixPrismSyncUtils {
 		storageVolume.name = volume.name
 		storageVolume.account = account
 		storageVolume.maxStorage = size?.toLong() ?: volume.maxStorage?.toLong() ?: volume.size?.toLong()
-		if(volume.storageType)
-			storageVolume.type = new StorageVolumeType(id: volume.storageType?.toLong())
-		else
+		if(volume.storageType) {
+			String storageTypeCode = "nutanix-prism-disk-" + volume.storageType.toLowerCase()
+			storageVolume.type = new StorageVolumeType(code: storageTypeCode)
+		} else
 			storageVolume.type = new StorageVolumeType(code: 'nutanix-prism-disk')
 		if(volume.externalId)
 			storageVolume.externalId = volume.externalId
