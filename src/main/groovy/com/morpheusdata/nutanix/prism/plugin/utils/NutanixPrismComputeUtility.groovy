@@ -83,8 +83,11 @@ class NutanixPrismComputeUtility {
 		]
 
 		if(runConfig.uefi) {
-			resources['machine_type'] = "Q35"
+			resources['boot_config'] = [
+					boot_type: "UEFI"
+			]
 			if(runConfig.secureBoot) {
+				resources['machine_type'] = "Q35"
 				resources['boot_config'] = [
 						boot_type: "SECURE_BOOT"
 				]
