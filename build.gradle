@@ -37,7 +37,7 @@ configurations {
 }
 
 dependencies {
-	provided "com.morpheusdata:morpheus-plugin-api:0.13.5"
+	provided "com.morpheusdata:morpheus-plugin-api:0.13.6-SNAPSHOT"
 	provided "org.codehaus.groovy:groovy-all:$groovyVersion"
 	implementation 'commons-beanutils:commons-beanutils:1.9.3'
 	implementation "org.slf4j:slf4j-api:$slf4jVersion"

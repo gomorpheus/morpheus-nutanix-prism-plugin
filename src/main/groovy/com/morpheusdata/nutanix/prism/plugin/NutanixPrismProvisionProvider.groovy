@@ -15,6 +15,7 @@ import com.morpheusdata.model.ComputeTypeLayout
 import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.HostType
+import com.morpheusdata.model.Icon
 import com.morpheusdata.model.ImageType
 import com.morpheusdata.model.Instance
 import com.morpheusdata.model.Network
@@ -48,6 +49,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	NutanixPrismProvisionProvider(NutanixPrismPlugin plugin, MorpheusContext context) {
 		this.plugin = plugin
 		this.morpheusContext = context
+	}
+
+	@Override
+	Icon getCircularIcon() {
+		return new Icon(path:"nutanix-prism-plugin-circular.svg", darkPath: "nutanix-prism-plugin-circular-dark.svg")
 	}
 
 	@Override

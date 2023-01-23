@@ -357,6 +357,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
+	Icon getCircularIcon() {
+		return new Icon(path:"nutanix-prism-plugin-circular.svg", darkPath: "nutanix-prism-plugin-circular-dark.svg")
+	}
+
+	@Override
 	String getName() {
 		return 'Nutanix Prism'
 	}
