@@ -34,7 +34,9 @@ import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
 import com.morpheusdata.model.projection.DatastoreIdentityProjection
 import com.morpheusdata.model.provisioning.WorkloadRequest
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.request.ResizeRequest
+import com.morpheusdata.request.UpdateModel
 import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.response.WorkloadResponse
 import groovy.json.JsonSlurper
@@ -585,13 +587,246 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	ServiceResponse resizeWorkload(Instance instance, Workload workload, ResizeRequest resizeRequest, Map opts) {
-		return ServiceResponse.error()
+		def server = morpheusContext.computeServer.get(workload.server.id).blockingGet()
+		if(server) {
+			return internalResizeServer(server, resizeRequest)
+		} else {
+			return ServiceResponse.error("No server provided")
+		}
 	}
 
 	@Override
 	ServiceResponse resizeServer(ComputeServer server, ResizeRequest resizeRequest, Map opts) {
-		return ServiceResponse.error()
+		return internalResizeServer(server, resizeRequest)
 	}
+
+	private internalResizeServer(ComputeServer server, ResizeRequest resizeRequest) {
+		ServiceResponse rtn = ServiceResponse.success()
+		try {
+			Cloud cloud = server.cloud
+
+			def authConfig = plugin.getAuthConfig(cloud)
+
+			def vmId = server.externalId
+			HttpApiClient client = new HttpApiClient()
+			client.networkProxy = cloud.apiProxy
+
+
+			//remove snapshots - TODO once/if we have snapshots
+
+			def serverDetails = waitForPowerState(client, authConfig, vmId)
+			def vmBody = serverDetails?.data
+
+			def maxCores = resizeRequest.maxCores ?: 1
+			def coresPerSocket = resizeRequest.coresPerSocket ?: 1
+			if(coresPerSocket == 0) {
+				coresPerSocket = 1
+			}
+
+			def updatedResources = [
+					maxMemory: resizeRequest.maxMemory.div(ComputeUtility.ONE_MEGABYTE),
+					maxCores: maxCores,
+					coresPerSocket: coresPerSocket,
+					numSockets: maxCores.toInteger() / coresPerSocket.toInteger()
+
+			]
+			def updateResourcesResult = NutanixPrismComputeUtility.adjustVmResources(client, authConfig, vmId, updatedResources, vmBody)
+
+
+			//disks
+			//skip controllers for now
+			//remove disks to delete
+			def volumesToDelete = resizeRequest.volumesDelete?.collect {it.externalId}
+			if(volumesToDelete.size() > 0) {
+				serverDetails = waitForPowerState(client, authConfig, vmId)
+				vmBody = serverDetails?.data
+				def newDiskList = vmBody.spec?.resources?.disk_list?.findAll { !volumesToDelete.contains(it.uuid) }
+				vmBody.spec?.resources?.disk_list = newDiskList
+				def deleteResults = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
+				if(deleteResults.success == true) {
+					log.info("resize volume delete complete: ${deleteResults.success}")
+					resizeRequest.volumesDelete?.each { StorageVolume volume ->
+						morpheusContext.storageVolume.remove([volume], server, true).blockingGet()
+					}
+				}
+			}
+
+			//update existing disks
+			resizeRequest.volumesUpdate?.each { UpdateModel<StorageVolume> volumeUpdate ->
+				StorageVolume existing = volumeUpdate.existingModel
+				Map updateProps = volumeUpdate.updateProps
+				log.info("resizing vm storage: {}", volumeUpdate)
+				if (updateProps.maxStorage > existing.maxStorage) {
+					serverDetails = waitForPowerState(client, authConfig, vmId)
+					vmBody = serverDetails?.data
+					def newDiskList = vmBody.spec?.resources?.disk_list
+					def diskMap = newDiskList.find{it.uuid == existing.externalId}
+					diskMap.disk_size_bytes = updateProps.maxStorage
+					diskMap.remove("disk_size_mib")
+					def result = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
+					if (result.success) {
+						existing.maxStorage = updateProps.maxStorage
+						morpheusContext.storageVolume.save([existing]).blockingGet()
+					} else {
+						rtn.setError(result.msg ?: "Failed to expand Disk: ${existing.name}")
+						log.warn("error resizing disk: ${result.msg}")
+					}
+				}
+			}
+
+			//add new disks
+			def datastoreIds = []
+			def storageVolumeTypes = [:]
+			resizeRequest.volumesAdd?.each { Map volumeAdd ->
+				datastoreIds << volumeAdd.datastoreId.toLong()
+				def storageVolumeTypeId = volumeAdd.storageType.toLong()
+				if(!storageVolumeTypes[storageVolumeTypeId]) {
+					storageVolumeTypes[storageVolumeTypeId] = morpheusContext.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
+				}
+
+			}
+			datastoreIds = datastoreIds.unique()
+			def datastores = [:]
+			morpheusContext.cloud.datastore.listById(datastoreIds).blockingSubscribe {
+				datastores[it.id.toLong()] = it
+			}
+			resizeRequest.volumesAdd?.each { Map volumeAdd ->
+				serverDetails = waitForPowerState(client, authConfig, vmId)
+				vmBody = serverDetails?.data
+				log.info("resizing vm adding storage: {}", volumeAdd)
+				def storageVolumeType = storageVolumeTypes[volumeAdd.storageType.toLong()]
+				def datastore = datastores[volumeAdd.datastoreId.toLong()]
+				def targetIndex = vmBody.spec?.resources?.disk_list.findAll { it.device_properties.disk_address.adapter_type == storageVolumeType.name }.collect { it.device_properties.disk_address.device_index }.max()
+				if(targetIndex) {
+					targetIndex++
+				} else {
+					targetIndex = 0
+				}
+				def newDiskList = vmBody.spec?.resources?.disk_list
+
+				def diskConfig = [
+						device_properties: [
+								device_type: "DISK",
+								disk_address: [
+										adapter_type: storageVolumeType.name,
+										device_index: targetIndex
+								],
+						],
+						disk_size_bytes: volumeAdd.maxStorage,
+						storage_config: [
+								storage_container_reference: [
+										uuid: datastore.externalId,
+										name: datastore.name,
+										kind: "storage_container",
+								]
+						]
+				]
+				newDiskList << diskConfig
+				vmBody.spec.resources.disk_list = newDiskList
+				def addDiskResults = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
+				if(addDiskResults.success) {
+					//wait for operation to complete
+					serverDetails = waitForPowerState(client, authConfig, vmId)
+					vmBody = serverDetails?.data
+					def newDisk = vmBody.spec.resources.disk_list.find {it.device_properties.disk_address.adapter_type == storageVolumeType.name && it.device_properties.disk_address.device_index == targetIndex}
+					def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
+					newVolume.externalId = newDisk.uuid
+					newVolume.type = new StorageVolumeType(id: volumeAdd.storageType.toLong())
+					morpheusContext.storageVolume.create([newVolume], server).blockingGet()
+					// Need to refetch the server
+					server = morpheusContext.computeServer.get(server.id).blockingGet()
+				} else {
+					//do stuff here to bubble up results
+					rtn.setError("error adding disk: ${addDiskResults?.msg}")
+					log.warn("error adding disk: ${addDiskResults}")
+				}
+			}
+
+
+			//networks
+
+			def networksToDelete = resizeRequest.interfacesDelete?.collect {it.externalId}
+			if(networksToDelete.size() > 0) {
+				serverDetails = waitForPowerState(client, authConfig, vmId)
+				vmBody = serverDetails?.data
+				def newNicList = vmBody.spec?.resources?.nic_list?.findAll { !networksToDelete.contains(it.uuid) }
+				vmBody.spec?.resources?.nic_list = newNicList
+				def deleteResults = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
+				if(deleteResults.success == true) {
+					log.info("resize network delete complete: ${deleteResults.success}")
+					resizeRequest.interfacesDelete?.each { ComputeServerInterface networkDelete ->
+						morpheusContext.computeServer.computeServerInterface.remove([networkDelete]).blockingGet()
+					}
+				}
+			}
+//
+			//TODO update support
+//			resizeRequest?.interfacesUpdate?.eachWithIndex { UpdateModel<ComputeServerInterface> networkUpdate, index ->
+//			}
+//
+			resizeRequest.interfacesAdd?.each{ Map networkAdd ->
+				serverDetails = waitForPowerState(client, authConfig, vmId)
+				vmBody = serverDetails?.data
+				def newIndex = networkAdd?.network?.isPrimary ? 0 : server.interfaces?.size()
+
+				Network newNetwork
+				morpheusContext.network.listById([networkAdd.network.id.toLong()]).blockingSubscribe { newNetwork = it }
+
+				def networkConfig = [
+						is_connected    : true,
+						subnet_reference: [
+								uuid: newNetwork.externalId,
+								name: newNetwork.name,
+								kind: "subnet"
+						]
+				]
+				if(networkAdd.ipAddress) {
+					networkConfig["ip_endpoint_list"] =  [
+							[
+							"ip": networkAdd.ipAddress
+						]
+					]
+				}
+				def newNicList = vmBody.spec?.resources?.nic_list
+				def oldNicList = newNicList.collect {it.uuid}
+				newNicList << networkConfig
+
+
+				vmBody.spec.resources.nic_list = newNicList
+				def networkResults = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
+				if(networkResults.success) {
+					//wait for operation to complete
+					serverDetails = waitForPowerState(client, authConfig, vmId)
+					vmBody = serverDetails?.data
+					def newNic = vmBody.spec.resources.nic_list.find {!oldNicList.contains(it.uuid)}
+					def newInterface = new ComputeServerInterface([
+							externalId      : newNic.uuid,
+							type            : new ComputeServerInterfaceType(code: 'nutanix-prism-normal-nic'),
+							macAddress      : newNic.mac_address,
+							name            : "eth${newIndex}",
+							ipAddress       : newNic.ip_endpoint_list?.getAt(0)?.ip,
+							network         : newNetwork ? new Network(id: newNetwork.id) : null,
+							displayOrder    : newIndex,
+							primaryInterface: networkAdd?.network?.isPrimary ? true : false
+					])
+					morpheusContext.computeServer.computeServerInterface.create([newInterface], server).blockingGet()
+					// Need to refetch the server
+					server = morpheusContext.computeServer.get(server.id).blockingGet()
+				} else {
+					//do stuff here to bubble up results
+					rtn.setError("error adding disk: ${addDiskResults?.msg}")
+					log.warn("error adding disk: ${addDiskResults}")
+				}
+
+			}
+//
+		} catch(e) {
+			log.error("Unable to resize container: ${e.message}", e)
+			rtn.setError("Error resizing workload: ${e}")
+		}
+		return rtn
+	}
+
 
 	@Override
 	ServiceResponse createWorkloadResources(Workload workload, Map opts) {
@@ -874,8 +1109,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				]
 				if(networkInterface.ipAddress) {
 					networkConfig["ip_endpoint_list"] =  [
-					        "ip": networkInterface.ipAddress,
-							"ip_type": "Static"
+							[
+					        "ip": networkInterface.ipAddress
+						]
 					]
 				}
 				nicList << networkConfig
@@ -1047,6 +1283,23 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 							def publicIp = serverDetail.ipAddress
 							server.internalIp = privateIp
 							server.externalIp = publicIp
+							
+							//update disks
+							def disks = serverDetail.diskList
+
+							//some ugly matching
+							def volumeTypeCountMap = [:]
+							def volumes = server.volumes.sort { it.displayOrder}
+							for(int i = 0; i < volumes.size(); i++) {
+								def volume = volumes[i]
+								if(!volumeTypeCountMap[volume.type.name]) {
+									volumeTypeCountMap[volume.type.name] = 0
+								}
+								def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name && disk.device_properties.disk_address.device_index == volumeTypeCountMap[volume.type.name] }
+								volume.externalId = newDisk?.uuid
+								volumeTypeCountMap[volume.type.name]++
+							}
+							morpheusContext.storageVolume.save(volumes).blockingGet()
 							server = saveAndGet(server)
 							workloadResponse.success = true
 						} else {
@@ -1148,6 +1401,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					rtn.success = true
 					rtn.virtualMachine = serverDetail.data
 					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
+					rtn.diskList = serverResource.disk_list
 					pending = false
 				}
 				attempts ++

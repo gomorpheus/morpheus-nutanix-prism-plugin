@@ -149,25 +149,33 @@ class NutanixPrismComputeUtility {
 
 	static ServiceResponse startVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
 		log.debug("startVm")
-		vmBody.remove('status')
 		if(vmBody?.spec?.resources?.power_state) {
 			vmBody.spec.resources.power_state = 'ON'
 		}
-		vmBody.metadata.remove('spec_hash')
 		return updateVm(client, authConfig, uuid, vmBody)
 	}
 
 	static ServiceResponse stopVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
 		log.debug("startVm")
-		vmBody.remove('status')
 		if(vmBody?.spec?.resources?.power_state) {
 			vmBody.spec.resources.power_state = 'OFF'
 		}
-		vmBody.metadata.remove('spec_hash')
+		return updateVm(client, authConfig, uuid, vmBody)
+	}
+
+	static adjustVmResources(HttpApiClient client, Map authConfig, String uuid, Map updateConfig, Map vmBody) {
+
+		if(vmBody?.spec?.resources) {
+			vmBody?.spec?.resources['num_sockets'] = updateConfig.numSockets
+			vmBody?.spec?.resources['memory_size_mib'] = updateConfig.maxMemory
+			vmBody?.spec?.resources['num_vcpus_per_socket'] = updateConfig.coresPerSocket
+		}
 		return updateVm(client, authConfig, uuid, vmBody)
 	}
 
 	static ServiceResponse updateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		vmBody.remove('status')
+		vmBody.metadata?.remove('spec_hash')
 		log.debug("updateVm")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')

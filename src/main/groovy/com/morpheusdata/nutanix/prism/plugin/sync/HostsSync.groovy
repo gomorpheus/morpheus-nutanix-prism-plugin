@@ -257,12 +257,6 @@ class HostsSync {
 				existingVolume.usedStorage = usedStorage
 				save = true
 			}
-			// don't update name? Not really a PC concept
-//			def name = NutanixPrismComputeUtility.getDiskName(cloudDisk)
-//			if(existingVolume.name != name) {
-//				existingVolume.name = name
-//				save = true
-//			}
 
 			if(save) {
 				saveList << existingVolume

@@ -333,8 +333,8 @@ class VirtualMachinesSync {
 			if (server.agentInstalled && server.usedStorage) {
 				maxUsedStorage = server.usedStorage
 			}
-
-			def workload = workloads[server.id]?.first()
+			
+			def workload = workloads[server.id]
 			if (workload) {
 				statsData << [
 						workload      : workload,
