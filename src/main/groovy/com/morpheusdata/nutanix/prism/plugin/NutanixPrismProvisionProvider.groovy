@@ -1,6 +1,6 @@
 package com.morpheusdata.nutanix.prism.plugin
 
-//import com.bertramlabs.plugins.karman.CloudFile
+import com.bertramlabs.plugins.karman.CloudFile
 import com.morpheusdata.core.AbstractProvisionProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
@@ -332,12 +332,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					def imageFile = cloudFiles?.find{cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2")}
 					// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
 					// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
-					def letNutanixDownloadImage = imageFile?.getURL()?.contains('morpheus-images')
+					def letNutanixDownloadImage = imageFile?.getURL()?.toString()?.contains('morpheus-images')
 					def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig,
 							virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL() : null)
 					if(imageResults.success && !letNutanixDownloadImage) {
 						imageExternalId = imageResults.data.metadata.uuid
-						def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputSream)
+						def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream)
 						if(!uploadResults.success) {
 							throw new Exception("Error in uploading the image: ${uploadResults.msg}")
 						}

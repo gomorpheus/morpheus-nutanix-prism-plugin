@@ -70,14 +70,14 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 							img.imageLocations.any { it.refId == cloudId && it.refType == 'ComputeZone' }) {
 						options << [name: img.name, value: img.id]
 					}
-//					else if(regionCode &&
-//							(img.imageRegion == regionCode ||
-//									img.userUploaded ||
-//									img.imageLocations.any { it.imageRegion == regionCode }
-//							)
-//					) {
-//						options << [name: img.name, value: img.id]
-//					}
+					else if(regionCode &&
+							(img.imageRegion == regionCode ||
+									img.userUploaded ||
+									img.imageLocations.any { it.imageRegion == regionCode }
+							)
+					) {
+						options << [name: img.name, value: img.id]
+					}
 				}
 			}
 		}
@@ -107,7 +107,10 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			morpheusContext.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
 				if (!(img.status in invalidStatus) &&
 						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
-					if(img.category.startsWith('nutanix.prism.image')) {
+					if(img.category?.startsWith('nutanix.prism.image')) {
+						options << [name: img.name, value: img.id]
+					}
+					else if((img.imageType == ImageType.qcow2 || img.imageType == ImageType.vmdk) && img.userUploaded) {
 						options << [name: img.name, value: img.id]
 					}
 				}
