@@ -972,14 +972,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			while(pending) {
 				sleep(1000l * 20l)
 				def imageDetail = NutanixPrismComputeUtility.getImage(apiClient, authConfig, imageExternalId)
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:waitForImageComplete imageDetail- ${imageDetail}\u001B[0m"
 				log.debug("imageDetail: ${imageDetail}")
 				if(!imageDetail.success && imageDetail.data.code == 404 ) {
 					pending = false
 				}
 				def imageStatus = imageDetail?.data?.status
 				def retrivalList = imageStatus?.resources.retrieval_uri_list
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:waitForImageComplete- ${retrivalList}\u001B[0m"
 				if(imageDetail.success == true && imageStatus.state == "COMPLETE" && retrivalList.size() > 0) {
 					rtn.success = true
 					rtn.data = imageDetail.data
