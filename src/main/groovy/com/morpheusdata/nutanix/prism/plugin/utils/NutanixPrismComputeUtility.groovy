@@ -22,7 +22,7 @@ class NutanixPrismComputeUtility {
 		return rtn
 	}
 
-	static ServiceResponse checkImageId(HttpApiClient client, Map authConfig, String imageId) {
+	static ServiceResponse getImage(HttpApiClient client, Map authConfig, String imageId) {
 		log.debug("checkImageId")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')

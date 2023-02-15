@@ -12,11 +12,9 @@ import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerInterface
 import com.morpheusdata.model.ComputeServerInterfaceType
 import com.morpheusdata.model.ComputeTypeLayout
-import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.HostType
 import com.morpheusdata.model.Icon
-import com.morpheusdata.model.ImageType
 import com.morpheusdata.model.Instance
 import com.morpheusdata.model.Network
 import com.morpheusdata.model.NetworkProxy
@@ -30,8 +28,6 @@ import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.VirtualImageLocation
 import com.morpheusdata.model.Workload
-import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
-import com.morpheusdata.model.projection.DatastoreIdentityProjection
 import com.morpheusdata.model.provisioning.WorkloadRequest
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
@@ -323,43 +319,43 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						log.info "Error in findVirtualImageLocation.. could be not found ${e}", e
 					}
 					if(imageExternalId) {
-						ServiceResponse response = NutanixPrismComputeUtility.checkImageId(client, authConfig, imageExternalId)
+						ServiceResponse response = NutanixPrismComputeUtility.getImage(client, authConfig, imageExternalId)
 						if(!response.success) {
 							imageExternalId = null
 						}
 					}
 				}
 
-//				if(!imageExternalId) { //If its userUploaded and still needs uploaded
-//					// Create the image
-//					def cloudFiles = morpheusContext.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
-//					def imageFile = cloudFiles?.find{cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2")}
-//					// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
-//					// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
-//					def letNutanixDownloadImage = imageFile?.getURL()?.contains('morpheus-images')
-//					def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig,
-//							virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL() : null)
-//					if(imageResults.success && !letNutanixDownloadImage) {
-//						imageExternalId = imageResults.data.metadata.uuid
-//						def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputSream)
-//						if(!uploadResults.success) {
-//							throw new Exception("Error in uploading the image: ${uploadResults.msg}")
-//						}
-//					} else {
-//						throw new Exception("Error in creating the image: ${imageResults.msg}")
-//					}
-//
-//					// Wait till the image is COMPLETE
-//					waitForImageComplete(client, authConfig, imageExternalId)
-//
-//					// Create the VirtualImageLocation
-//					VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
-//							virtualImage: virtualImage,
-//							externalId  : imageExternalId,
-//							imageRegion : cloud.regionCode
-//					])
-//					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud ).blockingGet()
-//				}
+				if(!imageExternalId) { //If its userUploaded and still needs uploaded
+					// Create the image
+					def cloudFiles = morpheusContext.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
+					def imageFile = cloudFiles?.find{cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2")}
+					// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
+					// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
+					def letNutanixDownloadImage = imageFile?.getURL()?.contains('morpheus-images')
+					def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig,
+							virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL() : null)
+					if(imageResults.success && !letNutanixDownloadImage) {
+						imageExternalId = imageResults.data.metadata.uuid
+						def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputSream)
+						if(!uploadResults.success) {
+							throw new Exception("Error in uploading the image: ${uploadResults.msg}")
+						}
+					} else {
+						throw new Exception("Error in creating the image: ${imageResults.msg}")
+					}
+
+					// Wait till the image is COMPLETE
+					waitForImageComplete(client, authConfig, imageExternalId)
+
+					// Create the VirtualImageLocation
+					VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
+							virtualImage: virtualImage,
+							externalId  : imageExternalId,
+							imageRegion : cloud.regionCode
+					])
+					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud ).blockingGet()
+				}
 			} finally {
 				morpheusContext.releaseLock(lockKey, [lock:lock]).blockingGet()
 			}
@@ -697,7 +693,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				def storageVolumeType = storageVolumeTypes[volumeAdd.storageType.toLong()]
 				def datastore = datastores[volumeAdd.datastoreId.toLong()]
 				def targetIndex = vmBody.spec?.resources?.disk_list.findAll { it.device_properties.disk_address.adapter_type == storageVolumeType.name }.collect { it.device_properties.disk_address.device_index }.max()
-				if(targetIndex) {
+				if(targetIndex != null) {
 					targetIndex++
 				} else {
 					targetIndex = 0
@@ -968,9 +964,35 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return networkProxy
 	}
 
-	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId) {
-		// TODO
-		return true
+	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId, Boolean) {
+		def rtn = [success:false]
+		try {
+			def pending = true
+			def attempts = 0
+			while(pending) {
+				sleep(1000l * 20l)
+				def imageDetail = NutanixPrismComputeUtility.getImage(apiClient, authConfig, imageExternalId)
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:waitForImageComplete imageDetail- ${imageDetail}\u001B[0m"
+				log.debug("imageDetail: ${imageDetail}")
+				if(!imageDetail.success && imageDetail.data.code == 404 ) {
+					pending = false
+				}
+				def imageStatus = imageDetail?.data?.status
+				def retrivalList = imageStatus?.resources.retrieval_uri_list
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:waitForImageComplete- ${retrivalList}\u001B[0m"
+				if(imageDetail.success == true && imageStatus.state == "COMPLETE" && retrivalList.size() > 0) {
+					rtn.success = true
+					rtn.data = imageDetail.data
+					pending = false
+				}
+				attempts ++
+				if(attempts > 60)
+					pending = false
+			}
+		} catch(e) {
+			log.error("An Exception Has Occurred: ${e.message}",e)
+		}
+		return rtn
 	}
 
 	private getDataDiskList(Workload workload) {
