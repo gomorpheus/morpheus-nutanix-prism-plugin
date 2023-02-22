@@ -334,12 +334,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
 					def letNutanixDownloadImage = imageFile?.getURL()?.toString()?.contains('morpheus-images')
 					def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig,
-							virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL() : null)
-					if(imageResults.success && !letNutanixDownloadImage) {
+							virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL()?.toString() : null)
+					if(imageResults.success) {
 						imageExternalId = imageResults.data.metadata.uuid
-						def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream)
-						if(!uploadResults.success) {
-							throw new Exception("Error in uploading the image: ${uploadResults.msg}")
+						if(!letNutanixDownloadImage) {
+							def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream)
+							if (!uploadResults.success) {
+								throw new Exception("Error in uploading the image: ${uploadResults.msg}")
+							}
 						}
 					} else {
 						throw new Exception("Error in creating the image: ${imageResults.msg}")
@@ -964,7 +966,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return networkProxy
 	}
 
-	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId, Boolean) {
+	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId) {
 		def rtn = [success:false]
 		try {
 			def pending = true
@@ -977,14 +979,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					pending = false
 				}
 				def imageStatus = imageDetail?.data?.status
-				def retrivalList = imageStatus?.resources.retrieval_uri_list
-				if(imageDetail.success == true && imageStatus.state == "COMPLETE" && retrivalList.size() > 0) {
+				def retrievalList = imageStatus?.resources?.retrieval_uri_list
+				if(imageDetail.success == true && imageStatus?.state == "COMPLETE" && retrievalList?.size() > 0) {
 					rtn.success = true
 					rtn.data = imageDetail.data
 					pending = false
 				}
 				attempts ++
-				if(attempts > 60)
+				if(attempts > 120)
 					pending = false
 			}
 		} catch(e) {

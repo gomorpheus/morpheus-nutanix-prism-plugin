@@ -205,40 +205,42 @@ class ImagesSync {
 				def save = false
 				def saveImage = false
 				def image = existingItems.find {it.id == imageLocation.virtualImage.id}
-				if(imageLocation.imageName != virtualImageConfig.name) {
-					imageLocation.imageName = virtualImageConfig.name
-					if(image && (image.refId == imageLocation.refId.toString())) {
-						image.name = virtualImageConfig.name
-						imagesToUpdate << image
+				if(image) {
+					if (imageLocation.imageName != virtualImageConfig.name) {
+						imageLocation.imageName = virtualImageConfig.name
+						if (image && (image.refId == imageLocation.refId.toString())) {
+							image.name = virtualImageConfig.name
+							imagesToUpdate << image
+							saveImage = true
+						}
+						save = true
+					}
+					if (imageLocation.imageRegion != virtualImageConfig.imageRegion) {
+						imageLocation.imageRegion = virtualImageConfig.imageRegion
+						save = true
+					}
+					if (image.remotePath != virtualImageConfig.remotePath) {
+						image.remotePath = virtualImageConfig.remotePath
 						saveImage = true
 					}
-					save = true
-				}
-				if(imageLocation.imageRegion != virtualImageConfig.imageRegion) {
-					imageLocation.imageRegion = virtualImageConfig.imageRegion
-					save = true
-				}
-				if(image.remotePath != virtualImageConfig.remotePath) {
-					image.remotePath =  virtualImageConfig.remotePath
-					saveImage = true
-				}
-				if(image.imageRegion != virtualImageConfig.imageRegion) {
-					image.imageRegion = virtualImageConfig.imageRegion
-					saveImage = true
-				}
-				if(image.minDisk != virtualImageConfig.minDisk) {
-					image.minDisk = virtualImageConfig.minDisk
-					saveImage = true
-				}
-				if(image.bucketId != virtualImageConfig.bucketId) {
-					image.bucketId = virtualImageConfig.bucketId
-					saveImage = true
-				}
-				if(save) {
-					locationsToUpdate << imageLocation
-				}
-				if(saveImage) {
-					imagesToUpdate << image
+					if (image.imageRegion != virtualImageConfig.imageRegion) {
+						image.imageRegion = virtualImageConfig.imageRegion
+						saveImage = true
+					}
+					if (image.minDisk != virtualImageConfig.minDisk) {
+						image.minDisk = virtualImageConfig.minDisk
+						saveImage = true
+					}
+					if (image.bucketId != virtualImageConfig.bucketId) {
+						image.bucketId = virtualImageConfig.bucketId
+						saveImage = true
+					}
+					if (save) {
+						locationsToUpdate << imageLocation
+					}
+					if (saveImage) {
+						imagesToUpdate << image
+					}
 				}
 			} else {
 				VirtualImage image = existingItems?.find { it.externalId == virtualImageConfig.externalId || it.name == virtualImageConfig.name }
