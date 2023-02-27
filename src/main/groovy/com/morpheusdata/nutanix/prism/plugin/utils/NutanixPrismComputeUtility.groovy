@@ -27,7 +27,7 @@ class NutanixPrismComputeUtility {
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
 		if(results?.success) {
-			return ServiceResponse.success()
+			return ServiceResponse.success(results.data)
 		} else {
 			return ServiceResponse.error()
 		}
@@ -59,11 +59,11 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse uploadImage(HttpApiClient client, Map authConfig, String imageExternalId, InputStream stream) {
+	static ServiceResponse uploadImage(HttpApiClient client, Map authConfig, String imageExternalId, InputStream stream, Long contentLength) {
 		log.debug("uploadImage: ${imageExternalId}")
-		byte[] body = stream.bytes  // gonna load it all into memory?! :(
+		def imageStream = new BufferedInputStream(stream, 1200)
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageExternalId}/file", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type': ContentType.APPLICATION_OCTET_STREAM], contentType: ContentType.APPLICATION_OCTET_STREAM, body: body, ignoreSSL: true), 'PUT')
+				new HttpApiClient.RequestOptions(headers:['Content-Type': ContentType.APPLICATION_OCTET_STREAM.toString(), 'Connection': 'Keep-Alive'], contentType: ContentType.APPLICATION_OCTET_STREAM, body: imageStream, contentLength: contentLength, ignoreSSL: true), 'PUT')
 		if(results?.success) {
 			return ServiceResponse.success()
 		} else {

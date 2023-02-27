@@ -296,7 +296,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			Cloud cloud = server.cloud
 			VirtualImage virtualImage = server.sourceImage
 			Map authConfig = plugin.getAuthConfig(cloud)
-			def runConfig = buildRunConfig(workload, workloadRequest, opts)
 
 			client = new HttpApiClient()
 			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
@@ -330,6 +329,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					// Create the image
 					def cloudFiles = morpheusContext.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
 					def imageFile = cloudFiles?.find{cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2")}
+					def contentLength = imageFile?.getContentLength()
 					// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
 					// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
 					def letNutanixDownloadImage = imageFile?.getURL()?.toString()?.contains('morpheus-images')
@@ -338,7 +338,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					if(imageResults.success) {
 						imageExternalId = imageResults.data.metadata.uuid
 						if(!letNutanixDownloadImage) {
-							def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream)
+							waitForImageComplete(client, authConfig, imageExternalId, false)
+							def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream, contentLength)
 							if (!uploadResults.success) {
 								throw new Exception("Error in uploading the image: ${uploadResults.msg}")
 							}
@@ -356,11 +357,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 							externalId  : imageExternalId,
 							imageRegion : cloud.regionCode
 					])
-					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud ).blockingGet()
+					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
 				}
 			} finally {
 				morpheusContext.releaseLock(lockKey, [lock:lock]).blockingGet()
 			}
+			def runConfig = buildRunConfig(workload, workloadRequest, imageExternalId, opts)
 			runConfig.imageExternalId = imageExternalId
 			runConfig.virtualImageId = server.sourceImage?.id
 			runConfig.userConfig = workloadRequest.usersConfiguration
@@ -966,7 +968,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return networkProxy
 	}
 
-	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId) {
+	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId, Boolean requireResources=true) {
 		def rtn = [success:false]
 		try {
 			def pending = true
@@ -980,7 +982,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				}
 				def imageStatus = imageDetail?.data?.status
 				def retrievalList = imageStatus?.resources?.retrieval_uri_list
-				if(imageDetail.success == true && imageStatus?.state == "COMPLETE" && retrievalList?.size() > 0) {
+				if(imageDetail.success == true && imageStatus?.state == "COMPLETE" && (!requireResources || retrievalList?.size() > 0)) {
 					rtn.success = true
 					rtn.data = imageDetail.data
 					pending = false
@@ -1001,7 +1003,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return rtn
 	}
 
-	private buildRunConfig(Workload workload, WorkloadRequest workloadRequest, Map opts) {
+	private buildRunConfig(Workload workload, WorkloadRequest workloadRequest, String imageExternalId, Map opts) {
 		log.debug "buildRunConfig: ${workload} ${workloadRequest}"
 
 		ComputeServer server = workload.server
@@ -1102,7 +1104,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			]
 			if(virtualImage && volume.rootVolume) {
 				diskConfig['data_source_reference'] = [
-					uuid: virtualImage.externalId,
+					uuid: imageExternalId ?: virtualImage.externalId,
 					name: virtualImage.name,
 					kind: "image"
 				]
