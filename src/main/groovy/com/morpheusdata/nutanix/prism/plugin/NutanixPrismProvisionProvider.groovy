@@ -312,7 +312,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						if(!virtualImageLocation) {
 							imageExternalId = null
 						} else {
-							imageExternalId = virtualImage.externalId
+							imageExternalId = virtualImageLocation.externalId
 						}
 					} catch(e) {
 						log.info "Error in findVirtualImageLocation.. could be not found ${e}", e
@@ -337,6 +337,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 							virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL()?.toString() : null)
 					if(imageResults.success) {
 						imageExternalId = imageResults.data.metadata.uuid
+						// Create the VirtualImageLocation before waiting for the upload
+						VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
+								virtualImage: virtualImage,
+								externalId  : imageExternalId,
+								imageRegion : cloud.regionCode,
+								code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
+								internalId  : imageExternalId,
+						])
+						morpheusContext.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
 						if(!letNutanixDownloadImage) {
 							waitForImageComplete(client, authConfig, imageExternalId, false)
 							def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream, contentLength)
@@ -345,19 +354,21 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 							}
 						}
 					} else {
+						VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
+								virtualImage: virtualImage,
+								externalId  : imageExternalId,
+								imageRegion : cloud.regionCode,
+								code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
+								internalId  : imageExternalId,
+						])
+						morpheusContext.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
 						throw new Exception("Error in creating the image: ${imageResults.msg}")
 					}
 
 					// Wait till the image is COMPLETE
 					waitForImageComplete(client, authConfig, imageExternalId)
 
-					// Create the VirtualImageLocation
-					VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
-							virtualImage: virtualImage,
-							externalId  : imageExternalId,
-							imageRegion : cloud.regionCode
-					])
-					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
+
 				}
 			} finally {
 				morpheusContext.releaseLock(lockKey, [lock:lock]).blockingGet()
