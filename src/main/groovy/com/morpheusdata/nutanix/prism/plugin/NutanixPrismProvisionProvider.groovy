@@ -694,6 +694,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				serverDetails = waitForPowerState(client, authConfig, vmId)
 				vmBody = serverDetails?.data
 				log.info("resizing vm adding storage: {}", volumeAdd)
+				if (!volumeAdd.maxStorage) {
+					volumeAdd.maxStorage = volumeAdd.size ? (volumeAdd.size.toDouble() * ComputeUtility.ONE_GIGABYTE).toLong() : 0
+				}
 				def storageVolumeType = storageVolumeTypes[volumeAdd.storageType.toLong()]
 				def datastore = datastores[volumeAdd.datastoreId.toLong()]
 				def targetIndex = vmBody.spec?.resources?.disk_list.findAll { it.device_properties.disk_address.adapter_type == storageVolumeType.name }.collect { it.device_properties.disk_address.device_index }.max()
@@ -1083,6 +1086,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		def categories = config.categories?.collect {it.value}
 
 		config.volumes?.eachWithIndex { volume, index ->
+			if (!volume.maxStorage) {
+				volume.maxStorage = volume.size ? (volume.size.toDouble() * ComputeUtility.ONE_GIGABYTE).toLong() : 0
+			}
 			def storageVolumeType = storageVolumeTypes[volume.storageType.toLong()]
 			def datastore = datastores[volume.datastoreId.toLong()]
 			def diskConfig = [
