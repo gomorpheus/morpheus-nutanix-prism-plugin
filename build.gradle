@@ -75,7 +75,7 @@ jar {
 				'Plugin-Version': version,
 				'Morpheus-Name': 'Nutanix Prism',
 				'Morpheus-Organization': 'morpheus',
-				'Morpheus-Code': 'nutanix-prism',
+				'Morpheus-Code': 'morpheus-nutanix-prism',
 				'Morpheus-Description': 'Plugin for Nutanix Prism Central',
 				'Morpheus-Logo': 'assets/nutanix-prism.svg',
 				'Morpheus-Logo-Dark': 'assets/nutanix-prism-dark.svg',
