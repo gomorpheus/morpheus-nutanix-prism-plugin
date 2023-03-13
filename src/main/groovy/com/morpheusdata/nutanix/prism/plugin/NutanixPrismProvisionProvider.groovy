@@ -37,6 +37,7 @@ import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.response.WorkloadResponse
 import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
+import org.apache.http.client.utils.URIBuilder
 
 @Slf4j
 class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
@@ -209,6 +210,27 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	@Override
 	Boolean networksScopedToPools() {
 		return true
+	}
+
+	@Override
+	ServiceResponse getNoVNCConsoleUrl(ComputeServer server) {
+		Map authConfig = plugin.getAuthConfig(server.cloud)
+		def consoleInfo = NutanixPrismComputeUtility.getVMConsoleUrl(authConfig, server.externalId, server?.resourcePool?.externalId)
+		return consoleInfo
+	}
+
+	@Override
+	ServiceResponse enableConsoleAccess(ComputeServer server) {
+		server.consoleType = 'vnc'
+		return updateServerHost(server)
+
+	}
+
+	@Override
+	ServiceResponse updateServerHost(ComputeServer server) {
+		server.consoleHost = new URIBuilder(plugin.getAuthConfig(server.cloud)?.apiUrl)?.getHost()
+		saveAndGet(server)
+		return ServiceResponse.success(server)
 	}
 
 	@Override
@@ -1249,6 +1271,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			server.osType = runConfig.osType
 			server.osDevice = '/dev/vda'
 			server.lvmEnabled = false
+			if(runConfig.osType == 'windows') {
+				server.guestConsoleType = ComputeServer.GuestConsoleType.rdp
+			} else if(runConfig.osType == 'linux') {
+				server.guestConsoleType = ComputeServer.GuestConsoleType.ssh
+			}
 
 
 			def newType = findVmNodeServerTypeForCloud(server.cloud.id, server.osType, 'nutanix-prism-provision-provider')
