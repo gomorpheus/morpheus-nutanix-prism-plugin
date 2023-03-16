@@ -6,7 +6,30 @@ import com.morpheusdata.response.ServiceResponse
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
+import org.apache.http.client.CookieStore
+import org.apache.http.client.HttpClient
+import org.apache.http.client.entity.UrlEncodedFormEntity
+import org.apache.http.client.methods.CloseableHttpResponse
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase
+import org.apache.http.client.methods.HttpGet
+import org.apache.http.client.methods.HttpPost
+import org.apache.http.client.methods.HttpPut
+import org.apache.http.client.methods.HttpRequestBase
+import org.apache.http.client.utils.URIBuilder
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory
+import org.apache.http.conn.ssl.SSLContextBuilder
+import org.apache.http.conn.ssl.TrustStrategy
+import org.apache.http.conn.ssl.X509HostnameVerifier
+import org.apache.http.cookie.Cookie
 import org.apache.http.entity.ContentType
+import org.apache.http.entity.InputStreamEntity
+import org.apache.http.impl.client.BasicCookieStore
+import org.apache.http.impl.client.HttpClients
+import org.apache.http.message.BasicNameValuePair
+
+import javax.net.ssl.SSLSession
+import javax.net.ssl.SSLSocket
+import java.security.cert.X509Certificate
 
 @Slf4j
 class NutanixPrismComputeUtility {
@@ -196,6 +219,137 @@ class NutanixPrismComputeUtility {
 			return ServiceResponse.error("Error deleting vm ${uuid}", null, results.data)
 		}
 	}
+
+	static String getNutanixSession(Map authConfig) {
+		URIBuilder uriBuilder = new URIBuilder(authConfig.apiUrl)
+		uriBuilder.setPath("api/nutanix/v3/users/info")
+
+		HttpRequestBase request
+		request = new HttpGet(uriBuilder.build())
+		def cookies = []
+		def sessionCookie
+
+		def outboundClient
+		def rtn = [success: false]
+		try {
+			def outboundSslBuilder = new SSLContextBuilder()
+			outboundSslBuilder.loadTrustMaterial(null, new TrustStrategy() {
+				@Override
+				boolean isTrusted(X509Certificate[] chain, String authType) throws java.security.cert.CertificateException {
+					return true
+				}
+			})
+			def outboundSocketFactory = new SSLConnectionSocketFactory(outboundSslBuilder.build(), SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
+			def clientBuilder = HttpClients.custom().setSSLSocketFactory(outboundSocketFactory)
+			clientBuilder.setHostnameVerifier(new X509HostnameVerifier() {
+				boolean verify(String host, SSLSession sess) { return true }
+
+				void verify(String host, SSLSocket ssl) {}
+
+				void verify(String host, String[] cns, String[] subjectAlts) {}
+
+				void verify(String host, X509Certificate cert) {}
+			})
+
+			String creds = authConfig.username + ":" + authConfig.password
+			String credHeader = "Basic " + Base64.getEncoder().encodeToString(creds.getBytes())
+
+			outboundClient = clientBuilder.build()
+			request.addHeader("Authorization", credHeader)
+			request.addHeader('Accept','text/html')
+
+
+			def responseBody = outboundClient.execute(request)
+			if(responseBody.statusLine.statusCode < 400) {
+				responseBody.getHeaders('Set-Cookie').each {
+					String cookie = it.value.split(';')[0]
+					cookies.add(cookie)
+					if(cookie.startsWith("NTNX_IGW_SESSION")) {
+						sessionCookie = cookie
+					}
+				}
+				if(sessionCookie) {
+					return sessionCookie
+				}
+			} else {
+				rtn.success = false
+			}
+		} catch(e) {
+			log.error("getNutanixSession error : ${e}", e)
+		} finally {
+			outboundClient.close()
+		}
+		return null
+	}
+
+	static ServiceResponse getVMConsoleUrl(Map authConfig, String vmUuid, String clusterUuid) {
+
+		String nutanixSessionCookie = getNutanixSession(authConfig) ?: ""
+
+		URIBuilder uriBuilder = new URIBuilder(authConfig.apiUrl)
+		uriBuilder.setPath("PrismGateway/j_spring_security_check")
+
+		HttpRequestBase request
+		request = new HttpPost(uriBuilder.build())
+		def cookies = []
+		def sessionCookie
+
+		def outboundClient
+		def rtn = [success: false]
+		try {
+			def outboundSslBuilder = new SSLContextBuilder()
+			outboundSslBuilder.loadTrustMaterial(null, new TrustStrategy() {
+				@Override
+				boolean isTrusted(X509Certificate[] chain, String authType) throws java.security.cert.CertificateException {
+					return true
+				}
+			})
+			def outboundSocketFactory = new SSLConnectionSocketFactory(outboundSslBuilder.build(), SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
+			def clientBuilder = HttpClients.custom().setSSLSocketFactory(outboundSocketFactory)
+			clientBuilder.setHostnameVerifier(new X509HostnameVerifier() {
+				boolean verify(String host, SSLSession sess) { return true }
+
+				void verify(String host, SSLSocket ssl) {}
+
+				void verify(String host, String[] cns, String[] subjectAlts) {}
+
+				void verify(String host, X509Certificate cert) {}
+			})
+
+			outboundClient = clientBuilder.build()
+			HttpEntityEnclosingRequestBase postRequest = (HttpEntityEnclosingRequestBase)request
+			def formEntity = new UrlEncodedFormEntity([new BasicNameValuePair('j_username',authConfig.username), new BasicNameValuePair('j_password', authConfig.password)])
+			postRequest.setEntity(formEntity)
+			postRequest.addHeader('Accept','text/html')
+
+
+			def responseBody = outboundClient.execute(postRequest)
+			if(responseBody.statusLine.statusCode < 400) {
+				responseBody.getHeaders('Set-Cookie').each {
+					String cookie = it.value.split(';')[0]
+					cookies.add(cookie)
+					if(cookie.startsWith("JSESSIONID")) {
+						sessionCookie = cookie
+					}
+				}
+				if(sessionCookie) {
+					def socketURI = new URIBuilder(authConfig.apiUrl)
+					socketURI.setScheme("wss")
+					socketURI.setPath("/vnc/vm/${vmUuid}/proxy")
+					socketURI.setParameter("proxyClusterUuid", clusterUuid)
+					return ServiceResponse.success([url: socketURI.build().toString(), headers: ['Cookie':sessionCookie + ";" + nutanixSessionCookie]])
+				}
+			} else {
+				rtn.success = false
+			}
+		} catch(e) {
+			log.error("getVmConsoleError: ${e}", e)
+		} finally {
+			outboundClient.close()
+		}
+		return ServiceResponse.error("Error getting console for vm ${vmUuid}", null,null )
+	}
+
 
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
 		log.debug("listNetworks")

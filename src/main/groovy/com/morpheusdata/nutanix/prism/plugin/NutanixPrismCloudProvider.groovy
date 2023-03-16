@@ -104,7 +104,18 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'config'
 		)
 
-		[apiUrl, credentials, username, password, inventoryInstances]
+		OptionType enableVnc = new OptionType(
+				name: 'Enable Hypervisor Console',
+				code: 'nutanix-prism-enableVnc',
+				fieldName: 'enableVnc',
+				displayOrder: 91,
+				fieldLabel: 'Enable Hypervisor Console',
+				required: false,
+				inputType: OptionType.InputType.CHECKBOX,
+				fieldContext: 'config'
+		)
+
+		[apiUrl, credentials, username, password, inventoryInstances, enableVnc]
 	}
 
 	@Override
