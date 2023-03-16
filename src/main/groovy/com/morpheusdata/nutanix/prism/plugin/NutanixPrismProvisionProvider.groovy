@@ -12,6 +12,7 @@ import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerInterface
 import com.morpheusdata.model.ComputeServerInterfaceType
 import com.morpheusdata.model.ComputeTypeLayout
+import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.HostType
 import com.morpheusdata.model.Icon
@@ -1459,10 +1460,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						log.debug("serverDetail: ${serverDetail}")
 						if(serverDetail.success == true) {
 
+							Map resourcePools = getAllResourcePools(server.cloud)
+							ComputeZonePool resourcePool = resourcePools[serverDetail?.virtualMachine?.status?.cluster_reference?.uuid]
+
 							def privateIp = serverDetail.ipAddress
 							def publicIp = serverDetail.ipAddress
 							server.internalIp = privateIp
 							server.externalIp = publicIp
+							server.resourcePool = resourcePool
 							
 							//update disks
 							def disks = serverDetail.diskList
@@ -1567,7 +1572,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return rtn
 	}
 
-	def checkServerReady(HttpApiClient client, Map authConfig, String vmId) {
+	static checkServerReady(HttpApiClient client, Map authConfig, String vmId) {
 		def rtn = [success:false]
 		try {
 			def pending = true
@@ -1594,7 +1599,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return rtn
 	}
 
-	def checkTaskReady(HttpApiClient client, Map authConfig, String taskId) {
+	static checkTaskReady(HttpApiClient client, Map authConfig, String taskId) {
 		def rtn = [success:false]
 		try {
 			def pending = true
@@ -1633,6 +1638,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				rtn = true
 		}
 		return rtn
+	}
+
+	private Map getAllResourcePools(Cloud cloud) {
+		log.debug "getAllResourcePools: ${cloud}"
+		def resourcePoolProjectionIds = []
+		morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').blockingSubscribe { resourcePoolProjectionIds << it.id }
+		def resourcePoolsMap = [:]
+		morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).blockingSubscribe { resourcePoolsMap[it.externalId] = it }
+		resourcePoolsMap
 	}
 
 }

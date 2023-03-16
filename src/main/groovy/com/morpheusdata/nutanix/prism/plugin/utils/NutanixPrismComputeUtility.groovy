@@ -160,7 +160,7 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse getTask(HttpApiClient client, Map authConfig, String uuid) {
-		log.debug("getVm")
+		log.debug("getTask")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/tasks/${uuid}", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
 		if(results?.success) {
