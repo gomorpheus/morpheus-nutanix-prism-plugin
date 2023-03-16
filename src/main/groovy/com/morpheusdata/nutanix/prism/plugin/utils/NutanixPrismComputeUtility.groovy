@@ -159,6 +159,17 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse getTask(HttpApiClient client, Map authConfig, String uuid) {
+		log.debug("getVm")
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/tasks/${uuid}", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error getting task ${uuid}", null, results.data)
+		}
+	}
+
 	static ServiceResponse getVm(HttpApiClient client, Map authConfig, String uuid) {
 		log.debug("getVm")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
@@ -349,6 +360,103 @@ class NutanixPrismComputeUtility {
 		}
 		return ServiceResponse.error("Error getting console for vm ${vmUuid}", null,null )
 	}
+
+	static ServiceResponse listSnapshots(HttpApiClient client, Map authConfig, String clusterUuid) {
+		log.debug("listSnapshots")
+
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], ignoreSSL: true), 'GET')
+
+		if(results?.success) {
+			return ServiceResponse.success(results?.data?.entities)
+		} else {
+			return ServiceResponse.error("Error listing snapshots for cluster ${clusterUuid}", null, results.data)
+		}
+	}
+
+
+	static ServiceResponse getSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String snapshotUuid) {
+		log.debug("getSnapshot")
+
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots/${snapshotUuid}", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], ignoreSSL: true), 'GET')
+
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error getting snapshot ${snapshotUuid}", null, results.data)
+		}
+	}
+
+
+	static ServiceResponse createSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String vmUuid, String snapshotName) {
+		log.debug("createSnapshot")
+
+		def body = [snapshot_specs:[[vm_uuid:vmUuid, snapshot_name:snapshotName]]]
+
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], body: body, ignoreSSL: true), 'POST')
+
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error creating snapshot for vm ${vmUuid}", null, results.data)
+		}
+	}
+
+	static ServiceResponse deleteSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String snapshotUuid) {
+		log.debug("deleteSnapshot")
+
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots/${snapshotUuid}", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], ignoreSSL: true), 'DELETE')
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error deleting snapshot ${snapshotUuid}", null, results.data)
+		}
+	}
+
+	static ServiceResponse restoreSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String vmUuid, String snapshotUuid) {
+		log.debug("restoreSnapshot")
+		def body = [restore_network_configuration: true, snapshot_uuid: snapshotUuid, uuid: vmUuid]
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/vms/${vmUuid}/restore", authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], body: body, ignoreSSL: true), 'POST')
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error restoring snapshot ${snapshotUuid}", null, results.data)
+		}
+	}
+
+
+//
+//	static ServiceResponse restoreSnapshot(opts) {
+//		def rtn = [success: false]
+//		def apiUrl = getNutanixApiUrl(opts.zone)
+//		def username = getNutanixUsername(opts.zone)
+//		def password = getNutanixPassword(opts.zone)
+//		def vmUuid
+//		def vmResult = loadVirtualMachine(opts, opts.vmId)
+//		if(vmResult?.success){
+//			vmUuid = vmResult.vmDetails.vmId
+//
+//			def body = [restore_network_configuration: true, snapshot_uuid: opts.snapshotId, uuid: vmUuid]
+//			log.info("Create snapshot body: ${body}")
+//			def headers = buildHeaders(null, username, password)
+//			def requestOpts = [headers:headers, body: body, proxySettings: opts.proxySettings]
+//			def results = ApiUtility.callJsonApi(apiUrl, v2Api + 'vms/' + vmUuid + '/restore' , null, null, requestOpts, 'POST')
+//			rtn.success = results?.success && results?.error != true
+//			if(rtn.success == true) {
+//				rtn.results = results.data
+//				log.info("restoreSnapshot: ${rtn.results}")
+//			}
+//		} else {
+//			rtn.msg = "VM not found: ${opts.vmId}"
+//		}
+//		return rtn
+//	}
+//
+
 
 
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {

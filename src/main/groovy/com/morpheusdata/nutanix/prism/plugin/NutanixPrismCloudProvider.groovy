@@ -25,6 +25,7 @@ import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
 import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.ImagesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
+import com.morpheusdata.nutanix.prism.plugin.sync.SnapshotsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.VirtualMachinesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.VirtualPrivateCloudSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
@@ -468,6 +469,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					(new ImagesSync(this.plugin, cloud, client)).execute()
 					(new HostsSync(this.plugin, cloud, client)).execute()
 					(new VirtualMachinesSync(this.plugin, cloud, client, createNew)).execute()
+					(new SnapshotsSync(this.plugin, cloud, client)).execute()
 
 					rtn = ServiceResponse.success()
 				}

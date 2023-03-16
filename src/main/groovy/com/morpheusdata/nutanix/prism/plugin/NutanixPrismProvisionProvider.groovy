@@ -23,11 +23,13 @@ import com.morpheusdata.model.PlatformType
 import com.morpheusdata.model.ProcessEvent
 import com.morpheusdata.model.ProxyConfiguration
 import com.morpheusdata.model.ServicePlan
+import com.morpheusdata.model.Snapshot
 import com.morpheusdata.model.StorageVolume
 import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.VirtualImageLocation
 import com.morpheusdata.model.Workload
+import com.morpheusdata.model.projection.SnapshotIdentityProjection
 import com.morpheusdata.model.provisioning.WorkloadRequest
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
@@ -38,6 +40,8 @@ import com.morpheusdata.response.WorkloadResponse
 import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
 import org.apache.http.client.utils.URIBuilder
+
+import java.util.concurrent.TimeUnit
 
 @Slf4j
 class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
@@ -188,6 +192,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	}
 
 	@Override
+	Boolean hasSnapshots() {
+		return true
+	}
+
+	@Override
 	Boolean hasDatastores() {
 		return true
 	}
@@ -231,6 +240,109 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		server.consoleHost = new URIBuilder(plugin.getAuthConfig(server.cloud)?.apiUrl)?.getHost()
 		saveAndGet(server)
 		return ServiceResponse.success(server)
+	}
+
+	@Override
+	ServiceResponse createSnapshot(ComputeServer server, Map opts) {
+		HttpApiClient client = new HttpApiClient()
+
+		Map authConfig = plugin.getAuthConfig(server.cloud)
+		def snapshotName = opts.snapshotName ?: "${server.name}.${System.currentTimeMillis()}"
+		log.debug("Executing Nutanix Prism snapshot for ${server?.name}")
+		def snapshotResult = NutanixPrismComputeUtility.createSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshotName)
+		def taskId = snapshotResult?.data?.task_uuid
+		def taskResults = checkTaskReady(client, authConfig, taskId)
+		log.debug("Snapshot results: ${taskResults}")
+		if(taskResults.success) {
+			def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}.uuid
+			if(snapshotUuid) {
+				def rawSnapshot = NutanixPrismComputeUtility.getSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshotUuid)
+				Date createdDate = null
+				if(rawSnapshot?.data?.created_time) {
+					long milliseconds = TimeUnit.MICROSECONDS.toMillis(rawSnapshot?.data?.created_time)
+					createdDate = new Date(milliseconds)
+				}
+				def snapshotConfig = [
+						account        : server.cloud.owner,
+						name           : rawSnapshot?.data?.snapshot_name,
+						externalId     : rawSnapshot?.data?.uuid,
+						cloud          : server.cloud,
+						snapshotCreated: createdDate,
+						currentlyActive: true
+				]
+				def add = new Snapshot(snapshotConfig)
+				Snapshot savedSnapshot = morpheusContext.snapshot.create(add).blockingGet()
+				if (!savedSnapshot) {
+					return ServiceResponse.error("Error saving snapshot")
+				} else {
+					morpheusContext.snapshot.addSnapshot(savedSnapshot, server).blockingGet()
+				}
+				return ServiceResponse.success()
+			} else {
+				return ServiceResponse.error("Error fetching snapshot after creation", null, taskResults)
+			}
+		} else {
+			return ServiceResponse.error("Error creating snapshot", null, taskResults)
+		}
+
+	}
+
+	@Override
+	ServiceResponse deleteSnapshots(ComputeServer server, Map opts) {
+		HttpApiClient client = new HttpApiClient()
+		Map authConfig = plugin.getAuthConfig(server.cloud)
+		log.debug("Deleting Nutanix Prism snapshots for server ${server.name}")
+		List<SnapshotIdentityProjection> snapshots = server.snapshots
+		Boolean success = true
+		for(int i = 0; i < snapshots.size(); i++) {
+			SnapshotIdentityProjection snapshot = snapshots[i]
+			def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
+			def taskId = snapshotResult?.data?.task_uuid
+			def taskResults = checkTaskReady(client, authConfig, taskId)
+			success &= taskResults.success
+			if(!taskResults.success) {
+				log.error("API error deleting snapshot ${taskResults}")
+			}
+		}
+		if(success) {
+			return ServiceResponse.success()
+		} else {
+			return ServiceResponse.error("Not all snapshots successfully deleted")
+		}
+	}
+
+	@Override
+	ServiceResponse deleteSnapshot(Snapshot snapshot, Map opts) {
+		HttpApiClient client = new HttpApiClient()
+		ComputeServer server = morpheusContext.computeServer.get(opts.serverId).blockingGet()
+		Map authConfig = plugin.getAuthConfig(server.cloud)
+		log.debug("Deleting Nutanix Prism Snapshot ${snapshot.name}")
+		def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
+		def taskId = snapshotResult?.data?.task_uuid
+		def taskResults = checkTaskReady(client, authConfig, taskId)
+		log.debug("Snapshot delete results : ${taskResults}")
+		if(taskResults.success) {
+			return ServiceResponse.success()
+		} else {
+			return ServiceResponse.error("API error deleting snapshot", null, taskResults)
+		}
+	}
+
+	@Override
+	ServiceResponse revertSnapshot(ComputeServer server, Snapshot snapshot, Map opts) {
+		HttpApiClient client = new HttpApiClient()
+		Map authConfig = plugin.getAuthConfig(server.cloud)
+		log.debug("Reverting Nutanix Prism Snapshot ${snapshot.name}")
+		def snapshotResult = NutanixPrismComputeUtility.restoreSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshot.externalId)
+		def taskId = snapshotResult?.data?.task_uuid
+		def taskResults = checkTaskReady(client, authConfig, taskId)
+		log.debug("Snapshot revert results : ${taskResults}")
+		if(taskResults.success) {
+			return ServiceResponse.success()
+		} else {
+			return ServiceResponse.error("API error reverting snapshot", null, taskResults)
+		}
+		return ServiceResponse.error()
 	}
 
 	@Override
@@ -1471,6 +1583,37 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
 					rtn.diskList = serverResource.disk_list
 					pending = false
+				}
+				attempts ++
+				if(attempts > 60)
+					pending = false
+			}
+		} catch(e) {
+			log.error("An Exception Has Occurred: ${e.message}",e)
+		}
+		return rtn
+	}
+
+	def checkTaskReady(HttpApiClient client, Map authConfig, String taskId) {
+		def rtn = [success:false]
+		try {
+			def pending = true
+			def attempts = 0
+			while(pending) {
+				sleep(1000l * 20l)
+				def taskDetail = NutanixPrismComputeUtility.getTask(client, authConfig, taskId)
+				log.debug("taskDetail: ${taskDetail}")
+				def taskStatus = taskDetail?.data?.status
+				if(taskDetail.success == true && taskStatus) {
+					if(taskStatus == 'SUCCEEDED') {
+						rtn.success = true
+						rtn.data = taskDetail.data
+						pending = false
+					} else if (taskStatus == 'FAILED') {
+						rtn.success = false
+						rtn.data = taskDetail.data
+						pending = false
+					}
 				}
 				attempts ++
 				if(attempts > 60)
