@@ -805,4 +805,100 @@ class NutanixPrismComputeUtility {
 	static toList(value) {
 		[value].flatten()
 	}
+
+	static waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
+		def rtn = [success:false]
+		try {
+			def pending = true
+			def attempts = 0
+			while(pending) {
+				sleep(1000l * 20l)
+				def serverDetail = getVm(client, authConfig, vmId)
+				log.debug("serverDetail: ${serverDetail}")
+				if(!serverDetail.success && serverDetail.data.code == 404 ) {
+					pending = false
+				}
+				def serverResource = serverDetail?.data?.spec?.resources
+				if(serverDetail.success == true && serverResource.power_state) {
+					rtn.success = true
+					rtn.data = serverDetail.data
+					rtn.powerState = serverResource.power_state
+					pending = false
+				}
+				attempts ++
+				if(attempts > 60)
+					pending = false
+			}
+		} catch(e) {
+			log.error("An Exception Has Occurred: ${e.message}",e)
+		}
+		return rtn
+	}
+
+	static checkServerReady(HttpApiClient client, Map authConfig, String vmId) {
+		def rtn = [success:false]
+		try {
+			def pending = true
+			def attempts = 0
+			while(pending) {
+				sleep(1000l * 20l)
+				def serverDetail = getVm(client, authConfig, vmId)
+				log.debug("serverDetail: ${serverDetail}")
+				def serverResource = serverDetail?.data?.spec?.resources
+				if(serverDetail.success == true && serverResource.power_state == 'ON' && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)} ) {
+					rtn.success = true
+					rtn.virtualMachine = serverDetail.data
+					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
+					rtn.diskList = serverResource.disk_list
+					pending = false
+				}
+				attempts ++
+				if(attempts > 60)
+					pending = false
+			}
+		} catch(e) {
+			log.error("An Exception Has Occurred: ${e.message}",e)
+		}
+		return rtn
+	}
+
+	static checkTaskReady(HttpApiClient client, Map authConfig, String taskId) {
+		def rtn = [success:false]
+		try {
+			def pending = true
+			def attempts = 0
+			while(pending) {
+				sleep(1000l * 20l)
+				def taskDetail = getTask(client, authConfig, taskId)
+				log.debug("taskDetail: ${taskDetail}")
+				def taskStatus = taskDetail?.data?.status
+				if(taskDetail.success == true && taskStatus) {
+					if(taskStatus == 'SUCCEEDED') {
+						rtn.success = true
+						rtn.data = taskDetail.data
+						pending = false
+					} else if (taskStatus == 'FAILED') {
+						rtn.success = false
+						rtn.data = taskDetail.data
+						pending = false
+					}
+				}
+				attempts ++
+				if(attempts > 60)
+					pending = false
+			}
+		} catch(e) {
+			log.error("An Exception Has Occurred: ${e.message}",e)
+		}
+		return rtn
+	}
+
+	static checkIpv4Ip(ipAddress) {
+		def rtn = false
+		if(ipAddress) {
+			if(ipAddress.indexOf('.') > 0 && !ipAddress.startsWith('169'))
+				rtn = true
+		}
+		return rtn
+	}
 }

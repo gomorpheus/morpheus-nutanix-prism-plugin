@@ -4,6 +4,7 @@ import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.model.AccountCredential
 import com.morpheusdata.model.Cloud
+import com.morpheusdata.nutanix.prism.plugin.backup.NutanixPrismBackupProvider
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -27,6 +28,9 @@ class NutanixPrismPlugin extends Plugin {
 		this.pluginProviders.put(nutanixProvision.code, nutanixProvision)
 		this.pluginProviders.put(nutanixPrismCloud.code, nutanixPrismCloud)
 		this.pluginProviders.put(nutanixPrismOptionSourceProvider.code, nutanixPrismOptionSourceProvider)
+
+		NutanixPrismBackupProvider backupProvider = new NutanixPrismBackupProvider(this, morpheus)
+		pluginProviders.put(backupProvider.code, backupProvider)
 	}
 
 	@Override

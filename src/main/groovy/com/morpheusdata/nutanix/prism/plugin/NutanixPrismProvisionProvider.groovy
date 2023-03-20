@@ -252,7 +252,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		log.debug("Executing Nutanix Prism snapshot for ${server?.name}")
 		def snapshotResult = NutanixPrismComputeUtility.createSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshotName)
 		def taskId = snapshotResult?.data?.task_uuid
-		def taskResults = checkTaskReady(client, authConfig, taskId)
+		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 		log.debug("Snapshot results: ${taskResults}")
 		if(taskResults.success) {
 			def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}.uuid
@@ -299,7 +299,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			SnapshotIdentityProjection snapshot = snapshots[i]
 			def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
 			def taskId = snapshotResult?.data?.task_uuid
-			def taskResults = checkTaskReady(client, authConfig, taskId)
+			def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 			success &= taskResults.success
 			if(!taskResults.success) {
 				log.error("API error deleting snapshot ${taskResults}")
@@ -320,7 +320,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		log.debug("Deleting Nutanix Prism Snapshot ${snapshot.name}")
 		def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
 		def taskId = snapshotResult?.data?.task_uuid
-		def taskResults = checkTaskReady(client, authConfig, taskId)
+		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 		log.debug("Snapshot delete results : ${taskResults}")
 		if(taskResults.success) {
 			return ServiceResponse.success()
@@ -336,7 +336,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		log.debug("Reverting Nutanix Prism Snapshot ${snapshot.name}")
 		def snapshotResult = NutanixPrismComputeUtility.restoreSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshot.externalId)
 		def taskId = snapshotResult?.data?.task_uuid
-		def taskResults = checkTaskReady(client, authConfig, taskId)
+		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 		log.debug("Snapshot revert results : ${taskResults}")
 		if(taskResults.success) {
 			return ServiceResponse.success()
@@ -556,8 +556,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			//check if ip changed and update
 			def serverResource = serverDetails?.data?.spec?.resources
 			def ipAddress = null
-			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)} ) {
-				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
+			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
+				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
 			}
 			def privateIp = ipAddress
 			def publicIp = ipAddress
@@ -583,7 +583,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			def vmResource = waitForPowerState(client, authConfig, server.externalId)
+			def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 			def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, server.externalId, vmResource.data)
 			log.debug("stopResults: ${stopResults}")
 			if(stopResults.success == true) {
@@ -605,7 +605,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			def vmResource = waitForPowerState(client, authConfig, server.externalId)
+			def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 			def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
 			log.debug("startResults: ${startResults}")
 			if(startResults.success == true) {
@@ -628,7 +628,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				HttpApiClient client = new HttpApiClient()
 				client.networkProxy = cloud.apiProxy
 				def authConfig = plugin.getAuthConfig(cloud)
-				def vmResource = waitForPowerState(client, authConfig, computeServer.externalId)
+				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
 				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, computeServer.externalId, vmResource.data)
 				if(startResults.success == true) {
 					rtn.success = true
@@ -653,7 +653,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				HttpApiClient client = new HttpApiClient()
 				client.networkProxy = cloud.apiProxy
 				def authConfig = plugin.getAuthConfig(cloud)
-				def vmResource = waitForPowerState(client, authConfig, computeServer.externalId)
+				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
 				def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, computeServer.externalId, vmResource.data)
 				if(stopResults.success == true) {
 					rtn.success = true
@@ -677,7 +677,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				HttpApiClient client = new HttpApiClient()
 				client.networkProxy = cloud.apiProxy
 				def authConfig = plugin.getAuthConfig(cloud)
-				def vmResource = waitForPowerState(client, authConfig, computeServer.externalId)
+				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
 				def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, computeServer.externalId)
 				if(removeResults.success == true) {
 					rtn.success = true
@@ -702,7 +702,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			def vmResource = waitForPowerState(client, authConfig, server.externalId)
+			def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 			def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, server.externalId)
 			if(removeResults.success == true) {
 				return ServiceResponse.success()
@@ -758,9 +758,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			client.networkProxy = cloud.apiProxy
 
 
-			//remove snapshots - TODO once/if we have snapshots
+			deleteSnapshots(server, [:])
 
-			def serverDetails = waitForPowerState(client, authConfig, vmId)
+			def serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 			def vmBody = serverDetails?.data
 
 			def maxCores = resizeRequest.maxCores ?: 1
@@ -784,7 +784,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			//remove disks to delete
 			def volumesToDelete = resizeRequest.volumesDelete?.collect {it.externalId}
 			if(volumesToDelete.size() > 0) {
-				serverDetails = waitForPowerState(client, authConfig, vmId)
+				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 				vmBody = serverDetails?.data
 				def newDiskList = vmBody.spec?.resources?.disk_list?.findAll { !volumesToDelete.contains(it.uuid) }
 				vmBody.spec?.resources?.disk_list = newDiskList
@@ -803,7 +803,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				Map updateProps = volumeUpdate.updateProps
 				log.info("resizing vm storage: {}", volumeUpdate)
 				if (updateProps.maxStorage > existing.maxStorage) {
-					serverDetails = waitForPowerState(client, authConfig, vmId)
+					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 					vmBody = serverDetails?.data
 					def newDiskList = vmBody.spec?.resources?.disk_list
 					def diskMap = newDiskList.find{it.uuid == existing.externalId}
@@ -837,7 +837,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				datastores[it.id.toLong()] = it
 			}
 			resizeRequest.volumesAdd?.each { Map volumeAdd ->
-				serverDetails = waitForPowerState(client, authConfig, vmId)
+				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 				vmBody = serverDetails?.data
 				log.info("resizing vm adding storage: {}", volumeAdd)
 				if (!volumeAdd.maxStorage) {
@@ -875,7 +875,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				def addDiskResults = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
 				if(addDiskResults.success) {
 					//wait for operation to complete
-					serverDetails = waitForPowerState(client, authConfig, vmId)
+					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 					vmBody = serverDetails?.data
 					def newDisk = vmBody.spec.resources.disk_list.find {it.device_properties.disk_address.adapter_type == storageVolumeType.name && it.device_properties.disk_address.device_index == targetIndex}
 					def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
@@ -896,7 +896,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			def networksToDelete = resizeRequest.interfacesDelete?.collect {it.externalId}
 			if(networksToDelete.size() > 0) {
-				serverDetails = waitForPowerState(client, authConfig, vmId)
+				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 				vmBody = serverDetails?.data
 				def newNicList = vmBody.spec?.resources?.nic_list?.findAll { !networksToDelete.contains(it.uuid) }
 				vmBody.spec?.resources?.nic_list = newNicList
@@ -914,7 +914,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 //			}
 //
 			resizeRequest.interfacesAdd?.each{ Map networkAdd ->
-				serverDetails = waitForPowerState(client, authConfig, vmId)
+				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 				vmBody = serverDetails?.data
 				def newIndex = networkAdd?.network?.isPrimary ? 0 : server.interfaces?.size()
 
@@ -945,7 +945,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				def networkResults = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
 				if(networkResults.success) {
 					//wait for operation to complete
-					serverDetails = waitForPowerState(client, authConfig, vmId)
+					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 					vmBody = serverDetails?.data
 					def newNic = vmBody.spec.resources.nic_list.find {!oldNicList.contains(it.uuid)}
 					def newInterface = new ComputeServerInterface([
@@ -1447,7 +1447,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 				morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
-				def vmResource = waitForPowerState(client, authConfig, server.externalId)
+				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
 				log.debug("start: ${startResults.success}")
 				if(startResults.success == true) {
@@ -1456,7 +1456,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						server = saveAndGet(server)
 					} else {
 						//good to go
-						def serverDetail = checkServerReady(client, authConfig, server.externalId)
+						def serverDetail = NutanixPrismComputeUtility.checkServerReady(client, authConfig, server.externalId)
 						log.debug("serverDetail: ${serverDetail}")
 						if(serverDetail.success == true) {
 
@@ -1543,102 +1543,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return rtn
 	}
 
-	def waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
-		def rtn = [success:false]
-		try {
-			def pending = true
-			def attempts = 0
-			while(pending) {
-				sleep(1000l * 20l)
-				def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
-				log.debug("serverDetail: ${serverDetail}")
-				if(!serverDetail.success && serverDetail.data.code == 404 ) {
-					pending = false
-				}
-				def serverResource = serverDetail?.data?.spec?.resources
-				if(serverDetail.success == true && serverResource.power_state) {
-					rtn.success = true
-					rtn.data = serverDetail.data
-					rtn.powerState = serverResource.power_state
-					pending = false
-				}
-				attempts ++
-				if(attempts > 60)
-					pending = false
-			}
-		} catch(e) {
-			log.error("An Exception Has Occurred: ${e.message}",e)
-		}
-		return rtn
-	}
-
-	static checkServerReady(HttpApiClient client, Map authConfig, String vmId) {
-		def rtn = [success:false]
-		try {
-			def pending = true
-			def attempts = 0
-			while(pending) {
-				sleep(1000l * 20l)
-				def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
-				log.debug("serverDetail: ${serverDetail}")
-				def serverResource = serverDetail?.data?.spec?.resources
-				if(serverDetail.success == true && serverResource.power_state == 'ON' && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)} ) {
-					rtn.success = true
-					rtn.virtualMachine = serverDetail.data
-					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
-					rtn.diskList = serverResource.disk_list
-					pending = false
-				}
-				attempts ++
-				if(attempts > 60)
-					pending = false
-			}
-		} catch(e) {
-			log.error("An Exception Has Occurred: ${e.message}",e)
-		}
-		return rtn
-	}
-
-	static checkTaskReady(HttpApiClient client, Map authConfig, String taskId) {
-		def rtn = [success:false]
-		try {
-			def pending = true
-			def attempts = 0
-			while(pending) {
-				sleep(1000l * 20l)
-				def taskDetail = NutanixPrismComputeUtility.getTask(client, authConfig, taskId)
-				log.debug("taskDetail: ${taskDetail}")
-				def taskStatus = taskDetail?.data?.status
-				if(taskDetail.success == true && taskStatus) {
-					if(taskStatus == 'SUCCEEDED') {
-						rtn.success = true
-						rtn.data = taskDetail.data
-						pending = false
-					} else if (taskStatus == 'FAILED') {
-						rtn.success = false
-						rtn.data = taskDetail.data
-						pending = false
-					}
-				}
-				attempts ++
-				if(attempts > 60)
-					pending = false
-			}
-		} catch(e) {
-			log.error("An Exception Has Occurred: ${e.message}",e)
-		}
-		return rtn
-	}
-
-
-	static checkIpv4Ip(ipAddress) {
-		def rtn = false
-		if(ipAddress) {
-			if(ipAddress.indexOf('.') > 0 && !ipAddress.startsWith('169'))
-				rtn = true
-		}
-		return rtn
-	}
 
 	private Map getAllResourcePools(Cloud cloud) {
 		log.debug "getAllResourcePools: ${cloud}"

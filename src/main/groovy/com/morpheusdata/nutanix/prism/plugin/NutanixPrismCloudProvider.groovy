@@ -5,6 +5,7 @@ import com.morpheusdata.core.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.core.ProvisioningProvider
+import com.morpheusdata.core.backup.BackupProvider
 import com.morpheusdata.core.util.ConnectionUtils
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.AccountCredential
@@ -166,8 +167,8 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
-	Collection<AbstractBackupProvider> getAvailableBackupProviders() {
-		return null
+	Collection<BackupProvider> getAvailableBackupProviders() {
+		return plugin.getProvidersByType(BackupProvider) as Collection<com.morpheusdata.core.backup.BackupProvider>
 	}
 
 	@Override
