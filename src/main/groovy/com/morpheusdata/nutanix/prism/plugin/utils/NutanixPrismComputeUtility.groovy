@@ -850,6 +850,7 @@ class NutanixPrismComputeUtility {
 					rtn.virtualMachine = serverDetail.data
 					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
 					rtn.diskList = serverResource.disk_list
+					rtn.name = serverDetail?.data?.spec?.name
 					pending = false
 				}
 				attempts ++

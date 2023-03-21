@@ -728,7 +728,28 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	ServiceResponse<WorkloadResponse> getServerDetails(ComputeServer server) {
-		return ServiceResponse.success()
+		WorkloadResponse rtn = new WorkloadResponse()
+		def serverUuid = server.externalId
+		if(server && server.uuid) {
+			Cloud cloud = server.cloud
+			HttpApiClient client = new HttpApiClient()
+			client.networkProxy = cloud.apiProxy
+			def authConfig = plugin.getAuthConfig(cloud)
+			ServiceResponse serverDetails = NutanixPrismComputeUtility.checkServerReady(client, authConfig, serverUuid)
+			if(serverDetails.success && serverDetails.data) {
+				rtn.externalId = serverUuid
+				rtn.success = serverDetails.success
+				rtn.publicIp = serverDetails.ipAddress
+				rtn.privateIp = serverDetails.ipAddress
+				rtn.hostname = serverDetails.name
+				return ServiceResponse.success(rtn)
+
+			} else {
+				return ServiceResponse.error("Server not ready/does not exist")
+			}
+		} else {
+			return ServiceResponse.error("Could not find server uuid")
+		}
 	}
 
 	@Override
