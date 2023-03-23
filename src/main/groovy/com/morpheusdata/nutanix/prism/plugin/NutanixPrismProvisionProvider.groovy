@@ -735,8 +735,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			ServiceResponse serverDetails = NutanixPrismComputeUtility.checkServerReady(client, authConfig, serverUuid)
-			if(serverDetails.success && serverDetails.data) {
+			Map serverDetails = NutanixPrismComputeUtility.checkServerReady(client, authConfig, serverUuid)
+			if(serverDetails.success && serverDetails.virtualMachine) {
 				rtn.externalId = serverUuid
 				rtn.success = serverDetails.success
 				rtn.publicIp = serverDetails.ipAddress
