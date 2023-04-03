@@ -47,12 +47,10 @@ class HostsSync {
 			queryResults.serverType = new ComputeServerType(code: 'nutanix-prism-hypervisor')
 			queryResults.serverOs = new OsType(code: 'esxi.6')
 
-			def poolListProjections = []
-			morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { poolProjection ->
+			def poolListProjections = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { poolProjection ->
 				return poolProjection.internalId != null && poolProjection.type == 'Cluster'
-			}.blockingSubscribe { poolListProjections << it }
-			queryResults.clusters = []
-			morpheusContext.cloud.pool.listById(poolListProjections.collect { it.id }).blockingSubscribe { queryResults.clusters << it }
+			}.toList().blockingGet()
+			queryResults.clusters = morpheusContext.cloud.pool.listById(poolListProjections.collect { it.id }).toList().blockingGet()
 
 			def cloudItems = []
 			def listResultSuccess = false
@@ -156,11 +154,10 @@ class HostsSync {
 
 		def volumeType = new StorageVolumeType(code: 'nutanix-prism-host-disk')
 
-		List<ComputeZonePoolIdentityProjection> zoneClusters = []
 		def clusterExternalIds = updateList.collect{ it.masterItem.cluster_uuid }.unique()
-		morpheusContext.cloud.pool.listSyncProjections(cloud.id, null).filter {
+		List<ComputeZonePoolIdentityProjection> zoneClusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, null).filter {
 			it.type == 'Cluster' && it.externalId in clusterExternalIds
-		}.blockingSubscribe { zoneClusters << it }
+		}.toList().blockingGet()
 
 		for(update in updateList) {
 			ComputeServer currentServer = update.existingItem

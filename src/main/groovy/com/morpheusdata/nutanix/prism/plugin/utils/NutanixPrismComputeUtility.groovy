@@ -208,8 +208,8 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse updateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
-		vmBody.remove('status')
-		vmBody.metadata?.remove('spec_hash')
+		vmBody?.remove('status')
+		vmBody?.metadata?.remove('spec_hash')
 		log.debug("updateVm")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')

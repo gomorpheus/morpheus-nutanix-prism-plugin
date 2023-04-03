@@ -31,10 +31,7 @@ class SnapshotsSync {
 		log.debug "BEGIN: execute SnapshotsSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def clusters = []
-			morpheusContext.cloud.pool.listSyncProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}").blockingSubscribe {
-				clusters << it.externalId
-			}
+			def clusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}").map{it.externalId}.toList().blockingGet()
 			def allResults = []
 			def success = true
 			for(int i = 0; i < clusters.size(); i++ ) {
@@ -129,10 +126,8 @@ class SnapshotsSync {
 
 	private Map getAllVms() {
 		log.debug "getAllVms: ${cloud}"
-		def vmIds = []
-		morpheusContext.computeServer.listSyncProjections(cloud.id).blockingSubscribe { vmIds << it.id }
-		def vmsMap = [:]
-		morpheusContext.computeServer.listById(vmIds).blockingSubscribe{ vmsMap[it.externalId] = it}
+		def vmIds = morpheusContext.computeServer.listSyncProjections(cloud.id).map{it.id}.toList().blockingGet()
+		def vmsMap = morpheusContext.computeServer.listById(vmIds).toMap {it.externalId}.blockingGet()
 		vmsMap
 	}
 

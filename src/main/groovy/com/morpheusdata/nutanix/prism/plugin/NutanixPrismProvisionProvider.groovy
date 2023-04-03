@@ -853,10 +853,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			}
 			datastoreIds = datastoreIds.unique()
-			def datastores = [:]
-			morpheusContext.cloud.datastore.listById(datastoreIds).blockingSubscribe {
-				datastores[it.id.toLong()] = it
-			}
+			def datastores = morpheusContext.cloud.datastore.listById(datastoreIds).toMap {it.id.toLong()}.blockingGet()
 			resizeRequest.volumesAdd?.each { Map volumeAdd ->
 				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 				vmBody = serverDetails?.data
@@ -939,8 +936,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				vmBody = serverDetails?.data
 				def newIndex = networkAdd?.network?.isPrimary ? 0 : server.interfaces?.size()
 
-				Network newNetwork
-				morpheusContext.network.listById([networkAdd.network.id.toLong()]).blockingSubscribe { newNetwork = it }
+				Network newNetwork = morpheusContext.network.listById([networkAdd.network.id.toLong()]).firstOrError().blockingGet()
 
 				def networkConfig = [
 						is_connected    : true,
@@ -1196,10 +1192,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			it.rootVolume == true
 		}
 		def datastoreId = rootVolumeConfig.datastoreId
-		def rootDatastore
-		morpheusContext.cloud.datastore.listById([datastoreId.toLong()]).blockingSubscribe { Datastore ds ->
-			rootDatastore = ds
-		}
+		def rootDatastore = morpheusContext.cloud.datastore.listById([datastoreId.toLong()]).firstOrError().blockingGet()
 		if(!rootDatastore) {
 			log.error("buildRunConfig error: Datastore option is invalid for selected host")
 			throw new Exception("There are no available datastores to use based on provisioning options for the target host.")
@@ -1245,10 +1238,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		}
 		datastoreIds = datastoreIds.unique()
-		def datastores = [:]
-		morpheusContext.cloud.datastore.listById(datastoreIds).blockingSubscribe {
-			datastores[it.id.toLong()] = it
-		}
+		def datastores = morpheusContext.cloud.datastore.listById(datastoreIds).toMap {it.id.toLong()}.blockingGet()
+
 		//categories
 		def categories = config.categories?.collect {it.value}
 
@@ -1290,9 +1281,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		}
 		networkIds = networkIds.unique()
 		def networks = [:]
-		morpheusContext.network.listById(networkIds).blockingSubscribe { Network it ->
-			networks[it.id.toLong()] = it
-		}
+		morpheusContext.network.listById(networkIds).toMap { it.id.toLong()}.blockingGet()
 		config.networkInterfaces?.each { networkInterface ->
 			def net = networks[networkInterface.network.id.toLong()]
 			if(net) {
@@ -1433,7 +1422,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, workloadResponse.installAgent: ${workloadResponse.installAgent}, workloadResponse.noAgent: ${workloadResponse.noAgent}"
 			//cloud_init
 			if(virtualImage?.isCloudInit && server.cloudConfigUser) {
-				log.debug "VirtualImage ${virtualImage} isCloudInit"
 				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
 			}
 
@@ -1446,7 +1434,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			if(virtualImage) {
 				createResults = NutanixPrismComputeUtility.createVm(client, authConfig, runConfig)
-				log.info("create server: ${createResults}")
+				log.debug("create server results: ${createResults}")
 			}
 
 			//check success
@@ -1462,60 +1450,66 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				workloadResponse.externalId = server.externalId
 				server.internalId = server.externalId
 				server = saveAndGet(server)
-					
+
 				//TODO tagging? No direct mapping
 				//applyTags(workload, client)
 
 				morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
-				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
-				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
-				log.debug("start: ${startResults.success}")
-				if(startResults.success == true) {
-					if(startResults.error == true) {
+				def taskId = createResults.data?.status?.execution_context?.task_uuid
+				def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+				if(taskResults.success) {
+					def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
+					def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
+					log.debug("start: ${startResults.success}")
+					if (startResults.success) {
+						if (startResults.error == true) {
+							server.statusMessage = 'Failed to start server'
+							server = saveAndGet(server)
+						} else {
+							//good to go
+							def serverDetail = NutanixPrismComputeUtility.checkServerReady(client, authConfig, server.externalId)
+							log.debug("serverDetail: ${serverDetail}")
+							if (serverDetail.success == true) {
+
+								Map resourcePools = getAllResourcePools(server.cloud)
+								ComputeZonePool resourcePool = resourcePools[serverDetail?.virtualMachine?.status?.cluster_reference?.uuid]
+
+								def privateIp = serverDetail.ipAddress
+								def publicIp = serverDetail.ipAddress
+								server.internalIp = privateIp
+								server.externalIp = publicIp
+								server.resourcePool = resourcePool
+
+								//update disks
+								def disks = serverDetail.diskList
+
+								//some ugly matching
+								def volumeTypeCountMap = [:]
+								def volumes = server.volumes.sort { it.displayOrder }
+								for (int i = 0; i < volumes.size(); i++) {
+									def volume = volumes[i]
+									if (!volumeTypeCountMap[volume.type.name]) {
+										volumeTypeCountMap[volume.type.name] = 0
+									}
+									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name && disk.device_properties.disk_address.device_index == volumeTypeCountMap[volume.type.name] }
+									volume.externalId = newDisk?.uuid
+									volumeTypeCountMap[volume.type.name]++
+								}
+								morpheusContext.storageVolume.save(volumes).blockingGet()
+								server = saveAndGet(server)
+								workloadResponse.success = true
+							} else {
+								server.statusMessage = 'Failed to load server details'
+								server = saveAndGet(server)
+							}
+						}
+					} else {
 						server.statusMessage = 'Failed to start server'
 						server = saveAndGet(server)
-					} else {
-						//good to go
-						def serverDetail = NutanixPrismComputeUtility.checkServerReady(client, authConfig, server.externalId)
-						log.debug("serverDetail: ${serverDetail}")
-						if(serverDetail.success == true) {
-
-							Map resourcePools = getAllResourcePools(server.cloud)
-							ComputeZonePool resourcePool = resourcePools[serverDetail?.virtualMachine?.status?.cluster_reference?.uuid]
-
-							def privateIp = serverDetail.ipAddress
-							def publicIp = serverDetail.ipAddress
-							server.internalIp = privateIp
-							server.externalIp = publicIp
-							server.resourcePool = resourcePool
-							
-							//update disks
-							def disks = serverDetail.diskList
-
-							//some ugly matching
-							def volumeTypeCountMap = [:]
-							def volumes = server.volumes.sort { it.displayOrder}
-							for(int i = 0; i < volumes.size(); i++) {
-								def volume = volumes[i]
-								if(!volumeTypeCountMap[volume.type.name]) {
-									volumeTypeCountMap[volume.type.name] = 0
-								}
-								def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name && disk.device_properties.disk_address.device_index == volumeTypeCountMap[volume.type.name] }
-								volume.externalId = newDisk?.uuid
-								volumeTypeCountMap[volume.type.name]++
-							}
-							morpheusContext.storageVolume.save(volumes).blockingGet()
-							server = saveAndGet(server)
-							workloadResponse.success = true
-						} else {
-							server.statusMessage = 'Failed to load server details'
-							server = saveAndGet(server)
-						}
 					}
 				} else {
-					server.statusMessage = 'Failed to start server'
-					server = saveAndGet(server)
+					workloadResponse.setError("Failed to create server - task error:  ${taskResults}")
 				}
 
 			} else {
@@ -1567,10 +1561,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	private Map getAllResourcePools(Cloud cloud) {
 		log.debug "getAllResourcePools: ${cloud}"
-		def resourcePoolProjectionIds = []
-		morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').blockingSubscribe { resourcePoolProjectionIds << it.id }
-		def resourcePoolsMap = [:]
-		morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).blockingSubscribe { resourcePoolsMap[it.externalId] = it }
+		def resourcePoolProjectionIds = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').map{it.id}.toList().blockingGet()
+		def resourcePoolsMap = morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId}.blockingGet()
 		resourcePoolsMap
 	}
 

@@ -128,10 +128,9 @@ class ImagesSync {
 		morpheusContext.virtualImage.create(adds, cloud).blockingGet()
 
 		// Fetch the images that we just created
-		def imageMap = [:]
-		morpheusContext.virtualImage.listSyncProjections(cloud.id).filter { VirtualImageIdentityProjection proj ->
+		def imageMap = morpheusContext.virtualImage.listSyncProjections(cloud.id).filter { VirtualImageIdentityProjection proj ->
 			addExternalIds.contains(proj.externalId)
-		}.blockingSubscribe { imageMap[it.externalId] = it }
+		}.toMap { it.externalId  }.blockingGet()
 
 		// Now add the locations
 		def locationAdds = []
@@ -179,17 +178,16 @@ class ImagesSync {
 		def externalIds = updateList?.findAll{ it.existingItem.externalId }?.collect{ it.existingItem.externalId }
 		List<VirtualImage> existingItems = []
 		if(imageIds && externalIds) {
-			def tmpImgProjs = []
-			morpheusContext.virtualImage.listSyncProjections(cloud.id).filter { img ->
+			def tmpImgProjs = morpheusContext.virtualImage.listSyncProjections(cloud.id).filter { img ->
 				img.id in imageIds || (!img.systemImage && img.externalId != null && img.externalId in externalIds)
-			}.blockingSubscribe { tmpImgProjs << it }
+			}.toList().blockingGet()
 			if(tmpImgProjs) {
-				morpheusContext.virtualImage.listById(tmpImgProjs.collect { it.id }).filter { img ->
+				existingItems = morpheusContext.virtualImage.listById(tmpImgProjs.collect { it.id }).filter { img ->
 					img.id in imageIds || img.imageLocations.size() == 0
-				}.blockingSubscribe { existingItems << it }
+				}.toList().blockingGet()
 			}
 		} else if(imageIds) {
-			morpheusContext.virtualImage.listById(imageIds).blockingSubscribe { existingItems << it }
+			existingItems = morpheusContext.virtualImage.listById(imageIds).toList().blockingGet()
 		}
 
 		List<VirtualImageLocation> locationsToCreate = []

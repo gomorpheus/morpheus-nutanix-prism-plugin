@@ -52,11 +52,8 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def regionCode = tmpCloud.regionCode
 
 		// Grab the projections.. doing a filter pass first
-		def virtualImageIds = []
 		ImageType[] imageTypes =  [ImageType.qcow2, ImageType.ova]
-		morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { VirtualImageIdentityProjection proj ->
-			return (proj.deleted == false)
-		}.blockingSubscribe{virtualImageIds << it.id }
+		def virtualImageIds = morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { it.deleted == false }.map{it.id}.toList().blockingGet()
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
@@ -95,11 +92,8 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 
 		// Grab the projections.. doing a filter pass first
-		def virtualImageIds = []
 		ImageType[] imageTypes =  [ImageType.qcow2, ImageType.ova]
-		morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { VirtualImageIdentityProjection proj ->
-			return (proj.deleted == false)
-		}.blockingSubscribe{virtualImageIds << it.id }
+		def virtualImageIds = morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { it.deleted == false}.map{it.id}.toList().blockingGet()
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
@@ -127,24 +121,14 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 	def nutanixPrismCategories(args){
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
-		def options = []
-		morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).blockingSubscribe { options << [name: it.externalId, value: it.externalId] }
-		if(options?.size() > 0) {
-			options = options.sort { it.name }
-		}
+		def options = morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).map{  [name: it.externalId, value: it.externalId] }.toSortedList {it.name}.blockingGet()
 		options
 	}
 
 	def nutanixPrismCluster(args){
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
-		def options = []
-		morpheusContext.cloud.pool.listSyncProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}").blockingSubscribe {
-			options << [name: it.name, value: it.externalId]
-		}
-		if(options?.size() > 0) {
-			options = options.sort { it.name }
-		}
+		def options = morpheusContext.cloud.pool.listSyncProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}").map {[name: it.name, value: it.externalId]}.toSortedList {it.name}.blockingGet()
 		options
 	}
 }

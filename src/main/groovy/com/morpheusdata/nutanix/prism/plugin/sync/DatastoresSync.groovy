@@ -36,10 +36,9 @@ class DatastoresSync {
 			def authConfig = plugin.getAuthConfig(cloud)
 
 			// Fetch our known clusters
-			def clusters = []
-			morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
+			def clusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
-			}.blockingSubscribe { clusters << it }
+			}.toList().blockingGet()
 
 			def listResults = NutanixPrismComputeUtility.listDatastores(apiClient, authConfig)
 			if(listResults.success == true) {
@@ -127,8 +126,7 @@ class DatastoresSync {
 					}
 				}.onDelete { removeItems ->
 					if(removeItems) {
-						def datastores = []
-						morpheusContext.cloud.datastore.listById(removeItems.collect { it.id }).blockingSubscribe { datastores << it }
+						def datastores = morpheusContext.cloud.datastore.listById(removeItems.collect { it.id }).toList().blockingGet()
 						datastores.each { Datastore removeItem ->
 							morpheusContext.cloud.datastore.remove([removeItem], removeItem.zonePool).blockingGet()
 						}

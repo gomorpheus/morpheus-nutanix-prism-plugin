@@ -34,15 +34,13 @@ class NetworksSync {
 		try {
 			def networkTypes = plugin.cloudProvider.getNetworkTypes()
 
-			def clusters = []
-			morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
+			def clusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
-			}.blockingSubscribe { clusters << it }
+			}.toList().blockingGet()
 
-			def vpcs = []
-			morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
+			def vpcs = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
 				return projection.type == 'VPC' && projection.internalId != null
-			}.blockingSubscribe { vpcs << it }
+			}.toList().blockingGet()
 
 			def authConfig = plugin.getAuthConfig(cloud)
 			def listResults = NutanixPrismComputeUtility.listNetworks(apiClient, authConfig)

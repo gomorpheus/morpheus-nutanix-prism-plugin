@@ -44,12 +44,7 @@ class VirtualMachinesSync {
 				def domainRecords = morpheusContext.computeServer.listSyncProjections(cloud.id).filter { ComputeServerIdentityProjection projection ->
 					projection.computeServerTypeCode != 'nutanix-prism-hypervisor'
 				}
-				def blackListedNames = []
-				domainRecords.blockingSubscribe { ComputeServerIdentityProjection server ->
-					if (server.status == 'provisioning') {
-						blackListedNames << server.name
-					}
-				}
+				def blackListedNames = domainRecords.filter {it.status == 'provisioning'}.map {it.name}.toList().blockingGet()
 
 				// To be used throughout the sync
 				def defaultServerType = new ComputeServerType(code: 'nutanix-prism-server')
@@ -141,13 +136,7 @@ class VirtualMachinesSync {
 
 		// Gather up all the Workloads that may pertain to the servers we are sync'ing
 		def managedServerIds = servers?.findAll{it.computeServerType?.managed }?.collect{it.id}
-		Map<Long, WorkloadIdentityProjection> tmpWorkloads = [:]
-		if(managedServerIds) {
-			morpheusContext.cloud.listCloudWorkloadProjections(cloud.id).filter {
-				it.serverId in managedServerIds
-			}.blockingSubscribe { tmpWorkloads[it.serverId] = it}
-		}
-
+		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.cloud.listCloudWorkloadProjections(cloud.id).filter {it.serverId in (managedServerIds ?: []) }.toMap {it.serverId}.blockingGet()
 		def statsData = []
 		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, updateList?.collect{ it.masterItem.metadata.uuid } )
 		for(update in updateList) {
@@ -280,49 +269,37 @@ class VirtualMachinesSync {
 
 	private Map getAllHosts() {
 		log.debug "getAllHosts: ${cloud}"
-		def hostIdentitiesMap = [:]
-		morpheusContext.computeServer.listSyncProjections(cloud.id).blockingSubscribe {
-			if(it.computeServerTypeCode == 'nutanix-prism-hypervisor') {
-				hostIdentitiesMap[it.externalId] = it.id
-			}
-		}
+		def hostIdentitiesMap = morpheusContext.computeServer.listSyncProjections(cloud.id).filter {
+			it.computeServerTypeCode == 'nutanix-prism-hypervisor'
+		}.toMap {it.externalId }.blockingGet()
 		hostIdentitiesMap
 	}
 
 	private Map getAllResourcePools() {
 		log.debug "getAllResourcePools: ${cloud}"
 		def resourcePoolProjectionIds = []
-		morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').blockingSubscribe { resourcePoolProjectionIds << it.id }
-		def resourcePoolsMap = [:]
-		morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).blockingSubscribe { resourcePoolsMap[it.externalId] = it }
+		morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').map{it.id}.toList().blockingGet()
+		def resourcePoolsMap = morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId }.blockingGet()
 		resourcePoolsMap
 	}
 
 	private Map getAllNetworks() {
 		log.debug "getAllNetworks: ${cloud}"
-		def networkProjectionsMap = [:]
-		morpheusContext.cloud.network.listSyncProjections(cloud.id).blockingSubscribe { networkProjectionsMap[it.externalId] = it }
+		def networkProjectionsMap = morpheusContext.cloud.network.listSyncProjections(cloud.id).toMap {it.externalId }.blockingGet()
 		networkProjectionsMap
 	}
 
 	private Map getAllOsTypes() {
 		log.debug "getAllOsTypes: ${cloud}"
-		Map osTypes = [:]
-		morpheusContext.osType.listAll().blockingSubscribe { osTypes[it.code] = it }
+		Map osTypes = morpheusContext.osType.listAll().toMap {it.code}.blockingGet()
 		osTypes
 	}
 
 	private List getAllServicePlans() {
 		log.debug "getAllServicePlans: ${cloud}"
-		def servicePlanProjections = []
 		def provisionType = new ProvisionType(code: 'nutanix-prism-provision-provider')
-		morpheusContext.servicePlan.listSyncProjections(provisionType).blockingSubscribe { servicePlanProjections << it }
-		def plans = []
-		morpheusContext.servicePlan.listById(servicePlanProjections.collect { it.id }).blockingSubscribe {
-			if(it.active == true && it.deleted != true) {
-				plans << it
-			}
-		}
+		def servicePlanProjections = morpheusContext.servicePlan.listSyncProjections(provisionType).toList().blockingGet()
+		def plans = morpheusContext.servicePlan.listById(servicePlanProjections.collect { it.id }).filter {it.active && it.deleted != true}.toList().blockingGet()
 		plans
 	}
 
@@ -374,9 +351,8 @@ class VirtualMachinesSync {
 			}
 
 			if(instanceIds) {
-				def instances = []
 				def instancesToSave = []
-				morpheusContext.instance.listById(instanceIds).blockingSubscribe { instances << it }
+				def instances = morpheusContext.instance.listById(instanceIds).toList().blockingGet()
 				instances.each { Instance instance ->
 					if(plan) {
 						if (instance.containers.every { cnt -> (cnt.plan.id == currentServer.plan.id && cnt.maxMemory == currentServer.maxMemory && cnt.maxCores == currentServer.maxCores && cnt.coresPerSocket == currentServer.coresPerSocket) || cnt.server.id == currentServer.id }) {
@@ -401,9 +377,8 @@ class VirtualMachinesSync {
 
 	private getWorkloadsForServer(ComputeServer currentServer) {
 		def workloads = []
-		def projs = []
-		morpheusContext.cloud.listCloudWorkloadProjections(cloud.id).filter { it.serverId == currentServer.id }.blockingSubscribe { projs << it }
-		for(proj in projs) {
+		def projections = morpheusContext.cloud.listCloudWorkloadProjections(cloud.id).filter { it.serverId == currentServer.id }.toList().blockingGet()
+		for(proj in projections) {
 			workloads << morpheusContext.cloud.getWorkloadById(proj.id).blockingGet()
 		}
 		workloads
