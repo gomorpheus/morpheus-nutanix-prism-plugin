@@ -1280,8 +1280,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			it.network?.id?.toLong()
 		}
 		networkIds = networkIds.unique()
-		def networks = [:]
-		morpheusContext.network.listById(networkIds).toMap { it.id.toLong()}.blockingGet()
+		def networks = morpheusContext.network.listById(networkIds).toMap { it.id.toLong()}.blockingGet()
 		config.networkInterfaces?.each { networkInterface ->
 			def net = networks[networkInterface.network.id.toLong()]
 			if(net) {
