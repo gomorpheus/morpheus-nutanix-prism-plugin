@@ -132,7 +132,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				fieldLabel : 'Image',
 				inputType : OptionType.InputType.SELECT,
 				displayOrder : 100,
-				required : true,
+				required : false,
 				optionSource : 'nutanixPrismNodeImage'
 		])
 		return [imageOption]
