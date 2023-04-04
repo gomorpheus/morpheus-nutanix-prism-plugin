@@ -151,14 +151,25 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		vmType.name = 'Nutanix Prism Linux VM'
 		vmType.code = 'nutanix-prism-vm'
 		vmType.description = 'Nutanix Prism Linux VM'
-		vmType.reconfigureSupported = false
+		vmType.reconfigureSupported = true
 		vmType.hasAutomation = true
 		vmType.supportsConsoleKeymap = true
 		vmType.platform = PlatformType.linux
 		vmType.managed = true
 		vmType.provisionTypeCode = 'nutanix-prism-provision-provider'
 
-		[hypervisorType, serverType, vmType]
+		ComputeServerType windowsType = new ComputeServerType()
+		windowsType.name = 'Nutanix Prism Windows VM'
+		windowsType.code = 'nutanix-prism-windows-vm'
+		windowsType.description = 'Nutanix Prism Windows VM'
+		windowsType.reconfigureSupported = true
+		windowsType.hasAutomation = true
+		windowsType.supportsConsoleKeymap = true
+		windowsType.platform = PlatformType.windows
+		windowsType.managed = true
+		windowsType.provisionTypeCode = 'nutanix-prism-provision-provider'
+
+		[hypervisorType, serverType, vmType, windowsType]
 	}
 
 	@Override
