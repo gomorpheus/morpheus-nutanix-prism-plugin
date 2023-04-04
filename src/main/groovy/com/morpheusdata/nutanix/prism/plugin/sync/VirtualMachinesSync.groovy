@@ -277,8 +277,7 @@ class VirtualMachinesSync {
 
 	private Map getAllResourcePools() {
 		log.debug "getAllResourcePools: ${cloud}"
-		def resourcePoolProjectionIds = []
-		morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').map{it.id}.toList().blockingGet()
+		def resourcePoolProjectionIds = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').map{it.id}.toList().blockingGet()
 		def resourcePoolsMap = morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId }.blockingGet()
 		resourcePoolsMap
 	}
