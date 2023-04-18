@@ -62,6 +62,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Collection<OptionType> getOptionTypes() {
+		// this needs to be on the instance type which will be handled by instance type packages
+		// TODO: move to generic instance type in package
 		OptionType cluster = new OptionType([
 				name : 'cluster',
 				code : 'nutanix-prism-provision-cluster',
@@ -1282,7 +1284,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		networkIds = networkIds.unique()
 		def networks = morpheusContext.network.listById(networkIds).toMap { it.id.toLong()}.blockingGet()
 		config.networkInterfaces?.each { networkInterface ->
-			def net = networks[networkInterface.network.id.toLong()]
+			def netId = networkInterface?.network?.id?.toLong()
+			def net = netId ? networks[netId] : null
 			if(net) {
 				def networkConfig = [
 						is_connected    : true,
