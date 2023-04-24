@@ -1,0 +1,61 @@
+resource "instance-type" "nutanix-prism-provision-provider" {
+	name =  "Nutanix Prism Central"
+	code = "nutanix-prism-provision-provider"
+	category = "cloud"
+	active = true
+	enabled = true
+	hasConfig = false
+	hasSettings = false
+	hasDeployment = false
+	versions = ['1.0']
+	optionTypes = [{code="nutanix-prism-provision-cluster"}, {code="nutanix-prism-provision-image"}]
+	logo = "nutanix-prism.svg" #?
+	darkLogo = "nutanix-prism.svg" #?
+}
+
+resource "container-type" "nutanix-prism-provision-provider-1.0" {
+	code = "nutanix-prism-provision-provider-1.0"
+	shortName = "nutanix-prism-central"
+	name = "Nutanix Prism Central"
+	environmentPrefix = "NUTANIX-PRISM-PROVISION-PROVIDER"
+	ports = []
+	containerVersion = '1.0'
+	serverType = "vm"
+	showServerLogs = true
+	category = "cloud"
+	provisionType {
+		code = "nutanix-prism-provision-provider"
+	}
+}
+
+resource "container-type-set" "nutanix-prism-1.0-set" {
+	code = "nutanix-prism-1.0-set"
+	containerType {
+		code = "nutanix-prism-provision-provider-1.0"
+	}
+	priorityOrder =  0
+	dynamicCount =  true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-1.0-single" {
+ 	code = "nutanix-prism-1.0-single"
+	name: "Nutanix Prism Central VM"
+	sortOrder = 0
+	instanceVersion = "1.0"
+	description: "This will provision a single vm"
+	instanceType {
+		code = "nutanix-prism-provision-provider"
+	}
+	serverCount =  1
+	portCount =  0
+	enabled = true
+	creatable =  true
+	containers: [{code = "nutanix-prism-1.0-set"}]
+	provisionType {
+		code = "nutanix-prism-provision-provider"
+	}
+	optionTypes: [{code = "nutanix-prism-provision-categories"}]
+}
+
+
