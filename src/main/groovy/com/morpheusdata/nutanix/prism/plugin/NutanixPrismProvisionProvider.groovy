@@ -57,7 +57,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Icon getCircularIcon() {
-		return new Icon(path:"nutanix-prism-plugin-circular.svg", darkPath: "nutanix-prism-plugin-circular-dark.svg")
+		return new Icon(path:"nutanix-prism-circular.svg", darkPath: "nutanix-prism-circular-dark.svg")
 	}
 
 	@Override
