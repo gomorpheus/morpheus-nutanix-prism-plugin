@@ -19,7 +19,7 @@ resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
 	rootVolume = true
 	unitNumber =  "0"
 	controller {
-		uniqueId = nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0
+		uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0"
 	}
 }
 
