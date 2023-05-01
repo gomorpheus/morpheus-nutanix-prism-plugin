@@ -17,7 +17,7 @@ resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
 	}
 	maxStorage =  2147483648
 	rootVolume = true
-	unitNumber = '0'
+	unitNumber =  "0"
 	controller {
 		uniqueId = nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0
 	}
@@ -61,7 +61,7 @@ resource "container-type" "nutanix-prism-ubuntu-20.04" {
 	ports = [22]
 	containerVersion =  "20.04"
 	imageCode = "morpheus ubuntu 20.04"
-	entryPoint =  ''
+	entryPoint =   ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
 	logTypeCode = "ubuntu"
@@ -123,7 +123,6 @@ resource "scale-action" "nutanix-prism-ubuntu-20.04-single" {
 		code = "ubuntu-add-node"
 	}
 	downAction {
-
 		code = "ubuntu-remove-node"
 	}
 }

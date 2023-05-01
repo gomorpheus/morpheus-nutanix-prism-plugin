@@ -7,7 +7,7 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	hasConfig = false
 	hasSettings = false
 	hasDeployment = false
-	versions = ['1.0']
+	versions = ["1.0"]
 	optionTypes = [{code="nutanix-prism-provision-cluster"}, {code="nutanix-prism-provision-image"}]
 	logo = "nutanix-prism.svg" #?
 	darkLogo = "nutanix-prism.svg" #?
@@ -19,7 +19,7 @@ resource "container-type" "nutanix-prism-provision-provider-1.0" {
 	name = "Nutanix Prism Central"
 	environmentPrefix = "NUTANIX-PRISM-PROVISION-PROVIDER"
 	ports = []
-	containerVersion = '1.0'
+	containerVersion = "1.0"
 	serverType = "vm"
 	showServerLogs = true
 	category = "cloud"
@@ -40,10 +40,10 @@ resource "container-type-set" "nutanix-prism-1.0-set" {
 
 resource "instance-type-layout" "nutanix-prism-1.0-single" {
  	code = "nutanix-prism-1.0-single"
-	name: "Nutanix Prism Central VM"
+	name = "Nutanix Prism Central VM"
 	sortOrder = 0
 	instanceVersion = "1.0"
-	description: "This will provision a single vm"
+	description = "This will provision a single vm"
 	instanceType {
 		code = "nutanix-prism-provision-provider"
 	}
@@ -51,11 +51,11 @@ resource "instance-type-layout" "nutanix-prism-1.0-single" {
 	portCount =  0
 	enabled = true
 	creatable =  true
-	containers: [{code = "nutanix-prism-1.0-set"}]
+	containers = [{code = "nutanix-prism-1.0-set"}]
 	provisionType {
 		code = "nutanix-prism-provision-provider"
 	}
-	optionTypes: [{code = "nutanix-prism-provision-categories"}]
+	optionTypes = [{code = "nutanix-prism-provision-categories"}]
 }
 
 
