@@ -10,14 +10,16 @@ resource "option-type" "nutanix-prism-provision-image" {
 	optionSource = "nutanixPrismProvisionImage"
 }
 
-resource "option-type" "nutanix-prism-provision-image" {
-	name = "virtual image",
-	code = "nutanix-prism-provision-image",
-	fieldName = "virtualImageId",
+resource "option-type" "nutanix-prism-provision-categories" {
+	name = "categories",
+	code = "nutanix-prism-provision-categories",
+	fieldName = "categories",
 	fieldContext = "config",
-	fieldLabel = "Image",
-	inputType = "select",
-	displayOrder = 102,
-	required = true,
-	optionSource = "nutanixPrismProvisionImage"
+	fieldLabel = "Categories",
+	inputType = "multiSelect",
+	displayOrder = 105,
+	optionSource = "nutanixPrismCategories"
 }
+
+
+

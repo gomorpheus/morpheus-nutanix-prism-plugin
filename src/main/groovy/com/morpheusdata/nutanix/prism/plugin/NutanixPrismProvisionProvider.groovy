@@ -76,17 +76,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				optionSource: 'nutanixPrismCluster'
 
 		])
-		OptionType imageOption = new OptionType([
-				name : 'virtual image',
-				code : 'nutanix-prism-provision-image',
-				fieldName : 'virtualImageId',
-				fieldContext : 'config',
-				fieldLabel : 'Image',
-				inputType : OptionType.InputType.SELECT,
-				displayOrder : 102,
-				required : true,
-				optionSource : 'nutanixPrismProvisionImage'
-		])
+//		OptionType imageOption = new OptionType([
+//				name : 'virtual image',
+//				code : 'nutanix-prism-provision-image',
+//				fieldName : 'virtualImageId',
+//				fieldContext : 'config',
+//				fieldLabel : 'Image',
+//				inputType : OptionType.InputType.SELECT,
+//				displayOrder : 102,
+//				required : true,
+//				optionSource : 'nutanixPrismProvisionImage'
+//		])
 		OptionType uefi = new OptionType([
 				name : 'uefi',
 				code : 'nutanix-prism-provision-uefi',
@@ -109,19 +109,20 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				fieldGroup: 'Nutanix Prism Boot Options'
 
 		])
-		OptionType categories = new OptionType([
-				name : 'categories',
-				code : 'nutanix-prism-provision-categories',
-				fieldName : 'categories',
-				fieldContext : 'config',
-				fieldLabel : 'Categories',
-				inputType : OptionType.InputType.MULTI_SELECT,
-				displayOrder : 105,
-				optionSource: 'nutanixPrismCategories'
+//		OptionType categories = new OptionType([
+//				name : 'categories',
+//				code : 'nutanix-prism-provision-categories',
+//				fieldName : 'categories',
+//				fieldContext : 'config',
+//				fieldLabel : 'Categories',
+//				inputType : OptionType.InputType.MULTI_SELECT,
+//				displayOrder : 105,
+//				optionSource: 'nutanixPrismCategories'
+//
+//		])
 
-		])
-
-		[cluster, imageOption, uefi, secureBoot, categories]
+		[cluster, uefi, secureBoot]
+		//[cluster, imageOption, uefi, secureBoot, categories]
 	}
 
 	@Override
