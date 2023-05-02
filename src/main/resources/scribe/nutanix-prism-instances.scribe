@@ -13,11 +13,10 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	darkLogo = "nutanix-prism.svg" #?
 }
 
-resource "container-type" "nutanix-prism-provision-provider-1.0" {
+resource "workload-type" "nutanix-prism-provision-provider-1.0" {
 	code = "nutanix-prism-provision-provider-1.0"
 	shortName = "nutanix-prism-central"
 	name = "Nutanix Prism Central"
-	environmentPrefix = "NUTANIX-PRISM-PROVISION-PROVIDER"
 	ports = []
 	containerVersion = "1.0"
 	serverType = "vm"
@@ -28,9 +27,9 @@ resource "container-type" "nutanix-prism-provision-provider-1.0" {
 	}
 }
 
-resource "container-type-set" "nutanix-prism-1.0-set" {
+resource "workload-type-set" "nutanix-prism-1.0-set" {
 	code = "nutanix-prism-1.0-set"
-	containerType {
+	workloadType {
 		code = "nutanix-prism-provision-provider-1.0"
 	}
 	priorityOrder =  0

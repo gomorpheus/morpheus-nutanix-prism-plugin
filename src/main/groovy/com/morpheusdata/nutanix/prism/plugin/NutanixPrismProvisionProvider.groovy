@@ -64,18 +64,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	Collection<OptionType> getOptionTypes() {
 		// this needs to be on the instance type which will be handled by instance type packages
 		// TODO: move to generic instance type in package
-		OptionType cluster = new OptionType([
-				name : 'cluster',
-				code : 'nutanix-prism-provision-cluster',
-				fieldName : 'cluster',
-				fieldContext : 'config',
-				fieldLabel : 'Cluster',
-				required : true,
-				inputType : OptionType.InputType.SELECT,
-				displayOrder : 101,
-				optionSource: 'nutanixPrismCluster'
-
-		])
+//		OptionType cluster = new OptionType([
+//				name : 'cluster',
+//				code : 'nutanix-prism-provision-cluster',
+//				fieldName : 'cluster',
+//				fieldContext : 'config',
+//				fieldLabel : 'Cluster',
+//				required : true,
+//				inputType : OptionType.InputType.SELECT,
+//				displayOrder : 101,
+//				optionSource: 'nutanixPrismCluster'
+//
+//		])
 //		OptionType imageOption = new OptionType([
 //				name : 'virtual image',
 //				code : 'nutanix-prism-provision-image',
@@ -87,28 +87,28 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 //				required : true,
 //				optionSource : 'nutanixPrismProvisionImage'
 //		])
-		OptionType uefi = new OptionType([
-				name : 'uefi',
-				code : 'nutanix-prism-provision-uefi',
-				fieldName : 'uefi',
-				fieldContext : 'config',
-				fieldLabel : 'UEFI',
-				inputType : OptionType.InputType.CHECKBOX,
-				displayOrder : 103,
-				fieldGroup: 'Nutanix Prism Boot Options'
-		])
-		OptionType secureBoot = new OptionType([
-				name : 'secure boot',
-				code : 'nutanix-prism-provision-secure-boot',
-				fieldName : 'secureBoot',
-				fieldContext : 'config',
-				fieldLabel : 'Secure Boot',
-				inputType : OptionType.InputType.CHECKBOX,
-				displayOrder : 104,
-				visibleOnCode: 'nutanix-prism-provision-uefi:on',
-				fieldGroup: 'Nutanix Prism Boot Options'
-
-		])
+//		OptionType uefi = new OptionType([
+//				name : 'uefi',
+//				code : 'nutanix-prism-provision-uefi',
+//				fieldName : 'uefi',
+//				fieldContext : 'config',
+//				fieldLabel : 'UEFI',
+//				inputType : OptionType.InputType.CHECKBOX,
+//				displayOrder : 103,
+//				fieldGroup: 'Nutanix Prism Boot Options'
+//		])
+//		OptionType secureBoot = new OptionType([
+//				name : 'secure boot',
+//				code : 'nutanix-prism-provision-secure-boot',
+//				fieldName : 'secureBoot',
+//				fieldContext : 'config',
+//				fieldLabel : 'Secure Boot',
+//				inputType : OptionType.InputType.CHECKBOX,
+//				displayOrder : 104,
+//				visibleOnCode: 'nutanix-prism-provision-uefi:on',
+//				fieldGroup: 'Nutanix Prism Boot Options'
+//
+//		])
 //		OptionType categories = new OptionType([
 //				name : 'categories',
 //				code : 'nutanix-prism-provision-categories',
@@ -120,8 +120,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 //				optionSource: 'nutanixPrismCategories'
 //
 //		])
-
-		[cluster, uefi, secureBoot]
+		return null
+		//[cluster, uefi, secureBoot]
 		//[cluster, imageOption, uefi, secureBoot, categories]
 	}
 

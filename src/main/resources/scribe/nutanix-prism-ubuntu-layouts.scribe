@@ -1,13 +1,3 @@
-resource "storage-controller" "nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0" {
-	uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0"
-	busNumber = 0
-	name = "SCSI 0"
-	type {
-		code =  "nutanix-prism-lsiLogic"
-	}
-	displayOrder= 	1
-}
-
 resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
 	uniqueId = "nutanix.prism.morpheus.ubuntu.22.04.volume.0"
 	name = "root"
@@ -18,9 +8,6 @@ resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
 	maxStorage =  2147483648
 	rootVolume = true
 	unitNumber =  "0"
-	controller {
-		uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0"
-	}
 }
 
 resource "compute-server-interface" "nutanix.prism.morpheus.ubuntu.20.04.eth0" {
@@ -34,7 +21,7 @@ resource "compute-server-interface" "nutanix.prism.morpheus.ubuntu.20.04.eth0" {
 
 resource "virtual-image" "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64" {
 	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64"
-	category = nutanix.prism.image.morpheus.ubuntu
+	category = "nutanix.prism.image.morpheus.ubuntu"
 	name =  "Morpheus Ubuntu 20.04.4 v2"
 	imageType = "qcow2"
 	#remotePath =  https://s3-us-west-1.amazonaws.com/morpheus-images/?
@@ -100,7 +87,7 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-20.04-single" {
 	instanceVersion = "20.04"
 	description = "This will provision a single vm"
 	instanceType {
-		code = "nutanix-prism-provision-provider"
+		code = "ubuntu"
 	}
 	serverCount =  1
 	portCount =  1
@@ -125,4 +112,25 @@ resource "scale-action" "nutanix-prism-ubuntu-20.04-single" {
 	downAction {
 		code = "ubuntu-remove-node"
 	}
+}
+
+
+resource "container-type" "nutanix-prism-ubuntu-20.04-test" {
+	code = "nutanix-prism-ubuntu-20.04-test"
+	shortName = "ubuntu"
+	name =  "Ubuntu 20.04"
+	containerVersion =  "20.04"
+	imageCode = "morpheus ubuntu 20.04"
+	entryPoint =   ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "ubuntu"
+	showServerLogs = true
+	category = "ubuntu"
+	cloneType = "ubuntu"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	checkTypeCode = "containerCheck"
+	backupType = "nutanixPrismSnapshot"
 }
