@@ -279,7 +279,6 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 
 	@Override
 	ServiceResponse getBackupRestoreInstanceConfig(BackupResult backupResult, Instance instance, Map restoreConfig, Map opts) {
-		println "\u001B[33mAC Log - NutanixPrismSnapshotProvider:getBackupRestoreInstanceConfig- ${backupResult} ${instance} ${restoreConfig} ${opts}\u001B[0m"
 		return ServiceResponse.success(restoreConfig)
 	}
 
