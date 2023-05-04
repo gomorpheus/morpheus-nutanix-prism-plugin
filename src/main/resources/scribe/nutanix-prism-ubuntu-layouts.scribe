@@ -17,7 +17,7 @@ resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
 	}
 	maxStorage =  2147483648
 	rootVolume = true
-	unitNumber = '0'
+	unitNumber = "0"
 #	controller {
 #		uniqueId = nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0
 #	}
@@ -31,7 +31,6 @@ resource "compute-server-interface" "nutanix.prism.morpheus.ubuntu.20.04.eth0" {
 	}
 }
 
-
 resource "virtual-image" "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64" {
 	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64"
 	category = nutanix.prism.image.morpheus.ubuntu
@@ -39,29 +38,32 @@ resource "virtual-image" "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2
 	imageType = "qcow2"
 	#remotePath =  https://s3-us-west-1.amazonaws.com/morpheus-images/?
 	#imagePath =  ?
-	isCloudInit =  true
-	systemImage =  true
-	installAgent =  true
-	osType {
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType = {
 		code =  "ubuntu.20.04.64"
 	}
 	zoneType = "nutanix" #?
-	interfaces = [{uniqueId =  "nutanix.prism.morpheus.ubuntu.20.04.eth0"}]
-	controllers = [{uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0"}]
-
-	volumes = [{uniqueId = "nutanix.prism.morpheus.ubuntu.22.04.volume.0"}]
-
+	interfaces = [
+		{uniqueId =  "nutanix.prism.morpheus.ubuntu.20.04.eth0"}
+	]
+	controllers = [
+		{uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0"}
+	]
+	volumes = [
+		{uniqueId = "nutanix.prism.morpheus.ubuntu.22.04.volume.0"}
+	]
 }
-
 
 resource "container-type" "nutanix-prism-ubuntu-20.04" {
 	code = "nutanix-prism-ubuntu-20.04"
 	shortName = "ubuntu"
-	name =  "Ubuntu 20.04"
+	name = "Ubuntu 20.04"
 	ports = [22]
 	containerVersion =  "20.04"
 	imageCode = "morpheus ubuntu 20.04"
-	entryPoint =  ''
+	entryPoint =  ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
 	logTypeCode = "ubuntu"
@@ -74,10 +76,10 @@ resource "container-type" "nutanix-prism-ubuntu-20.04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage {
+	virtualImage = {
 		code = "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64"
 	}
-	provisionType {
+	provisionType  = {
 		code = "nutanix-prism-provision-provider"
 	}
 	backupType = "nutanixPrismSnapshot"
@@ -85,11 +87,11 @@ resource "container-type" "nutanix-prism-ubuntu-20.04" {
 
 resource "container-type-set" "nutanix-prism-ubuntu-20.04-set" {
 	code = "nutanix-prism-ubuntu-20.04-set"
-	containerType {
+	containerType = {
 		code = "nutanix-prism-ubuntu-20.04"
 	}
-	priorityOrder =  0
-	dynamicCount =  true
+	priorityOrder = 0
+	dynamicCount = true
 	containerCount = 1
 }
 
@@ -99,15 +101,19 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-20.04-single" {
 	sortOrder = 30
 	instanceVersion = "20.04"
 	description = "This will provision a single vm"
-	instanceType {
+	instanceType = {
 		code = "nutanix-prism-provision-provider"
 	}
-	serverCount =  1
-	portCount =  1
+	serverCount = 1
+	portCount = 1
 	enabled = true
-	creatable =  true
-	containers = [{code = "nutanix-prism-ubuntu-20.04-set"}]
-	actions = [{code = "ubuntu-add-node"}]
+	creatable = true
+	containers = [
+		{code = "nutanix-prism-ubuntu-20.04-set"}
+	]
+	actions = [
+		{code = "ubuntu-add-node"}
+	]
 	provisionType {
 		code = "nutanix-prism-provision-provider"
 	}
@@ -116,14 +122,13 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-20.04-single" {
 resource "scale-action" "nutanix-prism-ubuntu-20.04-single" {
 	code = "nutanix-prism-ubuntu-20.04-single"
 	scaleType = "action"
-	layout {
+	layout = {
 		code = "nutanix-prism-ubuntu-20.04-single"
 	}
-	upAction {
+	upAction = {
 		code = "ubuntu-add-node"
 	}
-	downAction {
-
+	downAction = {
 		code = "ubuntu-remove-node"
 	}
 }

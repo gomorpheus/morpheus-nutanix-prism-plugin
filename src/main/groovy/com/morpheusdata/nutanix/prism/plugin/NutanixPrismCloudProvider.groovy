@@ -117,7 +117,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'config'
 		)
 
-		[apiUrl, credentials, username, password, inventoryInstances, enableVnc]
+		return [apiUrl, credentials, username, password, inventoryInstances, enableVnc]
 	}
 
 	@Override
