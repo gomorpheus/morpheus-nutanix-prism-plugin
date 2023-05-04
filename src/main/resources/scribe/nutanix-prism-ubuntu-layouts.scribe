@@ -32,7 +32,7 @@ resource "virtual-image" "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2
 	osType {
 		code =  "ubuntu.20.04.64"
 	}
-	zoneType = "nutanix" #?
+	zoneType = "nutanix-prism-cloud"
 	interfaces = [{uniqueId =  "nutanix.prism.morpheus.ubuntu.20.04.eth0"}]
 	volumes = [{uniqueId = "nutanix.prism.morpheus.ubuntu.22.04.volume.0"}]
 
