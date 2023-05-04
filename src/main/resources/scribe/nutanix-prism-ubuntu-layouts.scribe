@@ -11,7 +11,7 @@ resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
 }
 
 resource "compute-server-interface" "nutanix.prism.morpheus.ubuntu.20.04.eth0" {
-	uniqueId =  "nutanix.prism.morpheus.ubuntu.20.04.eth0"
+	uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.eth0"
 	name = "eth0"
 	type {
 		code = "nutanix-prism-normal-nic"
@@ -21,22 +21,19 @@ resource "compute-server-interface" "nutanix.prism.morpheus.ubuntu.20.04.eth0" {
 resource "virtual-image" "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64" {
 	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name =  "Morpheus Ubuntu 20.04.4 v2"
+	name = "Morpheus Ubuntu 20.04.4 v2"
 	imageType = "qcow2"
-	#remotePath =  https://s3-us-west-1.amazonaws.com/morpheus-images/?
-	#imagePath =  ?
+	#remotePath = https://s3-us-west-1.amazonaws.com/morpheus-images/?
+	#imagePath = ?
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
 	osType = {
-		code =  "ubuntu.20.04.64"
+		code = "ubuntu.20.04.64"
 	}
-	zoneType = "nutanix" #?
+	zoneType = "nutanix"
 	interfaces = [
-		{uniqueId =  "nutanix.prism.morpheus.ubuntu.20.04.eth0"}
-	]
-	controllers = [
-		{uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.controller.scsi0"}
+		{uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.eth0"}
 	]
 	volumes = [
 		{uniqueId = "nutanix.prism.morpheus.ubuntu.22.04.volume.0"}
@@ -48,9 +45,9 @@ resource "container-type" "nutanix-prism-ubuntu-20.04" {
 	shortName = "ubuntu"
 	name = "Ubuntu 20.04"
 	ports = [22]
-	containerVersion =  "20.04"
+	containerVersion = "20.04"
 	imageCode = "morpheus ubuntu 20.04"
-	entryPoint =  ""
+	entryPoint = ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
 	logTypeCode = "ubuntu"
@@ -123,10 +120,10 @@ resource "scale-action" "nutanix-prism-ubuntu-20.04-single" {
 resource "container-type" "nutanix-prism-ubuntu-20.04-test" {
 	code = "nutanix-prism-ubuntu-20.04-test"
 	shortName = "ubuntu"
-	name =  "Ubuntu 20.04"
-	containerVersion =  "20.04"
+	name = "Ubuntu 20.04"
+	containerVersion = "20.04"
 	imageCode = "morpheus ubuntu 20.04"
-	entryPoint =   ""
+	entryPoint = ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
 	logTypeCode = "ubuntu"
