@@ -1,5 +1,5 @@
 resource "instance-type" "nutanix-prism-provision-provider" {
-	name =  "Nutanix Prism Central"
+	name = "Nutanix Prism Central"
 	code = "nutanix-prism-provision-provider"
 	category = "cloud"
 	active = true
@@ -9,14 +9,14 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	hasDeployment = false
 	versions = ["1.0"]
 	optionTypes = [
-		{code="nutanix-prism-provision-cluster"}, 
-		{code="nutanix-prism-provision-image"}
+		option-type.nutanix-prism-provision-cluster, 
+		option-type.nutanix-prism-provision-image
 	]
 	logo = "file:nutanix-prism.svg"
 	darkLogo = "file:nutanix-prism.svg"
 }
 
-resource "workload-type" "nutanix-prism-provision-provider-1.0" {
+resource "workload-type" "nutanix-prism-provision-provider-1_0" {
 	code = "nutanix-prism-provision-provider-1.0"
 	shortName = "nutanix-prism-central"
 	name = "Nutanix Prism Central"
@@ -25,41 +25,33 @@ resource "workload-type" "nutanix-prism-provision-provider-1.0" {
 	serverType = "vm"
 	showServerLogs = true
 	category = "cloud"
-	provisionType {
-		code = "nutanix-prism-provision-provider"
-	}
+	provisionType = "nutanix-prism-provision-provider"
 }
 
-resource "workload-type-set" "nutanix-prism-1.0-set" {
+resource "workload-type-set" "nutanix-prism-1_0-set" {
 	code = "nutanix-prism-1.0-set"
-	workloadType {
-		code = "nutanix-prism-provision-provider-1.0"
-	}
-	priorityOrder =  0
-	dynamicCount =  true
+	workloadType = workload-type.nutanix-prism-provision-provider-1_0
+	priorityOrder = 0
+	dynamicCount = true
 	containerCount = 1
 }
 
-resource "instance-type-layout" "nutanix-prism-1.0-single" {
+resource "instance-type-layout" "nutanix-prism-1_0-single" {
  	code = "nutanix-prism-1.0-single"
 	name = "Nutanix Prism Central VM"
 	sortOrder = 0
 	instanceVersion = "1.0"
 	description = "This will provision a single vm"
-	instanceType {
-		code = "nutanix-prism-provision-provider"
-	}
-	serverCount =  1
-	portCount =  0
+	instanceType = instance-type.nutanix-prism-provision-provider
+	serverCount = 1
+	portCount = 0
 	enabled = true
-	creatable =  true
-	containers = [
-		{code = "nutanix-prism-1.0-set"}
+	creatable = true
+	workloads = [
+		workload-type-set.nutanix-prism-1.0-set
 	]
-	provisionType {
-		code = "nutanix-prism-provision-provider"
-	}
+	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = [
-		{code = "nutanix-prism-provision-categories"}
+		option-type.nutanix-prism-provision-categories
 	]
 }

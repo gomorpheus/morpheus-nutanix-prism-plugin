@@ -1,5 +1,5 @@
-resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
-	uniqueId = "nutanix.prism.morpheus.ubuntu.22.04.volume.0"
+resource "storage-volume" "nutanix-prism-morpheus-ubuntu-22_04-volume-0" {
+	uniqueId = "nutanix-prism-morpheus-ubuntu-22.04-volume-0"
 	name = "root"
 	deviceName = "/dev/vda"
 	type {
@@ -10,16 +10,16 @@ resource "storage-volume" "nutanix.prism.morpheus.ubuntu.22.04.volume.0" {
 	unitNumber = "0"
 }
 
-resource "compute-server-interface" "nutanix.prism.morpheus.ubuntu.20.04.eth0" {
-	uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.eth0"
+resource "compute-server-interface" "nutanix-prism-morpheus-ubuntu-20_04-eth0" {
+	uniqueId = "nutanix-prism-morpheus-ubuntu-20.04-eth0"
 	name = "eth0"
 	type {
 		code = "nutanix-prism-normal-nic"
 	}
 }
 
-resource "virtual-image" "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64" {
-	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64"
+resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-20_04_4-v2-ubuntu-20_04_4-amd64" {
+	code = "nutanix-prism-vsphere-image-morpheus-ubuntu-20.04.4-v2-ubuntu-20.04.4-amd64"
 	category = "nutanix.prism.image.morpheus.ubuntu"
 	name = "Morpheus Ubuntu 20.04.4 v2"
 	imageType = "qcow2"
@@ -33,14 +33,14 @@ resource "virtual-image" "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2
 	}
 	zoneType = "nutanix"
 	interfaces = [
-		{uniqueId = "nutanix.prism.morpheus.ubuntu.20.04.eth0"}
+		compute-server-interface.nutanix-prism-morpheus-ubuntu-20_04-eth0
 	]
 	volumes = [
-		{uniqueId = "nutanix.prism.morpheus.ubuntu.22.04.volume.0"}
+		storage-volume.nutanix-prism-morpheus-ubuntu-22.04-volume-0
 	]
 }
 
-resource "container-type" "nutanix-prism-ubuntu-20.04" {
+resource "workload-type" "nutanix-prism-ubuntu-20_04" {
 	code = "nutanix-prism-ubuntu-20.04"
 	shortName = "ubuntu"
 	name = "Ubuntu 20.04"
@@ -57,57 +57,51 @@ resource "container-type" "nutanix-prism-ubuntu-20.04" {
 	priorityOrder = 0
 	serverType = "vm"
 	providerType = "nutanix-prism"
-	containerPorts = [{code = "ubuntu.22"}]
-	actions = [{code = "ubuntu-remove-node"}]
+	containerPorts = [
+		{code = "ubuntu.22"}
+	]
+	actions = [
+		{code = "ubuntu-remove-node"}
+	]
 	checkTypeCode = "containerCheck"
-	virtualImage = {
-		code = "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.4-v2.ubuntu.20.04.4.amd64"
-	}
-	provisionType  = {
-		code = "nutanix-prism-provision-provider"
-	}
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-ubuntu-20_04_4-v2-ubuntu-20_04_4-amd64
+	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
 
-resource "container-type-set" "nutanix-prism-ubuntu-20.04-set" {
+resource "workload-type-set" "nutanix-prism-ubuntu-20_04-set" {
 	code = "nutanix-prism-ubuntu-20.04-set"
-	containerType = {
-		code = "nutanix-prism-ubuntu-20.04"
-	}
+	workload = workload-type.nutanix-prism-ubuntu-20_04
 	priorityOrder = 0
 	dynamicCount = true
 	containerCount = 1
 }
 
-resource "instance-type-layout" "nutanix-prism-ubuntu-20.04-single" {
+resource "instance-type-layout" "nutanix-prism-ubuntu-20_04-single" {
 	code = "nutanix-prism-ubuntu-20.04-single"
 	name = "Nutanix Prism Central VM"
 	sortOrder = 30
 	instanceVersion = "20.04"
 	description = "This will provision a single vm"
-	instanceType = {
-		code = "nutanix-prism-provision-provider"
-	}
+	instanceType = instance-type.nutanix-prism-provision-provider
 	serverCount = 1
 	portCount = 1
 	enabled = true
 	creatable = true
 	containers = [
-		{code = "nutanix-prism-ubuntu-20.04-set"}
+		workload-type-set.nutanix-prism-ubuntu-20_04-set
 	]
 	actions = [
 		{code = "ubuntu-add-node"}
 	]
-	provisionType {
-		code = "nutanix-prism-provision-provider"
-	}
+	provisionType = "nutanix-prism-provision-provider"
 }
 
-resource "scale-action" "nutanix-prism-ubuntu-20.04-single" {
+resource "scale-action" "nutanix-prism-ubuntu-20_04-single" {
 	code = "nutanix-prism-ubuntu-20.04-single"
 	scaleType = "action"
 	layout = {
-		code = "nutanix-prism-ubuntu-20.04-single"
+		instance-type-layout.nutanix-prism-ubuntu-20_04-single
 	}
 	upAction = {
 		code = "ubuntu-add-node"
@@ -117,7 +111,7 @@ resource "scale-action" "nutanix-prism-ubuntu-20.04-single" {
 	}
 }
 
-resource "container-type" "nutanix-prism-ubuntu-20.04-test" {
+resource "workload-type" "nutanix-prism-ubuntu-20_04-test" {
 	code = "nutanix-prism-ubuntu-20.04-test"
 	shortName = "ubuntu"
 	name = "Ubuntu 20.04"
