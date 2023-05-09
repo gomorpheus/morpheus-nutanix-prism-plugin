@@ -9,7 +9,7 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	hasDeployment = false
 	versions = ["1.0"]
 	optionTypes = [
-		option-type.nutanix-prism-provision-cluster, 
+		option-type.nutanix-prism-provision-cluster,
 		option-type.nutanix-prism-provision-image
 	]
 	logo = "file:nutanix-prism.svg"
@@ -48,10 +48,12 @@ resource "instance-type-layout" "nutanix-prism-1_0-single" {
 	enabled = true
 	creatable = true
 	workloads = [
-		workload-type-set.nutanix-prism-1.0-set
+		workload-type-set.nutanix-prism-1_0-set
 	]
 	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = [
-		option-type.nutanix-prism-provision-categories
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-uefi,
+		option-type.nutanix-prism-provision-secure-boot
 	]
 }

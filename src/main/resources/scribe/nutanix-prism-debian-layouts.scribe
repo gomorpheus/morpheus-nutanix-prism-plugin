@@ -1,0 +1,165 @@
+//10
+resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-debian-10-20230308" {
+	code = "nutanix.prism.vsphere.image.morpheus.debian.10.20230308"
+	category = "nutanix.prism.image.morpheus.debian"
+	name =  "Morpheus Debian 10 20230308"
+	imageType = "qcow2"
+	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230308/debian-10/morpheus-debian-10-amd64-20230308.qcow2"
+	imagePath =  "qemu/20230308/debian-10"
+	isCloudInit =  true
+	systemImage =  true
+	installAgent =  true
+	osType {
+		code =  "debian.10.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "workload-type" "nutanix-prism-debian-10" {
+	code = "nutanix-prism-debian-10"
+	shortName = "debian"
+	name =  "Debian 10"
+	ports = [22]
+	containerVersion =  "10"
+	entryPoint =   ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "debian"
+	showServerLogs = true
+	category = "debian"
+	cloneType = "debian"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	containerPorts = [{code = "debian.22"}]
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-debian-10-20230308
+	provisionType  = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+}
+
+resource "workload-type-set" "nutanix-prism-debian-10-set" {
+	code = "nutanix-prism-debian-10-set"
+	containerType = workload-type.nutanix-prism-debian-10
+	priorityOrder =  0
+	dynamicCount =  true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-debian-10-single" {
+	code = "nutanix-prism-debian-10-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 10
+	instanceVersion = "10"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "debian"
+	}
+	serverCount =  1
+	portCount =  1
+	serverType = "vm"
+	enabled = true
+	creatable =  true
+	containers = [
+		workload-type-set.nutanix-prism-debian-10-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-debian-10-single" {
+	code = "nutanix-prism-debian-10-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-debian-10-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
+
+//11
+resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-debian-11-20230308" {
+	code = "nutanix.prism.vsphere.image.morpheus.debian.11.20230308"
+	category = "nutanix.prism.image.morpheus.debian"
+	name =  "Morpheus Debian 11 20230308"
+	imageType = "qcow2"
+	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230308/debian-11/morpheus-debian-11-amd64-20230308.qcow2"
+	imagePath =  "qemu/20230308/debian-11"
+	isCloudInit =  true
+	systemImage =  true
+	installAgent =  true
+	osType {
+		code =  "debian.11.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "container-type" "nutanix-prism-debian-11" {
+	code = "nutanix-prism-debian-11"
+	shortName = "debian"
+	name =  "Debian 11"
+	ports = [22]
+	containerVersion =  "11"
+	entryPoint =   ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "debian"
+	showServerLogs = true
+	category = "debian"
+	cloneType = "debian"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	containerPorts = [{code = "debian.22"}]
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-debian-11-20230308
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+}
+
+resource "container-type-set" "nutanix-prism-debian-11-set" {
+	code = "nutanix-prism-debian-11-set"
+	containerType = workload-type.nutanix-prism-debian-11
+	priorityOrder =  0
+	dynamicCount =  true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-debian-11-single" {
+	code = "nutanix-prism-debian-11-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 20
+	instanceVersion = "11"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "debian"
+	}
+	serverCount =  1
+	portCount =  1
+	serverType = "vm"
+	enabled = true
+	creatable =  true
+	containers = [
+		workload-type-set.nutanix-prism-debian-11-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-debian-11-single" {
+	code = "nutanix-prism-debian-11-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-debian-11-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}

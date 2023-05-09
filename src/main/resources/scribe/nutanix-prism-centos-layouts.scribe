@@ -1,0 +1,329 @@
+//7.3
+resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-7_3" {
+	code = "nutanix.prism.vsphere.image.morpheus.centos.7.3"
+	category = "nutanix.prism.image.morpheus.centos"
+	name =  "Morpheus CentOS 7.3"
+	imageType = "qcow2"
+	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/kvm/centos/centos-7_3-v1/centos-7_3/morpheus-centos-7_3-v1.qcow2"
+	imagePath =  "kvm/centos/centos-7_3-v1/centos-7_3"
+	isCloudInit =  true
+	systemImage =  true
+	installAgent =  true
+	osType {
+		code =  "cent.7.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "container-type" "nutanix-prism-centos-7_3" {
+	code = "nutanix-prism-centos-7.3"
+	shortName = "centos"
+	name =  "CentOS 7.3"
+	containerVersion =  "7.3"
+	entryPoint =   ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "centos"
+	showServerLogs = true
+	category = "centos"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-7_3
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-centos-7_3-set" {
+	code = "nutanix-prism-centos-7.3-set"
+	containerType = workload-type.nutanix-prism-centos-7_3
+	priorityOrder =  0
+	dynamicCount =  true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
+	code = "nutanix-prism-centos-7.3-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 10
+	instanceVersion = "7.3"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "centos"
+	}
+	serverCount =  1
+	portCount =  1
+	enabled = true
+	creatable =  true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-centos-7_3-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+
+}
+
+resource "scale-action" "nutanix-prism-centos-7_3-single" {
+	code = "nutanix-prism-centos-7.3-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-centos-7_3-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
+
+//7.5
+resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-7_5" {
+	code = "nutanix.prism.vsphere.image.morpheus.centos.7.5"
+	category = "nutanix.prism.image.morpheus.centos"
+	name =  "Morpheus CentOS 7.5"
+	imageType = "qcow2"
+	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/kvm/centos/centos-7_5-v4/morpheus-centos-7_5-v4-x86_64.qcow2"
+	imagePath =  "kvm/centos/centos-7_5-v4"
+	isCloudInit =  true
+	systemImage =  true
+	installAgent =  true
+	osType {
+		code =  "cent.7.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "workload-type" "nutanix-prism-centos-7_5" {
+	code = "nutanix-prism-centos-7.5"
+	shortName = "centos"
+	name =  "CentOS 7.5"
+	containerVersion =  "7.5"
+	entryPoint =   ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "centos"
+	showServerLogs = true
+	category = "centos"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-7_5
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-centos-7_5-set" {
+	code = "nutanix-prism-centos-7.5-set"
+	containerType = workload-type.nutanix-prism-centos-7_5
+	priorityOrder =  0
+	dynamicCount =  true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
+	code = "nutanix-prism-centos-7.5-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 20
+	instanceVersion = "7.5"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "centos"
+	}
+	serverCount =  1
+	portCount =  1
+	enabled = true
+	creatable =  true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-centos-7_5-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-centos-7_5-single" {
+	code = "nutanix-prism-centos-7.5-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-centos-7_5-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
+
+//8.4
+resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-8_4" {
+	code = "nutanix.prism.vsphere.image.morpheus.centos.8.4"
+	category = "nutanix.prism.image.morpheus.centos"
+	name =  "Morpheus CentOS 8.4"
+	imageType = "qcow2"
+	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/kvm/centos/centos-8_4-v1/morpheus-centos-8_4-v1-amd64.qcow2"
+	imagePath =  "kvm/centos/centos-8_4-v1"
+	isCloudInit =  true
+	systemImage =  true
+	installAgent =  true
+	osType {
+		code =  "cent.8.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "workload-type" "nutanix-prism-centos-8_4" {
+	code = "nutanix-prism-centos-8.4"
+	shortName = "centos"
+	name =  "CentOS 8.4"
+	containerVersion =  "8.4"
+	entryPoint =   ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "centos"
+	showServerLogs = true
+	category = "centos"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-8_4
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-centos-8_4-set" {
+	code = "nutanix-prism-centos-8.4-set"
+	containerType = workload-type.nutanix-prism-centos-8_4
+
+	priorityOrder =  0
+	dynamicCount =  true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-centos-8_4-single" {
+	code = "nutanix-prism-centos-8.4-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 30
+	instanceVersion = "8.4"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "centos"
+	}
+	serverCount =  1
+	portCount =  1
+	enabled = true
+	creatable =  true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-centos-8_4-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-centos-8_4-single" {
+	code = "nutanix-prism-centos-8.4-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-centos-8_4-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
+
+//9-stream
+resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-9-stream" {
+	code = "nutanix.prism.vsphere.image.morpheus.centos.9-stream"
+	category = "nutanix.prism.image.morpheus.centos"
+	name =  "Morpheus CentOS 8.4"
+	imageType = "qcow2"
+	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230131/centos-9-stream/morpheus-centos-9-stream-x86_64-20230131.qcow2"
+	imagePath =  "qemu/20230131/centos-9-stream"
+	isCloudInit =  true
+	systemImage =  true
+	installAgent =  true
+	osType {
+		code =  "cent.9.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "workload-type" "nutanix-prism-centos-9-stream" {
+	code = "nutanix-prism-centos-9-stream"
+	shortName = "centos"
+	name =  "CentOS 9-stream"
+	containerVersion =  "9-stream"
+	entryPoint =   ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "centos"
+	showServerLogs = true
+	category = "centos"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-9-stream
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-centos-9-stream-set" {
+	code = "nutanix-prism-centos-9-stream-set"
+	containerType = workload-type.nutanix-prism-centos-9-stream
+	priorityOrder =  0
+	dynamicCount =  true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-centos-9-stream-single" {
+	code = "nutanix-prism-centos-9-stream-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 40
+	instanceVersion = "9-stream"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "centos"
+	}
+	serverCount =  1
+	portCount =  1
+	enabled = true
+	creatable =  true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-centos-9-stream-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-centos-9-stream-single" {
+	code = "nutanix-prism-centos-9-stream-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-centos-9-stream-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}

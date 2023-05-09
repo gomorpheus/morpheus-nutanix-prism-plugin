@@ -121,7 +121,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 	def nutanixPrismCategories(args){
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
-		def options = morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).map{  [name: it.externalId, value: it.externalId] }.toSortedList {it.name}.blockingGet()
+		def options = morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).map{  [name: it.externalId, value: it.externalId] }.toList().blockingGet()
 		options
 	}
 
