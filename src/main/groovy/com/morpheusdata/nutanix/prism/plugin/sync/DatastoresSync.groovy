@@ -68,7 +68,6 @@ class DatastoresSync {
 								cloud       : cloud,
 								storageSize : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'storage.user_capacity_bytes')?.toLong(),
 								freeSpace   : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'storage.user_free_bytes')?.toLong(),
-								zonePool    : new ComputeZonePool(id: cluster?.id),
 								type        : 'generic',
 								category    : "nutanix-prism-datastore.${cloud.id}",
 								drsEnabled  : false,
