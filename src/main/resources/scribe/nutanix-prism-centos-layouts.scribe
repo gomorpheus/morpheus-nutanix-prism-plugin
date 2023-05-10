@@ -66,6 +66,10 @@ resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
+	optionTypes = [
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-cluster
+	]
 
 }
 
@@ -149,6 +153,10 @@ resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
+	optionTypes = [
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-cluster
+	]
 }
 
 resource "scale-action" "nutanix-prism-centos-7_5-single" {
@@ -232,6 +240,10 @@ resource "instance-type-layout" "nutanix-prism-centos-8_4-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
+	optionTypes = [
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-cluster
+	]
 }
 
 resource "scale-action" "nutanix-prism-centos-8_4-single" {
@@ -314,6 +326,10 @@ resource "instance-type-layout" "nutanix-prism-centos-9-stream-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
+	optionTypes = [
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-cluster
+	]
 }
 
 resource "scale-action" "nutanix-prism-centos-9-stream-single" {

@@ -68,7 +68,10 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 	]
 	actions = [{code = "ubuntu-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-
+	optionTypes = [
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-cluster
+	]
 }
 
 resource "scale-action" "nutanix-prism-ubuntu-18_04-single" {
@@ -154,7 +157,10 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-20_04-single" {
 	]
 	actions = [{code = "ubuntu-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-
+	optionTypes = [
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-cluster
+	]
 }
 
 resource "scale-action" "nutanix-prism-ubuntu-20_04-single" {
@@ -239,6 +245,10 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-22_04-single" {
 	]
 	actions = [{code = "ubuntu-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
+	optionTypes = [
+		option-type.nutanix-prism-provision-categories,
+		option-type.nutanix-prism-provision-cluster
+	]
 }
 
 resource "scale-action" "nutanix-prism-ubuntu-22_04-single" {

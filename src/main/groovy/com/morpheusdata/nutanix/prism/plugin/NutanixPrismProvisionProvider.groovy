@@ -395,7 +395,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		def rtn = [success: false, msg: null]
 		try {
-			Long virtualImageId = workload.getConfigProperty('virtualImageId')?.toLong()
+			Long virtualImageId = workload.getConfigProperty('virtualImageId')?.toLong() ?: workload?.workloadType?.virtualImage?.id
 			if(!virtualImageId) {
 				rtn.msg = "No virtual image selected"
 			} else {

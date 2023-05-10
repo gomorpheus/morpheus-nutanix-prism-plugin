@@ -111,8 +111,9 @@ class DatastoresSync {
 
 						def clusterId = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'cluster')
 						def cluster = clusters.find { it.externalId == clusterId }
-						if(existingItem.zonePool?.id != cluster?.id) {
-							existingItem.zonePool = new ComputeZonePool(id: cluster?.id)
+						//don't associate zone pool
+						if(existingItem.zonePool?.id) {
+							existingItem.zonePool = null
 							save = true
 						}
 						if(cluster?.id && !existingItem.assignedZonePools?.find{it.id == cluster?.id}) {
