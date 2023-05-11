@@ -26,6 +26,7 @@ resource "workload-type" "nutanix-prism-provision-provider-1_0" {
 	showServerLogs = true
 	category = "cloud"
 	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
 }
 
 resource "workload-type-set" "nutanix-prism-1_0-set" {

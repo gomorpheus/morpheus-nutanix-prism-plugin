@@ -171,6 +171,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 								log.debug("Snapshot details: ${snapshot}")
 								if(snapshotResp.success && snapshot && !rtn.data.backupResult.externalId) {
 									rtn.data.backupResult.externalId = snapshot?.id
+									rtn.data.backupResult.setConfigProperty("snapshotId", snapshot?.id)
 									doUpdate = true
 								}
 
@@ -184,6 +185,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 									rtn.data.backupResult.startDate = createdDate
 									rtn.data.backupResult.endDate = DateUtility.parseDate(taskResults?.data?.completion_time)
 									rtn.data.backupResult.externalId = snapshot?.uuid
+									rtn.data.backupResult.setConfigProperty("snapshotId", snapshot?.uuid)
 									rtn.data.backupResult.sizeInMb = 0
 
 									def startDate = rtn.data.backupResult.startDate

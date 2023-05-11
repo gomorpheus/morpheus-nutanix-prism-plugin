@@ -159,6 +159,37 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse cloneVm(HttpApiClient client, Map authConfig, Map runConfig, String vmUuid) {
+		log.debug("cloneVm")
+
+		def body = [
+			override_spec: [
+				name: runConfig.name,
+				num_sockets: runConfig.numSockets,
+				memory_size_mib: runConfig.maxMemory,
+				num_vcpus_per_socket: runConfig.coresPerSocket,
+				nic_list: runConfig.nicList
+			]
+		]
+
+		if(runConfig.cloudInitUserData) {
+			body['override_spec']['guest_customization'] = [
+				"cloud_init": [
+					"user_data": runConfig.cloudInitUserData
+				]
+			]
+		}
+
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${vmUuid}/clone", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error creating vm for ${runConfig.name}", null, results.data)
+		}
+	}
+
+
 	static ServiceResponse getTask(HttpApiClient client, Map authConfig, String uuid) {
 		log.debug("getTask")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/tasks/${uuid}", authConfig.username, authConfig.password,
