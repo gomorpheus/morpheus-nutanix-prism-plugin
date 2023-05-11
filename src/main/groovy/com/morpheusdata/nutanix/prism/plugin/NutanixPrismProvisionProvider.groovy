@@ -62,67 +62,30 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	@Override
 	Collection<OptionType> getOptionTypes() {
-		// this needs to be on the instance type which will be handled by instance type packages
-		// TODO: move to generic instance type in package
-//		OptionType cluster = new OptionType([
-//				name : 'cluster',
-//				code : 'nutanix-prism-provision-cluster',
-//				fieldName : 'cluster',
-//				fieldContext : 'config',
-//				fieldLabel : 'Cluster',
-//				required : true,
-//				inputType : OptionType.InputType.SELECT,
-//				displayOrder : 101,
-//				optionSource: 'nutanixPrismCluster'
-//
-//		])
-//		OptionType imageOption = new OptionType([
-//				name : 'virtual image',
-//				code : 'nutanix-prism-provision-image',
-//				fieldName : 'virtualImageId',
-//				fieldContext : 'config',
-//				fieldLabel : 'Image',
-//				inputType : OptionType.InputType.SELECT,
-//				displayOrder : 102,
-//				required : true,
-//				optionSource : 'nutanixPrismProvisionImage'
-//		])
-//		OptionType uefi = new OptionType([
-//				name : 'uefi',
-//				code : 'nutanix-prism-provision-uefi',
-//				fieldName : 'uefi',
-//				fieldContext : 'config',
-//				fieldLabel : 'UEFI',
-//				inputType : OptionType.InputType.CHECKBOX,
-//				displayOrder : 103,
-//				fieldGroup: 'Nutanix Prism Boot Options'
-//		])
-//		OptionType secureBoot = new OptionType([
-//				name : 'secure boot',
-//				code : 'nutanix-prism-provision-secure-boot',
-//				fieldName : 'secureBoot',
-//				fieldContext : 'config',
-//				fieldLabel : 'Secure Boot',
-//				inputType : OptionType.InputType.CHECKBOX,
-//				displayOrder : 104,
-//				visibleOnCode: 'nutanix-prism-provision-uefi:on',
-//				fieldGroup: 'Nutanix Prism Boot Options'
-//
-//		])
-//		OptionType categories = new OptionType([
-//				name : 'categories',
-//				code : 'nutanix-prism-provision-categories',
-//				fieldName : 'categories',
-//				fieldContext : 'config',
-//				fieldLabel : 'Categories',
-//				inputType : OptionType.InputType.MULTI_SELECT,
-//				displayOrder : 105,
-//				optionSource: 'nutanixPrismCategories'
-//
-//		])
-		return null
-		//[cluster, uefi, secureBoot]
-		//[cluster, imageOption, uefi, secureBoot, categories]
+		def options = []
+		options << new OptionType(
+			name: 'skip agent install',
+			code: 'provisionType.nutanixPrism.noAgent',
+			category: 'provisionType.nutanixPrism',
+			inputType: OptionType.InputType.CHECKBOX,
+			fieldName: 'noAgent',
+			fieldContext: 'config',
+			fieldCode: 'gomorpheus.optiontype.SkipAgentInstall',
+			fieldLabel: 'Skip Agent Install',
+			fieldGroup:'Advanced Options',
+			displayOrder: 4,
+			required: false,
+			enabled: true,
+			editable:false,
+			global:false,
+			placeHolder:null,
+			helpBlock:'Skipping Agent installation will result in a lack of logging and guest operating system statistics. Automation scripts may also be adversely affected.',
+			defaultValue:null,
+			custom:false,
+			fieldClass:null
+		)
+
+		return options
 	}
 
 	@Override
@@ -1344,7 +1307,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				uefi              : workload.getConfigProperty('uefi'),
 				secureBoot        : workload.getConfigProperty('secureBoot'),
 				clusterReference  : clusterReference,
-				categories        : categories
+				categories        : categories,
+				noAgent           : (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
+				installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 
 		]
 		return runConfig
@@ -1418,9 +1383,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			Map cloudConfigOpts = workloadRequest.cloudConfigOpts
 
-			// Inform Morpheus to not install the agent if we are doing it via cloudInit
-			workloadResponse.installAgent = runConfig.installAgent && (cloudConfigOpts.installAgent != true) && !runConfig.noAgent
+			// Inform Morpheus to install the agent (or not) after the server is created
 			workloadResponse.noAgent = runConfig.noAgent
+			workloadResponse.installAgent = runConfig.installAgent
 
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, workloadResponse.installAgent: ${workloadResponse.installAgent}, workloadResponse.noAgent: ${workloadResponse.noAgent}"
 			//cloud_init
@@ -1435,33 +1400,49 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
 
-			if(virtualImage) {
+
+			if(runConfig.cloneContainerId) {
+				def sourceWorkload = morpheusContext.workload.get(runConfig.cloneContainerId).blockingGet()
+				def vmUuid = sourceWorkload?.server?.externalId
+				createResults = NutanixPrismComputeUtility.cloneVm(client, authConfig, runConfig, vmUuid)
+				log.debug("clone server results: ${createResults}")
+			} else if(virtualImage) {
 				createResults = NutanixPrismComputeUtility.createVm(client, authConfig, runConfig)
 				log.debug("create server results: ${createResults}")
 			}
 
 			//check success
-			if(createResults.success == true && createResults.data?.metadata?.uuid) {
+			if(createResults.success == true && (createResults.data?.metadata?.uuid || createResults.data?.task_uuid)) {
 
 				server = morpheusContext.computeServer.get(server.id).blockingGet()
 				workload = morpheusContext.cloud.getWorkloadById(workload.id).blockingGet()
 				if(virtualImage) {
 					virtualImage = morpheusContext.virtualImage.get(virtualImage.id).blockingGet()
 				}
-				//update server ids
-				server.externalId = createResults.data.metadata.uuid
-				workloadResponse.externalId = server.externalId
-				server.internalId = server.externalId
-				server = saveAndGet(server)
+
+				if(createResults.data?.metadata?.uuid) {
+					//update server ids
+					server.externalId = createResults.data.metadata.uuid
+					workloadResponse.externalId = server.externalId
+					server.internalId = server.externalId
+					server = saveAndGet(server)
+				}
+
 
 				//TODO tagging? No direct mapping
 				//applyTags(workload, client)
 
 				morpheusContext.process.startProcessStep(workloadRequest.process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
-				def taskId = createResults.data?.status?.execution_context?.task_uuid
+				def taskId = createResults.data?.status?.execution_context?.task_uuid ?: createResults.data?.task_uuid
 				def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 				if(taskResults.success) {
+					if(createResults.data?.task_uuid) {
+						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}.uuid
+						workloadResponse.externalId = server.externalId
+						server.internalId = server.externalId
+						server = saveAndGet(server)
+					}
 					def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 					def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
 					log.debug("start: ${startResults.success}")
