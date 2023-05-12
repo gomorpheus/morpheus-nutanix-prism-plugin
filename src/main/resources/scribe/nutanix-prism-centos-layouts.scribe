@@ -49,7 +49,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_3-set" {
 
 resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	code = "nutanix-prism-centos-7.3-single"
-	name = "Nutanix Prism Central VM"
+	name = "Nutanix Prism Central VM asdf"
 	sortOrder = 10
 	instanceVersion = "7.3"
 	description = "This will provision a single vm"
@@ -66,11 +66,6 @@ resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-	optionTypes = [
-		option-type.nutanix-prism-provision-categories,
-		option-type.nutanix-prism-provision-cluster
-	]
-
 }
 
 resource "scale-action" "nutanix-prism-centos-7_3-single" {
@@ -136,7 +131,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_5-set" {
 
 resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	code = "nutanix-prism-centos-7.5-single"
-	name = "Nutanix Prism Central VM"
+	name = "Nutanix Prism Central VM adsf"
 	sortOrder = 20
 	instanceVersion = "7.5"
 	description = "This will provision a single vm"
@@ -153,10 +148,6 @@ resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-	optionTypes = [
-		option-type.nutanix-prism-provision-categories,
-		option-type.nutanix-prism-provision-cluster
-	]
 }
 
 resource "scale-action" "nutanix-prism-centos-7_5-single" {
@@ -223,7 +214,7 @@ resource "workload-type-set" "nutanix-prism-centos-8_4-set" {
 
 resource "instance-type-layout" "nutanix-prism-centos-8_4-single" {
 	code = "nutanix-prism-centos-8.4-single"
-	name = "Nutanix Prism Central VM"
+	name = "Nutanix Prism Central VM asdf"
 	sortOrder = 30
 	instanceVersion = "8.4"
 	description = "This will provision a single vm"
@@ -240,10 +231,6 @@ resource "instance-type-layout" "nutanix-prism-centos-8_4-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-	optionTypes = [
-		option-type.nutanix-prism-provision-categories,
-		option-type.nutanix-prism-provision-cluster
-	]
 }
 
 resource "scale-action" "nutanix-prism-centos-8_4-single" {
@@ -326,10 +313,6 @@ resource "instance-type-layout" "nutanix-prism-centos-9-stream-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-	optionTypes = [
-		option-type.nutanix-prism-provision-categories,
-		option-type.nutanix-prism-provision-cluster
-	]
 }
 
 resource "scale-action" "nutanix-prism-centos-9-stream-single" {

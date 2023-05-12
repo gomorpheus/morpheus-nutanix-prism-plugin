@@ -67,10 +67,6 @@ resource "instance-type-layout" "nutanix-prism-debian-10-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-	optionTypes = [
-		option-type.nutanix-prism-provision-categories,
-		option-type.nutanix-prism-provision-cluster
-	]
 }
 
 resource "scale-action" "nutanix-prism-debian-10-single" {
@@ -154,10 +150,6 @@ resource "instance-type-layout" "nutanix-prism-debian-11-single" {
 	]
 	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
-	optionTypes = [
-		option-type.nutanix-prism-provision-categories,
-		option-type.nutanix-prism-provision-cluster
-	]
 }
 
 resource "scale-action" "nutanix-prism-debian-11-single" {

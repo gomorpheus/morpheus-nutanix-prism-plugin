@@ -1,16 +1,3 @@
-resource "option-type" "nutanix-prism-provision-cluster" {
-	name = "cluster"
-	code = "nutanix-prism-provision-cluster"
-	fieldName = "cluster"
-	fieldContext = "config"
-	fieldLabel = "Cluster"
-	inputType = "select"
-	required = true
-	displayOrder = 101
-	required = true
-	optionSource = "nutanixPrismCluster"
-}
-
 resource "option-type" "nutanix-prism-provision-image" {
 	name = "virtual image"
 	code = "nutanix-prism-provision-image"
@@ -46,13 +33,3 @@ resource "option-type" "nutanix-prism-provision-secure-boot" {
 	fieldGroup = "Nutanix Prism Boot Options"
 }
 
-resource "option-type" "nutanix-prism-provision-categories" {
-	name = "categories"
-	code = "nutanix-prism-provision-categories"
-	fieldName = "categories"
-	fieldContext = "config"
-	fieldLabel = "Categories"
-	inputType = "multiSelect"
-	displayOrder = 105
-	optionSource = "nutanixPrismCategories"
-}

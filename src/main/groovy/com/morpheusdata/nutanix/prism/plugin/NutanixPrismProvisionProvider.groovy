@@ -85,6 +85,31 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			fieldClass:null
 		)
 
+		options << new OptionType([
+			name : 'cluster',
+			code : 'nutanix-prism-provision-cluster',
+			fieldName : 'cluster',
+			fieldContext : 'config',
+			fieldLabel : 'Cluster',
+			required : true,
+			inputType : OptionType.InputType.SELECT,
+			displayOrder : 101,
+			optionSource: 'nutanixPrismCluster'
+
+		])
+
+		options << new OptionType([
+			name : 'categories',
+			code : 'nutanix-prism-provision-categories',
+			fieldName : 'categories',
+			fieldContext : 'config',
+			fieldLabel : 'Categories',
+			inputType : OptionType.InputType.MULTI_SELECT,
+			displayOrder : 105,
+			optionSource: 'nutanixPrismCategories'
+
+		])
+
 		return options
 	}
 
@@ -381,7 +406,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			log.error "${rtn.msg}, ${e}", e
 
 		}
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:prepareWorkload- ${rtn}\u001B[0m"
 		new ServiceResponse(rtn.success, rtn.msg, null, null)
 	}
 
@@ -1394,8 +1418,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			//cloud_init && sysprep
 			if(virtualImage?.isCloudInit && server.cloudConfigUser) {
 				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
-			} else if (virtualImage?.isSysprep) {
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${server.cloudConfigUser} ${server.cloudConfigMeta}\u001B[0m"
+			} else if (virtualImage?.isSysprep && server.cloudConfigUser) {
+				runConfig.isSysprep = true
+				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
 			}
 
 			//main create or clone

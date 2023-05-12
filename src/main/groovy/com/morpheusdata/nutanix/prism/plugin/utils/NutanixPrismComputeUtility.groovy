@@ -118,11 +118,19 @@ class NutanixPrismComputeUtility {
 		}
 
 		if(runConfig.cloudInitUserData) {
-			resources['guest_customization'] = [
-					"cloud_init": [
-					        "user_data": runConfig.cloudInitUserData
+			if(runConfig.isSysprep) {
+				resources['guest_customization'] = [
+					"sysprep": [
+						"user_data": runConfig.cloudInitUserData
 					]
-			]
+				]
+			} else {
+				resources['guest_customization'] = [
+					"cloud_init": [
+						"user_data": runConfig.cloudInitUserData
+					]
+				]
+			}
 		}
 
 		def body = [
