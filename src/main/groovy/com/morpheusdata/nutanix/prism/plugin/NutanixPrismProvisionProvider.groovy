@@ -93,8 +93,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		OptionType imageOption = new OptionType([
 				name : 'image',
 				code : 'nutanix-prism-node-image',
-				fieldName : 'containerType.virtualImage.id',
-				fieldContext : null,
+				fieldName : 'virtualImage.id',
+				fieldContext : 'domain',
 				fieldLabel : 'Image',
 				inputType : OptionType.InputType.SELECT,
 				displayOrder : 100,
@@ -381,6 +381,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			log.error "${rtn.msg}, ${e}", e
 
 		}
+		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:prepareWorkload- ${rtn}\u001B[0m"
 		new ServiceResponse(rtn.success, rtn.msg, null, null)
 	}
 
@@ -1388,9 +1389,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			workloadResponse.installAgent = runConfig.installAgent
 
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, workloadResponse.installAgent: ${workloadResponse.installAgent}, workloadResponse.noAgent: ${workloadResponse.noAgent}"
-			//cloud_init
+
+			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${server.cloudConfigUser} ${virtualImage?.isCloudInit} ${virtualImage?.isSysprep}\u001B[0m"
+			//cloud_init && sysprep
 			if(virtualImage?.isCloudInit && server.cloudConfigUser) {
 				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
+			} else if (virtualImage?.isSysprep) {
+				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${server.cloudConfigUser} ${server.cloudConfigMeta}\u001B[0m"
 			}
 
 			//main create or clone
