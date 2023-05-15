@@ -16,7 +16,7 @@ resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-7_3" {
 }
 
 
-resource "container-type" "nutanix-prism-centos-7_3" {
+resource "workload-type" "nutanix-prism-centos-7_3" {
 	code = "nutanix-prism-centos-7.3"
 	shortName = "centos"
 	name = "CentOS 7.3"

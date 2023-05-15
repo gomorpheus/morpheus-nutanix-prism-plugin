@@ -128,7 +128,8 @@ class NutanixPrismComputeUtility {
 				resources['guest_customization'] = [
 					"cloud_init": [
 						"user_data": runConfig.cloudInitUserData
-					]
+					],
+					"is_overridable": true
 				]
 			}
 		}
@@ -184,7 +185,8 @@ class NutanixPrismComputeUtility {
 			body['override_spec']['guest_customization'] = [
 				"cloud_init": [
 					"user_data": runConfig.cloudInitUserData
-				]
+				],
+				"is_overridable": true
 			]
 		}
 

@@ -99,7 +99,7 @@ resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-debian-11-2023030
 }
 
 
-resource "container-type" "nutanix-prism-debian-11" {
+resource "workload-type" "nutanix-prism-debian-11" {
 	code = "nutanix-prism-debian-11"
 	shortName = "debian"
 	name = "Debian 11"
@@ -123,7 +123,7 @@ resource "container-type" "nutanix-prism-debian-11" {
 	backupType = "nutanixPrismSnapshot"
 }
 
-resource "container-type-set" "nutanix-prism-debian-11-set" {
+resource "workload-type-set" "nutanix-prism-debian-11-set" {
 	code = "nutanix-prism-debian-11-set"
 	containerType = workload-type.nutanix-prism-debian-11
 	priorityOrder = 0
