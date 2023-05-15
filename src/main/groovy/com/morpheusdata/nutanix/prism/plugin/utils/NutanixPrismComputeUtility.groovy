@@ -121,7 +121,7 @@ class NutanixPrismComputeUtility {
 			if(runConfig.isSysprep) {
 				resources['guest_customization'] = [
 					"sysprep": [
-						"user_data": runConfig.cloudInitUserData
+						"unattend_xml": runConfig.cloudInitUserData
 					]
 				]
 			} else {
