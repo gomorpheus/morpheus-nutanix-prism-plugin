@@ -1414,7 +1414,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, workloadResponse.installAgent: ${workloadResponse.installAgent}, workloadResponse.noAgent: ${workloadResponse.noAgent}"
 
-			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${server.cloudConfigUser} ${virtualImage?.isCloudInit} ${virtualImage?.isSysprep}\u001B[0m"
 			//cloud_init && sysprep
 			if(virtualImage?.isCloudInit && server.cloudConfigUser) {
 				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
