@@ -97,7 +97,7 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse createVm(HttpApiClient client, Map authConfig, Map runConfig) {
 		log.debug("createVM")
 
-		def resources =  [
+		def resources = [
 				num_sockets: runConfig.numSockets,
 				memory_size_mib: runConfig.maxMemory,
 				num_vcpus_per_socket: runConfig.coresPerSocket,

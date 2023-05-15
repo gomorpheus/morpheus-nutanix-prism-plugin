@@ -938,7 +938,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						]
 				]
 				if(networkAdd.ipAddress) {
-					networkConfig["ip_endpoint_list"] =  [
+					networkConfig["ip_endpoint_list"] = [
 							[
 							"ip": networkAdd.ipAddress
 						]
@@ -1285,7 +1285,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						]
 				]
 				if(networkInterface.ipAddress) {
-					networkConfig["ip_endpoint_list"] =  [
+					networkConfig["ip_endpoint_list"] = [
 							[
 					        "ip": networkInterface.ipAddress
 						]

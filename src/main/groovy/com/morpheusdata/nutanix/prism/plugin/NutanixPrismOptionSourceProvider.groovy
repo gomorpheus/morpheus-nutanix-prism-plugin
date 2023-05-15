@@ -52,7 +52,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def regionCode = tmpCloud.regionCode
 
 		// Grab the projections.. doing a filter pass first
-		ImageType[] imageTypes =  [ImageType.qcow2, ImageType.ova]
+		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
 		def virtualImageIds = morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { it.deleted == false }.map{it.id}.toList().blockingGet()
 
 		List options = []
@@ -92,7 +92,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 
 		// Grab the projections.. doing a filter pass first
-		ImageType[] imageTypes =  [ImageType.qcow2, ImageType.ova]
+		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
 		def virtualImageIds = morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { it.deleted == false}.map{it.id}.toList().blockingGet()
 
 		List options = []

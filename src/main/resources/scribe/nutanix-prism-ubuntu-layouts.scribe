@@ -3,15 +3,15 @@
 resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-18_04-20230131" {
 	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.18.04.20230131"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name =  "Morpheus Ubuntu 18.04 20230131"
+	name = "Morpheus Ubuntu 18.04 20230131"
 	imageType = "qcow2"
-	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230131/ubuntu-18/morpheus-ubuntu-18_04-amd64-20230131.qcow2"
-	imagePath =  "qemu/20230131/ubuntu-18"
-	isCloudInit =  true
-	systemImage =  true
-	installAgent =  true
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230131/ubuntu-18/morpheus-ubuntu-18_04-amd64-20230131.qcow2"
+	imagePath = "qemu/20230131/ubuntu-18"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
 	osType {
-		code =  "ubuntu.18.04.64"
+		code = "ubuntu.18.04.64"
 	}
 	zoneType = "nutanix-prism-cloud"
 }
@@ -20,10 +20,10 @@ resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-18_04-2023
 resource "workload-type" "nutanix-prism-ubuntu-18_04" {
 	code = "nutanix-prism-ubuntu-18.04"
 	shortName = "ubuntu"
-	name =  "Ubuntu 18.04"
+	name = "Ubuntu 18.04"
 	ports = [22]
-	containerVersion =  "18.04"
-	entryPoint =   ""
+	containerVersion = "18.04"
+	entryPoint = ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
 	logTypeCode = "ubuntu"
@@ -44,8 +44,8 @@ resource "workload-type" "nutanix-prism-ubuntu-18_04" {
 resource "workload-type-set" "nutanix-prism-ubuntu-18_04-set" {
 	code = "nutanix-prism-ubuntu-18.04-set"
 	containerType = workload-type.nutanix-prism-ubuntu-18_04
-	priorityOrder =  0
-	dynamicCount =  true
+	priorityOrder = 0
+	dynamicCount = true
 	containerCount = 1
 }
 
@@ -58,11 +58,11 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 	instanceType {
 		code = "ubuntu"
 	}
-	serverCount =  1
-	portCount =  1
+	serverCount = 1
+	portCount = 1
 	serverType = "vm"
 	enabled = true
-	creatable =  true
+	creatable = true
 	containers = [
 		workload-type-set.nutanix-prism-ubuntu-18_04-set
 	]
@@ -88,15 +88,15 @@ resource "scale-action" "nutanix-prism-ubuntu-18_04-single" {
 resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-20_04-20230131" {
 	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.20.04.20230131.ubuntu.20.04.4"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name =  "Morpheus Ubuntu 20.04.04 20230131"
+	name = "Morpheus Ubuntu 20.04.04 20230131"
 	imageType = "qcow2"
-	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230131/ubuntu-20/morpheus-ubuntu-20_04-amd64-20230131.qcow2"
-	imagePath =  "qemu/20230131/ubuntu-20"
-	isCloudInit =  true
-	systemImage =  true
-	installAgent =  true
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230131/ubuntu-20/morpheus-ubuntu-20_04-amd64-20230131.qcow2"
+	imagePath = "qemu/20230131/ubuntu-20"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
 	osType {
-		code =  "ubuntu.20.04.64"
+		code = "ubuntu.20.04.64"
 	}
 	zoneType = "nutanix-prism-cloud"
 }
@@ -105,10 +105,10 @@ resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-20_04-2023
 resource "workload-type" "nutanix-prism-ubuntu-20_04" {
 	code = "nutanix-prism-ubuntu-20.04"
 	shortName = "ubuntu"
-	name =  "Ubuntu 20.04"
+	name = "Ubuntu 20.04"
 	ports = [22]
-	containerVersion =  "20.04"
-	entryPoint =   ""
+	containerVersion = "20.04"
+	entryPoint = ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
 	logTypeCode = "ubuntu"
@@ -129,8 +129,8 @@ resource "workload-type" "nutanix-prism-ubuntu-20_04" {
 resource "workload-type-set" "nutanix-prism-ubuntu-20_04-set" {
 	code = "nutanix-prism-ubuntu-20.04-set"
 	containerType = workload-type.nutanix-prism-ubuntu-20_04
-	priorityOrder =  0
-	dynamicCount =  true
+	priorityOrder = 0
+	dynamicCount = true
 	containerCount = 1
 }
 
@@ -143,11 +143,11 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-20_04-single" {
 	instanceType {
 		code = "ubuntu"
 	}
-	serverCount =  1
-	portCount =  1
+	serverCount = 1
+	portCount = 1
 	serverType = "vm"
 	enabled = true
-	creatable =  true
+	creatable = true
 	containers = [
 		workload-type-set.nutanix-prism-ubuntu-20_04-set
 	]
@@ -172,15 +172,15 @@ resource "scale-action" "nutanix-prism-ubuntu-20_04-single" {
 resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-22_04-20230307" {
 	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.22.04.20230307.amd64"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name =  "Morpheus Ubuntu 22.04 20230307"
+	name = "Morpheus Ubuntu 22.04 20230307"
 	imageType = "qcow2"
-	remotePath =  "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230307/ubuntu-22/morpheus-ubuntu-22_04-amd64-20230307.qcow2"
-	imagePath =  "qemu/20230307/ubuntu-18"
-	isCloudInit =  true
-	systemImage =  true
-	installAgent =  true
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230307/ubuntu-22/morpheus-ubuntu-22_04-amd64-20230307.qcow2"
+	imagePath = "qemu/20230307/ubuntu-18"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
 	osType {
-		code =  "ubuntu.22.04.64"
+		code = "ubuntu.22.04.64"
 	}
 	zoneType = "nutanix-prism-cloud"
 }
@@ -189,10 +189,10 @@ resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-22_04-2023
 resource "workload-type" "nutanix-prism-ubuntu-22_04" {
 	code = "nutanix-prism-ubuntu-22.04"
 	shortName = "ubuntu"
-	name =  "Ubuntu 22.04"
+	name = "Ubuntu 22.04"
 	ports = [22]
-	containerVersion =  "22.04"
-	entryPoint =   ""
+	containerVersion = "22.04"
+	entryPoint = ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
 	logTypeCode = "ubuntu"
@@ -213,8 +213,8 @@ resource "workload-type" "nutanix-prism-ubuntu-22_04" {
 resource "workload-type-set" "nutanix-prism-ubuntu-22_04-set" {
 	code = "nutanix-prism-ubuntu-22.04-set"
 	containerType = workload-type.nutanix-prism-ubuntu-22_04
-	priorityOrder =  0
-	dynamicCount =  true
+	priorityOrder = 0
+	dynamicCount = true
 	containerCount = 1
 }
 
@@ -227,11 +227,11 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-22_04-single" {
 	instanceType {
 		code = "ubuntu"
 	}
-	serverCount =  1
-	portCount =  1
+	serverCount = 1
+	portCount = 1
 	serverType = "vm"
 	enabled = true
-	creatable =  true
+	creatable = true
 	containers = [
 		workload-type-set.nutanix-prism-ubuntu-22_04-set
 	]
