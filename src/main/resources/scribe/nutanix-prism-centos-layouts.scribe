@@ -49,7 +49,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_3-set" {
 
 resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	code = "nutanix-prism-centos-7.3-single"
-	name = "Nutanix Prism Central VM asdf"
+	name = "Nutanix Prism Central VM"
 	sortOrder = 10
 	instanceVersion = "7.3"
 	description = "This will provision a single vm"
@@ -214,7 +214,7 @@ resource "workload-type-set" "nutanix-prism-centos-8_4-set" {
 
 resource "instance-type-layout" "nutanix-prism-centos-8_4-single" {
 	code = "nutanix-prism-centos-8.4-single"
-	name = "Nutanix Prism Central VM asdf"
+	name = "Nutanix Prism Central VM"
 	sortOrder = 30
 	instanceVersion = "8.4"
 	description = "This will provision a single vm"
