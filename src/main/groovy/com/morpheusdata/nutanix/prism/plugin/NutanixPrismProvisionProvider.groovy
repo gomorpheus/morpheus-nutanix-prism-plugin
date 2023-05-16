@@ -1366,6 +1366,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			ComputeServer server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
 			Workload workload = morpheusContext.cloud.getWorkloadById(runConfig.workloadId).blockingGet()
+			Workload sourceWorkload
 			PlatformType platformType = PlatformType.valueOf(runConfig.platform)
 			VirtualImage virtualImage
 			if(runConfig.virtualImageId) {
@@ -1431,8 +1432,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 
 			if(runConfig.cloneContainerId) {
-				def sourceWorkload = morpheusContext.workload.get(runConfig.cloneContainerId).blockingGet()
-				def vmUuid = sourceWorkload?.server?.externalId
+				sourceWorkload = morpheusContext.workload.get(runConfig.cloneContainerId).blockingGet()
+				def sourceServer = sourceWorkload?.server
+				def vmUuid = sourceServer?.externalId
+				if(server.serverOs?.platform != 'windows') {
+					getPlugin().morpheus.executeCommandOnServer(sourceServer, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old ; sync', false, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
+				}
 				createResults = NutanixPrismComputeUtility.cloneVm(client, authConfig, runConfig, vmUuid)
 				log.debug("clone server results: ${createResults}")
 			} else if(virtualImage) {
@@ -1467,6 +1472,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 				if(taskResults.success) {
 					if(createResults.data?.task_uuid) {
+						def sourceServer = sourceWorkload?.server
+						if(server?.serverOs?.platform != 'windows') {
+							getPlugin().morpheus.executeCommandOnServer(sourceServer, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
+						}
 						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}.uuid
 						workloadResponse.externalId = server.externalId
 						server.internalId = server.externalId
