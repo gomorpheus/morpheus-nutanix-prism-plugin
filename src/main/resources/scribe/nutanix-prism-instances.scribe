@@ -23,6 +23,8 @@ resource "workload-type" "nutanix-prism-provision-provider-1_0" {
 	containerVersion = "1.0"
 	serverType = "vm"
 	showServerLogs = true
+	statTypeCode = "vm"
+	logTypeCode = "nutanix-prism-central"
 	category = "cloud"
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"

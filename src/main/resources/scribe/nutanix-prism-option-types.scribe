@@ -4,7 +4,7 @@ resource "option-type" "nutanix-prism-provision-image" {
 	fieldName = "virtualImageId"
 	fieldContext = "config"
 	fieldLabel = "Image"
-	inputType = "select"
+	type = "select"
 	displayOrder = 102
 	required = true
 	optionSource = "nutanixPrismProvisionImage"
@@ -16,7 +16,7 @@ resource "option-type" "nutanix-prism-provision-uefi" {
 	fieldName = "uefi"
 	fieldContext = "config"
 	fieldLabel = "UEFI"
-	inputType = "checkbox"
+	type = "checkbox"
 	displayOrder = 103
 	fieldGroup = "Nutanix Prism Boot Options"
 }
@@ -27,7 +27,7 @@ resource "option-type" "nutanix-prism-provision-secure-boot" {
 	fieldName = "secureBoot"
 	fieldContext = "config"
 	fieldLabel = "Secure Boot"
-	inputType = "checkbox"
+	type = "checkbox"
 	displayOrder = 104
 	visibleOnCode = "nutanix-prism-provision-uefi:on"
 	fieldGroup = "Nutanix Prism Boot Options"
