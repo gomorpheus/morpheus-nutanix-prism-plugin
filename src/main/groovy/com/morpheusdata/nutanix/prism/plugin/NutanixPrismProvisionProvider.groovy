@@ -245,7 +245,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		def taskId = snapshotResult?.data?.task_uuid
 		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 		log.debug("Snapshot results: ${taskResults}")
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:createSnapshot- ${opts}\u001B[0m"
 		if(taskResults.success) {
 			def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}.uuid
 			if(snapshotUuid) {
