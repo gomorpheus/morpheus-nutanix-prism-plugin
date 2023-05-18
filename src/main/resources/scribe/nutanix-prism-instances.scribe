@@ -1,6 +1,7 @@
 resource "instance-type" "nutanix-prism-provision-provider" {
 	name = "Nutanix Prism Central"
 	code = "nutanix-prism-provision-provider"
+	description = "Spin up any VM Image on Nutanix Prism Central infrastructure."
 	category = "cloud"
 	active = true
 	enabled = true
