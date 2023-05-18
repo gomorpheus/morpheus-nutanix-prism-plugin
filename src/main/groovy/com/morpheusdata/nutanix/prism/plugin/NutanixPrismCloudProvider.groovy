@@ -123,9 +123,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	@Override
 	Collection<ComputeServerType> getComputeServerTypes() {
 		ComputeServerType hypervisorType = new ComputeServerType()
-		hypervisorType.name = 'Nutanix Prism Hypervisor'
+		hypervisorType.name = 'Nutanix Prism Central Hypervisor'
 		hypervisorType.code = 'nutanix-prism-hypervisor'
-		hypervisorType.description = 'Nutanix Prism Hypervisor'
+		hypervisorType.description = 'Nutanix Prism Central Hypervisor'
 		hypervisorType.vmHypervisor = true
 		hypervisorType.controlPower = false
 		hypervisorType.reconfigureSupported = false
@@ -137,9 +137,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider'
 
 		ComputeServerType serverType = new ComputeServerType()
-		serverType.name = 'Nutanix Prism Server'
+		serverType.name = 'Nutanix Prism Central Server'
 		serverType.code = 'nutanix-prism-server'
-		serverType.description = 'Nutanix Prism Server'
+		serverType.description = 'Nutanix Prism Central Server'
 		serverType.reconfigureSupported = false
 		serverType.hasAutomation = false
 		serverType.supportsConsoleKeymap = true
@@ -148,9 +148,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		serverType.provisionTypeCode = 'nutanix-prism-provision-provider'
 
 		ComputeServerType vmType = new ComputeServerType()
-		vmType.name = 'Nutanix Prism Linux VM'
+		vmType.name = 'Nutanix Prism Central Linux VM'
 		vmType.code = 'nutanix-prism-vm'
-		vmType.description = 'Nutanix Prism Linux VM'
+		vmType.description = 'Nutanix Prism Central Linux VM'
 		vmType.reconfigureSupported = true
 		vmType.hasAutomation = true
 		vmType.supportsConsoleKeymap = true
@@ -159,9 +159,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		vmType.provisionTypeCode = 'nutanix-prism-provision-provider'
 
 		ComputeServerType windowsType = new ComputeServerType()
-		windowsType.name = 'Nutanix Prism Windows VM'
+		windowsType.name = 'Nutanix Prism Central Windows VM'
 		windowsType.code = 'nutanix-prism-windows-vm'
-		windowsType.description = 'Nutanix Prism Windows VM'
+		windowsType.description = 'Nutanix Prism Central Windows VM'
 		windowsType.reconfigureSupported = true
 		windowsType.hasAutomation = true
 		windowsType.supportsConsoleKeymap = true
@@ -198,7 +198,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				gatewayEditable   : true,
 				vlanIdEditable    : true,
 				canAssignPool     : true,
-				name              : 'Nutanix Prism VLAN Network'
+				name              : 'Nutanix Prism Central VLAN Network'
 		])
 		NetworkType overlayNetwork = new NetworkType([
 				code              : 'nutanix-prism-overlay-network',
@@ -209,7 +209,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				gatewayEditable   : true,
 				vlanIdEditable    : true,
 				canAssignPool     : true,
-				name              : 'Nutanix Prism Overlay Network'
+				name              : 'Nutanix Prism Central Overlay Network'
 		])
 		[vlanNetwork, overlayNetwork]
 	}
@@ -224,12 +224,12 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		def volumeTypes = []
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-datastore',
-				name: 'Nutanix Prism Datastore'
+				name: 'Nutanix Prism Central Datastore'
 		])
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-host-disk',
-				name: 'Nutanix Prism Host Disk'
+				name: 'Nutanix Prism Central Host Disk'
 		])
 
 		volumeTypes << new StorageVolumeType([
@@ -240,25 +240,29 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-scsi',
 				externalId: 'SCSI',
-				name: 'SCSI'
+				name: 'SCSI',
+				displayOrder: 1
 		])
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-pci',
 				externalId: 'PCI',
-				name: 'PCI'
+				name: 'PCI',
+				displayOrder: 2
 		])
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-ide',
 				externalId: 'IDE',
-				name: 'IDE'
+				name: 'IDE',
+				displayOrder: 3
 		])
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-sata',
 				externalId: 'SATA',
-				name: 'SATA'
+				name: 'SATA',
+				displayOrder: 0
 		])
 
 		volumeTypes
@@ -387,7 +391,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	String getName() {
-		return 'Nutanix Prism'
+		return 'Nutanix Prism Central'
 	}
 
 	@Override

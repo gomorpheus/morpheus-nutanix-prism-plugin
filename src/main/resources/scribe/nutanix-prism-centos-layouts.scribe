@@ -131,7 +131,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_5-set" {
 
 resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	code = "nutanix-prism-centos-7.5-single"
-	name = "Nutanix Prism Central VM adsf"
+	name = "Nutanix Prism Central VM"
 	sortOrder = 20
 	instanceVersion = "7.5"
 	description = "This will provision a single vm"

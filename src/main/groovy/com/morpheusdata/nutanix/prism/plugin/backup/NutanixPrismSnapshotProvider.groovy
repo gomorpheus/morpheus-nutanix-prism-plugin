@@ -30,7 +30,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 
 	@Override
 	String getName() {
-		return "Nutanix Prism VM Snapshot"
+		return "Nutanix Prism Central VM Snapshot"
 	}
 
 	@Override

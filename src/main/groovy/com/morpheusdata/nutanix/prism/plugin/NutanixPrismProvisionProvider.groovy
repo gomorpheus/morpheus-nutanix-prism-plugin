@@ -175,7 +175,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		ComputeServerInterfaceType computeServerInterface = new ComputeServerInterfaceType([
 				code:'nutanix-prism-normal-nic',
 				externalId:'NORMAL_NIC',
-				name:'Nutanix Prism Normal NIC',
+				name:'Nutanix Prism Central Normal NIC',
 				defaultType: true,
 				enabled: true,
 				displayOrder:1
@@ -240,7 +240,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		def snapshotName = opts.snapshotName ?: "${server.name}.${System.currentTimeMillis()}"
-		log.debug("Executing Nutanix Prism snapshot for ${server?.name}")
+		log.debug("Executing Nutanix Prism Central snapshot for ${server?.name}")
 		def snapshotResult = NutanixPrismComputeUtility.createSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshotName)
 		def taskId = snapshotResult?.data?.task_uuid
 		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
@@ -284,7 +284,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	ServiceResponse deleteSnapshots(ComputeServer server, Map opts) {
 		HttpApiClient client = new HttpApiClient()
 		Map authConfig = plugin.getAuthConfig(server.cloud)
-		log.debug("Deleting Nutanix Prism snapshots for server ${server.name}")
+		log.debug("Deleting Nutanix Prism Central snapshots for server ${server.name}")
 		List<SnapshotIdentityProjection> snapshots = server.snapshots
 		Boolean success = true
 		for(int i = 0; i < snapshots.size(); i++) {
@@ -309,7 +309,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		HttpApiClient client = new HttpApiClient()
 		ComputeServer server = morpheusContext.computeServer.get(opts.serverId).blockingGet()
 		Map authConfig = plugin.getAuthConfig(server.cloud)
-		log.debug("Deleting Nutanix Prism Snapshot ${snapshot.name}")
+		log.debug("Deleting Nutanix Prism Central Snapshot ${snapshot.name}")
 		def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
 		def taskId = snapshotResult?.data?.task_uuid
 		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
@@ -325,7 +325,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	ServiceResponse revertSnapshot(ComputeServer server, Snapshot snapshot, Map opts) {
 		HttpApiClient client = new HttpApiClient()
 		Map authConfig = plugin.getAuthConfig(server.cloud)
-		log.debug("Reverting Nutanix Prism Snapshot ${snapshot.name}")
+		log.debug("Reverting Nutanix Prism Central Snapshot ${snapshot.name}")
 		def snapshotResult = NutanixPrismComputeUtility.restoreSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshot.externalId)
 		def taskId = snapshotResult?.data?.task_uuid
 		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
@@ -420,6 +420,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		WorkloadResponse workloadResponse = new WorkloadResponse(success: true, installAgent: false)
 		ComputeServer server = workload.server
 		try {
+			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${server.platform} ${server.osType}\u001B[0m"
 			Cloud cloud = server.cloud
 			VirtualImage virtualImage = server.sourceImage
 			Map authConfig = plugin.getAuthConfig(cloud)
@@ -1069,29 +1070,35 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 	private getStorageVolumeTypes() {
 		def volumeTypes = []
+
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-disk-scsi',
-				externalId: 'SCSI',
-				name: 'SCSI'
+			code: 'nutanix-prism-disk-scsi',
+			externalId: 'SCSI',
+			name: 'SCSI',
+			displayOrder: 1
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-disk-pci',
-				externalId: 'PCI',
-				name: 'PCI'
+			code: 'nutanix-prism-disk-pci',
+			externalId: 'PCI',
+			name: 'PCI',
+			displayOrder: 2
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-disk-ide',
-				externalId: 'IDE',
-				name: 'IDE'
+			code: 'nutanix-prism-disk-ide',
+			externalId: 'IDE',
+			name: 'IDE',
+			displayOrder: 3
 		])
 
 		volumeTypes << new StorageVolumeType([
-				code: 'nutanix-prism-disk-sata',
-				externalId: 'SATA',
-				name: 'SATA'
+			code: 'nutanix-prism-disk-sata',
+			externalId: 'SATA',
+			name: 'SATA',
+			displayOrder: 0
 		])
+
 		volumeTypes
 	}
 

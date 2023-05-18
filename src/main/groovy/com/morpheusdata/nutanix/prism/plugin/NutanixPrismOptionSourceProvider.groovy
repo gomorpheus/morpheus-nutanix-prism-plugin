@@ -36,7 +36,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	String getName() {
-		return 'Nutanix Prism Option Source'
+		return 'Nutanix Prism Central Option Source'
 	}
 
 	@Override

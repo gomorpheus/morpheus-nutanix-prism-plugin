@@ -75,7 +75,7 @@ jar {
 		attributes(
 				'Plugin-Class': 'com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin',
 				'Plugin-Version': version,
-				'Morpheus-Name': 'Nutanix Prism',
+				'Morpheus-Name': 'Nutanix Prism Central',
 				'Morpheus-Organization': 'morpheus',
 				'Morpheus-Code': 'morpheus-nutanix-prism',
 				'Morpheus-Description': 'Plugin for Nutanix Prism Central',
