@@ -407,6 +407,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			log.error "${rtn.msg}, ${e}", e
 
 		}
+		if(!rtn.success) {
+			log.error "prepareWorkload: error - ${rtn.msg}"
+		}
 		new ServiceResponse(rtn.success, rtn.msg, null, null)
 	}
 

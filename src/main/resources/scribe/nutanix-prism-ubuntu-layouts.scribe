@@ -170,7 +170,7 @@ resource "scale-action" "nutanix-prism-ubuntu-20_04-single" {
 //22
 
 resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-ubuntu-22_04-20230307" {
-	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.22.04.20230307.amd64"
+	code = "nutanix.prism.vsphere.image.morpheus.ubuntu.22.04.20230307"
 	category = "nutanix.prism.image.morpheus.ubuntu"
 	name = "Morpheus Ubuntu 22.04 20230307"
 	imageType = "qcow2"
@@ -205,7 +205,7 @@ resource "workload-type" "nutanix-prism-ubuntu-22_04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-ubuntu-22_04-20230131
+	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-ubuntu-22_04-20230307
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
