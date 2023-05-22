@@ -12,8 +12,10 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	optionTypes = [
 		option-type.nutanix-prism-provision-image
 	]
-	logo = "file:nutanix-prism.svg"
-	darkLogo = "file:nutanix-prism.svg"
+	pluginIconPath = "nutanix-prism.svg"
+	pluginIconHidpiPath= "nutanix-prism.svg"
+	pluginIconDarkPath = "nutanix-prism-dark.svg"
+	pluginIconDarkHidpiPath = "nutanix-prism-dark.svg"
 }
 
 resource "workload-type" "nutanix-prism-provision-provider-1_0" {

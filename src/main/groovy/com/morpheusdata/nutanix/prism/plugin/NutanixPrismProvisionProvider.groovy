@@ -88,7 +88,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		options << new OptionType([
 			name : 'cluster',
 			code : 'nutanix-prism-provision-cluster',
-			fieldName : 'cluster',
+			fieldName : 'clusterName',
 			fieldContext : 'config',
 			fieldLabel : 'Cluster',
 			required : true,
@@ -384,7 +384,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		def rtn = [success: false, msg: null]
 		try {
-			Long virtualImageId = workload.getConfigProperty('virtualImageId')?.toLong() ?: workload?.workloadType?.virtualImage?.id
+			Long virtualImageId = workload.getConfigProperty('imageId')?.toLong() ?: workload?.workloadType?.virtualImage?.id
 			if(!virtualImageId) {
 				rtn.msg = "No virtual image selected"
 			} else {
@@ -420,7 +420,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		WorkloadResponse workloadResponse = new WorkloadResponse(success: true, installAgent: false)
 		ComputeServer server = workload.server
 		try {
-			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildRunConfig- ${server.platform} ${server.osType}\u001B[0m"
 			Cloud cloud = server.cloud
 			VirtualImage virtualImage = server.sourceImage
 			Map authConfig = plugin.getAuthConfig(cloud)
@@ -868,7 +867,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						device_properties: [
 								device_type: "DISK",
 								disk_address: [
-										adapter_type: storageVolumeType.name,
+										adapter_type: storageVolumeType.name.toUpperCase(),
 										device_index: targetIndex
 								],
 						],
@@ -888,7 +887,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					//wait for operation to complete
 					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 					vmBody = serverDetails?.data
-					def newDisk = vmBody.spec.resources.disk_list.find {it.device_properties.disk_address.adapter_type == storageVolumeType.name && it.device_properties.disk_address.device_index == targetIndex}
+					def newDisk = vmBody.spec.resources.disk_list.find {it.device_properties.disk_address.adapter_type == storageVolumeType.name.toUpperCase() && it.device_properties.disk_address.device_index == targetIndex}
 					def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
 					newVolume.externalId = newDisk.uuid
 					newVolume.type = new StorageVolumeType(id: volumeAdd.storageType.toLong())
@@ -1073,29 +1072,29 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		volumeTypes << new StorageVolumeType([
 			code: 'nutanix-prism-disk-scsi',
-			externalId: 'SCSI',
-			name: 'SCSI',
+			externalId: 'scsi',
+			name: 'scsi',
 			displayOrder: 1
 		])
 
 		volumeTypes << new StorageVolumeType([
 			code: 'nutanix-prism-disk-pci',
-			externalId: 'PCI',
-			name: 'PCI',
+			externalId: 'pci',
+			name: 'pci',
 			displayOrder: 2
 		])
 
 		volumeTypes << new StorageVolumeType([
 			code: 'nutanix-prism-disk-ide',
-			externalId: 'IDE',
-			name: 'IDE',
+			externalId: 'ide',
+			name: 'ide',
 			displayOrder: 3
 		])
 
 		volumeTypes << new StorageVolumeType([
 			code: 'nutanix-prism-disk-sata',
-			externalId: 'SATA',
-			name: 'SATA',
+			externalId: 'sata',
+			name: 'sata',
 			displayOrder: 0
 		])
 
@@ -1252,7 +1251,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				device_properties: [
 					device_type: "DISK",
 					disk_address: [
-						adapter_type: storageVolumeType.name,
+						adapter_type: storageVolumeType.name.toUpperCase(),
 						device_index: index
 					],
 				],
@@ -1305,7 +1304,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		def clusterReference = [
 				kind: "cluster",
-				uuid: config.cluster
+				uuid: config.clusterName
 		]
 
 		def runConfig = [:] + opts
@@ -1522,7 +1521,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 									if (!volumeTypeCountMap[volume.type.name]) {
 										volumeTypeCountMap[volume.type.name] = 0
 									}
-									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name && disk.device_properties.disk_address.device_index == volumeTypeCountMap[volume.type.name] }
+									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeTypeCountMap[volume.type.name] }
 									volume.externalId = newDisk?.uuid
 									volumeTypeCountMap[volume.type.name]++
 								}

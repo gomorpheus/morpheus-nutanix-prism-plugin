@@ -1,7 +1,7 @@
 resource "option-type" "nutanix-prism-provision-image" {
 	name = "virtual image"
 	code = "nutanix-prism-provision-image"
-	fieldName = "virtualImageId"
+	fieldName = "imageId"
 	fieldContext = "config"
 	fieldLabel = "Image"
 	type = "select"

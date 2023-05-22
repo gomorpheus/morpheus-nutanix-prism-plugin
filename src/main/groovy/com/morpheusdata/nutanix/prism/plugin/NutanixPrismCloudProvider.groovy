@@ -239,29 +239,29 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-scsi',
-				externalId: 'SCSI',
-				name: 'SCSI',
+				externalId: 'scsi',
+				name: 'scsi',
 				displayOrder: 1
 		])
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-pci',
-				externalId: 'PCI',
-				name: 'PCI',
+				externalId: 'pci',
+				name: 'pci',
 				displayOrder: 2
 		])
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-ide',
-				externalId: 'IDE',
-				name: 'IDE',
+				externalId: 'ide',
+				name: 'ide',
 				displayOrder: 3
 		])
 
 		volumeTypes << new StorageVolumeType([
 				code: 'nutanix-prism-disk-sata',
-				externalId: 'SATA',
-				name: 'SATA',
+				externalId: 'sata',
+				name: 'sata',
 				displayOrder: 0
 		])
 
