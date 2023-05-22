@@ -1,0 +1,176 @@
+
+resource "workload-type" "docker-nutanix-prism-ubuntu-16_04" {
+	code = "docker-nutanix-prism-ubuntu-16.04"
+	shortName = "ubuntu"
+	name = "Docker Ubuntu 16.04"
+	ports = [22]
+	containerVersion = "16.04"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "ubuntu"
+	showServerLogs = true
+	category = "ubuntu"
+	cloneType = "ubuntu"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	containerPorts = [{code = "ubuntu.22"}]
+	checkTypeCode = "vmCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-16_04
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "compute-type-set" "docker-nutanix-prism-ubuntu-16_04-set" {
+	code = "docker-nutanix-prism-ubuntu-16.04-set"
+	name = "docker host"
+	containerType = workload-type.docker-nutanix-prism-ubuntu-16_04
+	computeServerType = compute-server-type.nutanix-prism-linux
+	priorityOrder = 0
+	dynamicCount = true
+	nodeCount = 1
+	nodeType = "worker"
+	canAddNodes = true
+	installContainerRuntime = true
+	installStorageRuntime = true
+}
+
+resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
+	code = "docker-nutanix-prism-ubuntu-16.04-single"
+	name = "Nutanix Prism Central Docker Ubuntu 16.04"
+	sortOrder = 5
+	computeVersion = "16.04"
+	description = "This will provision a single docker host vm in nutanix prism central"
+	serverCount = 1
+	memoryRequirement = 1024 * 1024 * 1024
+	hasAutoScale = true
+	type = "nutanix-prism-vm"
+	groupType = "docker-cluster"
+	computeServers = ["docker-nutanix-prism-ubuntu-16.04-set"]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+
+//kubernetes
+resource "workload-type" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism" {
+	code = "kubernetes-1.26_.1-ubuntu-20.04-nutanix-prism"
+	shortName = "kubernetes-ubuntu"
+	name = "Kubernetes 1.26 Cluster on Ubuntu 20.04"
+	containerVersion = "1.26.1"
+	repositoryImage = ""
+	imageCode = "morpheus Kubernetes 1.26.1 on Ubuntu 20.04"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "ubuntu"
+	logTypeCode = "ubuntu"
+	showServerLogs = true
+	category = "kubernetes"
+	cloneType = "ubuntu"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	checkTypeCode = "vmCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-18_04-20230131
+	containerPorts = [{code = "ubuntu.22"}]
+	provisionType = "nutanix-prism-provision-provider"
+	scripts = [
+		{code = "kubernetes-1-26-ubuntu-install-v1"},
+		{code = "kubernetes-1-26-kubeadm-cluster-master-init-v1"},
+		{code = "kubernetes-1-26-kubeadm-cluster-master-setup-v1"}
+	]
+	templates = []
+}
+
+resource "workload-type" "kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism" {
+	code = "kubernetes-1.26_.1-ubuntu-20.04-worker-nutanix-prism"
+	shortName = "kubernetes-worker-ubuntu"
+	name = "Kubernetes 1.26 Worker on Ubuntu 20.04"
+	containerVersion = "1.26.1"
+	repositoryImage = ""
+	imageCode = "morpheus Kubernetes 1.26.1 on Ubuntu 20.04"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "ubuntu"
+	logTypeCode = "ubuntu"
+	showServerLogs = true
+	category = "kubernetes"
+	cloneType = "ubuntu"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	checkTypeCode = "vmCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-18_04-20230131
+	containerPorts = [{code = "ubuntu.22"}]
+	provisionType = "nutanix-prism-provision-provider"
+	scripts = [
+		{code = "kubernetes-1-26-ubuntu-install-v1"},
+		{code = "kubernetes-1-26-kubeadm-worker-join-v1"},
+	]
+	templates = []
+}
+
+resource "compute-type-set" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-set" {
+	code = "kubernetes-1.26.1-ubuntu-20.04-nutanix-prism-set"
+	name = "kubernetes master"
+	workloadType = workload-type.kubernetes-1_26_1-ubuntu-20_04-nutanix-prism
+	computeServerType = "nutanix-prism-kube-master"
+	category = "ubuntu"
+	priorityOrder = 0
+	dynamicCount = false
+	nodeCount = 1
+	nameSuffix = "-master"
+	nodeType = "master"
+	installContainerRuntime = true
+	installStorageRuntime = true
+	//userData?
+}
+
+resource "compute-type-set" "kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism-set" {
+	code = "kubernetes-1.26.1-ubuntu-20.04-worker-nutanix-prism-set"
+	name = "kubernetes worker"
+	workloadType = workload-type.kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism
+	computeServerType = "nutanix-prism-kube-worker"
+	category = "ubuntu"
+	priorityOrder = 1
+	dynamicCount = true
+	nodeCount = 3
+	nameSuffix = "-worker"
+	nodeType = "worker"
+	canAddNodes = true
+	installContainerRuntime = true
+	installStorageRuntime = true
+}
+
+resource "compute-type-layout" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-single" {
+	code = "kubernetes-1.26.1-ubuntu-20.04-nutanix-prism-single"
+	name = "MKS Kubernetes 1.26 Cluster on Ubuntu 20.04"
+	sortOrder = 10
+	computeVersion = "20.04"
+	clusterVersion = "1.26.1"
+	description = "provision a Kubernetes 1.26 cluster on Ubuntu 20.04"
+	type = "nutanix-prism-kube-master"
+	serverCount = 4
+	memoryRequirement = 1073741824
+	hasAutoScale = true
+	containerRuntime = "containerd"
+	networkRuntime = "calico"
+	computeServers = [
+		{code = "kubernetes-1.26.1-ubuntu-20.04-nutanix-prism-set"},
+		{code = "kubernetes-1.26.1-ubuntu-20.04-worker-nutanix-prism-set"}
+	]
+	groupType = "kubernetes-cluster"
+	provisionType = "nutanix-prism-provision-provider"
+	optionTypes = [
+		{code = "kubernetes.master.podCidr"},
+		{code = "kubernetes.master.serviceCidr"}
+	]
+#	packages = [
+#		{code = "kubernetes-calico-3-24-2-package"},
+#		{code = "kubernetes-fluentbit-1-8-9-package"},
+#		{code = "kubernetes-prometheus-0-9-package"},
+#		{code = "kubernetes-nginx-ingress-operator-0-30-package"}
+#	]
+
+}
+
+

@@ -1,6 +1,6 @@
 //10
-resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-debian-10-20230308" {
-	code = "nutanix.prism.vsphere.image.morpheus.debian.10.20230308"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20230308" {
+	code = "nutanix.prism.image.morpheus.debian.10.20230308"
 	category = "nutanix.prism.image.morpheus.debian"
 	name = "Morpheus Debian 10 20230308"
 	imageType = "qcow2"
@@ -35,7 +35,7 @@ resource "workload-type" "nutanix-prism-debian-10" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-debian-10-20230308
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-10-20230308
 	provisionType  = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -82,8 +82,8 @@ resource "scale-action" "nutanix-prism-debian-10-single" {
 }
 
 //11
-resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-debian-11-20230308" {
-	code = "nutanix.prism.vsphere.image.morpheus.debian.11.20230308"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20230308" {
+	code = "nutanix.prism.image.morpheus.debian.11.20230308"
 	category = "nutanix.prism.image.morpheus.debian"
 	name = "Morpheus Debian 11 20230308"
 	imageType = "qcow2"
@@ -118,7 +118,7 @@ resource "workload-type" "nutanix-prism-debian-11" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-debian-11-20230308
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-11-20230308
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }

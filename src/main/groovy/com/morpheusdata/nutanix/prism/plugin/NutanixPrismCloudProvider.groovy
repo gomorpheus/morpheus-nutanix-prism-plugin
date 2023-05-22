@@ -135,6 +135,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		hypervisorType.platform = PlatformType.esxi
 		hypervisorType.managed = false
 		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		hypervisorType.nodeType = 'nutanix-prism-node'
 
 		ComputeServerType serverType = new ComputeServerType()
 		serverType.name = 'Nutanix Prism Central Server'
@@ -146,6 +147,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		serverType.platform = PlatformType.none
 		serverType.managed = false
 		serverType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		serverType.nodeType = 'morpheus-vm-node'
 
 		ComputeServerType vmType = new ComputeServerType()
 		vmType.name = 'Nutanix Prism Central Linux VM'
@@ -157,6 +159,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		vmType.platform = PlatformType.linux
 		vmType.managed = true
 		vmType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		vmType.nodeType = 'morpheus-vm-node'
 
 		ComputeServerType windowsType = new ComputeServerType()
 		windowsType.name = 'Nutanix Prism Central Windows VM'
@@ -168,8 +171,67 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		windowsType.platform = PlatformType.windows
 		windowsType.managed = true
 		windowsType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		windowsType.nodeType = 'morpheus-windows-vm-node'
 
-		[hypervisorType, serverType, vmType, windowsType]
+		ComputeServerType unmanagedType = new ComputeServerType()
+		unmanagedType.name = 'Nutanix Prism Instance'
+		unmanagedType.code = 'nutanix-prism-unmanaged'
+		unmanagedType.description = 'Nutanix Prism Instance'
+		unmanagedType.reconfigureSupported = true
+		unmanagedType.hasAutomation = true
+		unmanagedType.supportsConsoleKeymap = true
+		unmanagedType.platform = PlatformType.linux
+		unmanagedType.managed = true
+		unmanagedType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		unmanagedType.nodeType = 'unmanaged'
+		unmanagedType.managedServerType = 'nutanix-prism-vm'
+
+		ComputeServerType linuxDockerType = new ComputeServerType()
+		linuxDockerType.name = 'Nutanix Prism Docker Host'
+		linuxDockerType.code = 'nutanix-prism-linux'
+		linuxDockerType.description = 'Nutanix Prism Docker Host'
+		linuxDockerType.containerHypervisor = true
+		linuxDockerType.reconfigureSupported = true
+		linuxDockerType.hasAutomation = true
+		linuxDockerType.supportsConsoleKeymap = true
+		linuxDockerType.platform = PlatformType.linux
+		linuxDockerType.managed = true
+		linuxDockerType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		linuxDockerType.agentType = ComputeServerType.AgentType.host
+		linuxDockerType.clusterType = ComputeServerType.ClusterType.docker
+		linuxDockerType.computeTypeCode = 'docker-host'
+
+		ComputeServerType kubeMasterType = new ComputeServerType()
+		kubeMasterType.name = 'Nutanix Prism Kubernetes Master'
+		kubeMasterType.code = 'nutanix-prism-kube-master'
+		kubeMasterType.description = 'Nutanix Prism Kubernetes Master'
+		kubeMasterType.containerHypervisor = true
+		kubeMasterType.reconfigureSupported = true
+		kubeMasterType.hasAutomation = true
+		kubeMasterType.supportsConsoleKeymap = true
+		kubeMasterType.platform = PlatformType.linux
+		kubeMasterType.managed = true
+		kubeMasterType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		kubeMasterType.agentType = ComputeServerType.AgentType.host
+		kubeMasterType.clusterType = ComputeServerType.ClusterType.kubernetes
+		kubeMasterType.computeTypeCode = 'kube-master'
+
+		ComputeServerType kubeWorkerType = new ComputeServerType()
+		kubeWorkerType.name = 'Nutanix Prism Kubernetes Worker'
+		kubeWorkerType.code = 'nutanix-prism-kube-worker'
+		kubeWorkerType.description = 'Nutanix Prism Kubernetes Worker'
+		kubeWorkerType.containerHypervisor = true
+		kubeWorkerType.reconfigureSupported = true
+		kubeWorkerType.hasAutomation = true
+		kubeWorkerType.supportsConsoleKeymap = true
+		kubeWorkerType.platform = PlatformType.linux
+		kubeWorkerType.managed = true
+		kubeWorkerType.provisionTypeCode = 'nutanix-prism-provision-provider'
+		kubeWorkerType.agentType = ComputeServerType.AgentType.host
+		kubeWorkerType.clusterType = ComputeServerType.ClusterType.kubernetes
+		kubeWorkerType.computeTypeCode = 'kube-worker'
+
+		[hypervisorType, serverType, vmType, windowsType, unmanagedType, linuxDockerType, kubeMasterType, ]
 	}
 
 	@Override

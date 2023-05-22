@@ -476,7 +476,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 								internalId  : imageExternalId,
 						])
 						morpheusContext.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
-						if(!letNutanixDownloadImage) {
+						if(letNutanixDownloadImage == false) {
 							waitForImageComplete(client, authConfig, imageExternalId, false)
 							def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream, contentLength)
 							if (!uploadResults.success) {

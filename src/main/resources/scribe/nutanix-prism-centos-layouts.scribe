@@ -1,6 +1,6 @@
 //7.3
-resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-7_3" {
-	code = "nutanix.prism.vsphere.image.morpheus.centos.7.3"
+resource "virtual-image" "nutanix-prism-image-morpheus-centos-7_3" {
+	code = "nutanix.prism.image.morpheus.centos.7.3"
 	category = "nutanix.prism.image.morpheus.centos"
 	name = "Morpheus CentOS 7.3"
 	imageType = "qcow2"
@@ -31,7 +31,7 @@ resource "workload-type" "nutanix-prism-centos-7_3" {
 	providerType = "nutanix-prism"
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-7_3
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-7_3
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 	commEnabled = true
@@ -81,8 +81,8 @@ resource "scale-action" "nutanix-prism-centos-7_3-single" {
 }
 
 //7.5
-resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-7_5" {
-	code = "nutanix.prism.vsphere.image.morpheus.centos.7.5"
+resource "virtual-image" "nutanix-prism-image-morpheus-centos-7_5" {
+	code = "nutanix.prism.image.morpheus.centos.7.5"
 	category = "nutanix.prism.image.morpheus.centos"
 	name = "Morpheus CentOS 7.5"
 	imageType = "qcow2"
@@ -113,7 +113,7 @@ resource "workload-type" "nutanix-prism-centos-7_5" {
 	providerType = "nutanix-prism"
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-7_5
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-7_5
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 	commEnabled = true
@@ -163,8 +163,8 @@ resource "scale-action" "nutanix-prism-centos-7_5-single" {
 }
 
 //8.4
-resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-8_4" {
-	code = "nutanix.prism.vsphere.image.morpheus.centos.8.4"
+resource "virtual-image" "nutanix-prism-image-morpheus-centos-8_4" {
+	code = "nutanix.prism.image.morpheus.centos.8.4"
 	category = "nutanix.prism.image.morpheus.centos"
 	name = "Morpheus CentOS 8.4"
 	imageType = "qcow2"
@@ -195,7 +195,7 @@ resource "workload-type" "nutanix-prism-centos-8_4" {
 	providerType = "nutanix-prism"
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-8_4
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-8_4
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 	commEnabled = true
@@ -246,8 +246,8 @@ resource "scale-action" "nutanix-prism-centos-8_4-single" {
 }
 
 //9-stream
-resource "virtual-image" "nutanix-prism-vsphere-image-morpheus-centos-9-stream" {
-	code = "nutanix.prism.vsphere.image.morpheus.centos.9-stream"
+resource "virtual-image" "nutanix-prism-image-morpheus-centos-9-stream" {
+	code = "nutanix.prism.image.morpheus.centos.9-stream"
 	category = "nutanix.prism.image.morpheus.centos"
 	name = "Morpheus CentOS 8.4"
 	imageType = "qcow2"
@@ -278,7 +278,7 @@ resource "workload-type" "nutanix-prism-centos-9-stream" {
 	providerType = "nutanix-prism"
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-vsphere-image-morpheus-centos-9-stream
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-9-stream
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 	commEnabled = true
