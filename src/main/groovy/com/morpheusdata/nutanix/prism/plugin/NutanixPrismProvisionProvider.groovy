@@ -426,6 +426,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			Cloud cloud = server.cloud
 			VirtualImage virtualImage = server.sourceImage
 			Map authConfig = plugin.getAuthConfig(cloud)
+			
+			println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload 1 - ${virtualImage} ${virtualImage.id}\u001B[0m"
 
 			client = new HttpApiClient()
 			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
@@ -458,11 +460,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				if(!imageExternalId) { //If its userUploaded and still needs uploaded
 					// Create the image
 					def cloudFiles = morpheusContext.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
+					println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload 2 - ${cloudFiles}\u001B[0m"
 					def imageFile = cloudFiles?.find{cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2")}
 					def contentLength = imageFile?.getContentLength()
 					// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
 					// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
 					def letNutanixDownloadImage = imageFile?.getURL()?.toString()?.contains('morpheus-images')
+					println "\u001B[33mAC Log - NutanixPrismProvisionProvider:runWorkload- ${letNutanixDownloadImage} ${imageFile?.getURL()?.toString()}\u001B[0m"
 					def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig,
 							virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL()?.toString() : null)
 					if(imageResults.success) {
