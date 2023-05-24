@@ -58,6 +58,7 @@ resource "instance-type-layout" "nutanix-prism-debian-10-single" {
 		code = "debian"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
 	enabled = true
@@ -141,6 +142,7 @@ resource "instance-type-layout" "nutanix-prism-debian-11-single" {
 		code = "debian"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
 	enabled = true

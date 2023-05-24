@@ -39,7 +39,7 @@ configurations {
 }
 
 dependencies {
-	provided "com.morpheusdata:morpheus-plugin-api:0.14.2-SNAPSHOT"
+	provided "com.morpheusdata:morpheus-plugin-api:0.14.3-SNAPSHOT"
 	provided "org.codehaus.groovy:groovy-all:$groovyVersion"
 
 	provided("com.bertramlabs.plugins:karman-core:${karmanVersion}") {

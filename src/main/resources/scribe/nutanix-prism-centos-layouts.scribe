@@ -57,6 +57,7 @@ resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 		code = "centos"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	enabled = true
 	creatable = true
@@ -139,6 +140,7 @@ resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 		code = "centos"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	enabled = true
 	creatable = true
@@ -221,6 +223,7 @@ resource "instance-type-layout" "nutanix-prism-centos-8-stream-single" {
 		code = "centos"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	enabled = true
 	creatable = true
@@ -303,6 +306,7 @@ resource "instance-type-layout" "nutanix-prism-centos-9-stream-single" {
 		code = "centos"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	enabled = true
 	creatable = true

@@ -76,6 +76,7 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 		code = "ubuntu"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
 	enabled = true
@@ -161,6 +162,7 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-20_04-single" {
 		code = "ubuntu"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
 	enabled = true
@@ -245,6 +247,7 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-22_04-single" {
 		code = "ubuntu"
 	}
 	serverCount = 1
+	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
 	enabled = true
