@@ -47,7 +47,7 @@ class VirtualMachinesSync {
 				def blackListedNames = domainRecords.filter {it.status == 'provisioning'}.map {it.name}.toList().blockingGet()
 
 				// To be used throughout the sync
-				def defaultServerType = new ComputeServerType(code: 'nutanix-prism-server')
+				def defaultServerType = new ComputeServerType(code: 'nutanix-prism-unmanaged')
 				Map hosts = getAllHosts()
 				Map resourcePools = getAllResourcePools()
 				Map networks = getAllNetworks()
