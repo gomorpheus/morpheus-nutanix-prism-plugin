@@ -105,15 +105,16 @@ class NutanixPrismComputeUtility {
 				nic_list: runConfig.nicList,
 		]
 
+		if(runConfig.diskList.size() > 1 || runConfig.uefi) {
+			resources['boot_config'] = [boot_device: [disk_address:[adapter_type:runConfig.storageType.toUpperCase(), device_index:0]]]
+		}
+
 		if(runConfig.uefi) {
-			resources['boot_config'] = [
-					boot_type: "UEFI"
-			]
+			resources['boot_config'] = resources['boot_config'] ?:[:]
+			resources['boot_config']['boot_type'] = "UEFI"
 			if(runConfig.secureBoot) {
 				resources['machine_type'] = "Q35"
-				resources['boot_config'] = [
-						boot_type: "SECURE_BOOT"
-				]
+				resources['boot_config']['boot_type'] = "SECURE_BOOT"
 			}
 		}
 
