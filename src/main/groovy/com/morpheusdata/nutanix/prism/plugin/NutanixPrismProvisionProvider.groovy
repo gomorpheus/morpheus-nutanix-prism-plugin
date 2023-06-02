@@ -219,6 +219,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	}
 
 	@Override
+	Boolean hasCloneTemplate() {
+		return true
+	}
+
+	@Override
 	ServiceResponse getNoVNCConsoleUrl(ComputeServer server) {
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		def consoleInfo = NutanixPrismComputeUtility.getVMConsoleUrl(authConfig, server.externalId, server?.resourcePool?.externalId)
