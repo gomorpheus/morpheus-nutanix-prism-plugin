@@ -84,7 +84,7 @@ class NetworksSync {
 							networkConfig.config = [vpc: cloudItem.spec.resources.vpc_reference.uuid]
 						}
 						if(clusterId) {
-							networkConfig.displayName = "${cloudItem.status.name} (${cluster.name})"
+							networkConfig.displayName = "${cloudItem.status.name} ${cluster.name}"
 						}
 
 						Network networkAdd = new Network(networkConfig)

@@ -126,7 +126,38 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				required : false,
 				optionSource : 'nutanixPrismNodeImage'
 		])
-		return [imageOption]
+		OptionType logFolder = new OptionType([
+			name : 'mountLogs',
+			code : 'nutanix-prism-node-log-folder',
+			fieldName : 'mountLogs',
+			fieldContext : 'domain',
+			fieldLabel : 'Log Folder',
+			inputType : OptionType.InputType.TEXT,
+			displayOrder : 101,
+			required : false,
+		])
+		OptionType configFolder = new OptionType([
+			name : 'mountConfig',
+			code : 'nutanix-prism-node-config-folder',
+			fieldName : 'mountConfig',
+			fieldContext : 'domain',
+			fieldLabel : 'Config Folder',
+			inputType : OptionType.InputType.TEXT,
+			displayOrder : 102,
+			required : false,
+		])
+		OptionType deployFolder = new OptionType([
+			name : 'mountData',
+			code : 'nutanix-prism-node-deploy-folder',
+			fieldName : 'mountData',
+			fieldContext : 'domain',
+			fieldLabel : 'Deploy Folder',
+			inputType : OptionType.InputType.TEXT,
+			displayOrder : 103,
+			helpText: '(Optional) If using deployment services, this mount point will be replaced with the contents of said deployments.',
+			required : false,
+		])
+		return [imageOption, logFolder, configFolder, deployFolder]
 	}
 
 	@Override
@@ -1527,16 +1558,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 								def disks = serverDetail.diskList
 
 								//some ugly matching
-								def volumeTypeCountMap = [:]
+								def volumeCount = 0
 								def volumes = server.volumes.sort { it.displayOrder }
 								for (int i = 0; i < volumes.size(); i++) {
 									def volume = volumes[i]
-									if (!volumeTypeCountMap[volume.type.name]) {
-										volumeTypeCountMap[volume.type.name] = 0
-									}
-									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeTypeCountMap[volume.type.name] }
+									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeCount }
 									volume.externalId = newDisk?.uuid
-									volumeTypeCountMap[volume.type.name]++
+									volumeCount++
 								}
 								morpheusContext.storageVolume.save(volumes).blockingGet()
 								server = saveAndGet(server)
