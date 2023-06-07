@@ -1437,7 +1437,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			server.sourceImage = virtualImage
 			server.serverOs = runConfig.serverOs
 			server.osType = runConfig.osType
-			server.osDevice = '/dev/vda'
+			server.osDevice = '/dev/sda'
 			server.lvmEnabled = false
 			if(runConfig.osType == 'windows') {
 				server.guestConsoleType = ComputeServer.GuestConsoleType.rdp
@@ -1564,6 +1564,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 									def volume = volumes[i]
 									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeCount }
 									volume.externalId = newDisk?.uuid
+
+									def deviceName = ''
+									if(newDisk.device_properties.disk_address.adapter_type == 'SCSI' || newDisk.device_properties.disk_address.adapter_type == 'SATA') {
+										deviceName += 'sd'
+									} else {
+										deviceName += 'hd'
+									}
+									def letterIndex = ['a','b','c','d','e','f','g','h','i','j','k','l']
+									def indexPos = newDisk.device_properties?.disk_address?.device_index ?: 0
+									deviceName += letterIndex[indexPos]
+									volume.deviceName = '/dev/' + deviceName
+									volume.deviceDisplayName = deviceName
 									volumeCount++
 								}
 								morpheusContext.storageVolume.save(volumes).blockingGet()
@@ -1605,8 +1617,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		try {
 			if(workloadResponse.success == true) {
 				server.statusDate = new Date()
-				server.osDevice = '/dev/vda'
-				server.dataDevice = '/dev/vda'
+				server.osDevice = '/dev/sda'
+				server.dataDevice = '/dev/sda'
 				server.lvmEnabled = false
 				server.capacityInfo = new ComputeCapacityInfo(maxCores:runConfig.maxCores, maxMemory:workload.maxMemory,
 						maxStorage:getContainerVolumeSize(workload))
