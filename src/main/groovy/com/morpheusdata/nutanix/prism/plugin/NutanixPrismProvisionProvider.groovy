@@ -157,7 +157,51 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			helpText: '(Optional) If using deployment services, this mount point will be replaced with the contents of said deployments.',
 			required : false,
 		])
-		return [imageOption, logFolder, configFolder, deployFolder]
+		OptionType checkTypeCode = new OptionType([
+			name : 'checkTypeCode',
+			code : 'nutanix-prism-node-check-type-code',
+			fieldName : 'checkTypeCode',
+			fieldContext : 'domain',
+			fieldLabel : 'Check Type Code',
+			inputType : OptionType.InputType.HIDDEN,
+			defaultValue: 'vmCheck',
+			displayOrder : 104,
+			required : false,
+		])
+		OptionType statTypeCode = new OptionType([
+			name : 'statTypeCode',
+			code : 'nutanix-prism-node-stat-type-code',
+			fieldName : 'statTypeCode',
+			fieldContext : 'domain',
+			fieldLabel : 'Stat Type Code',
+			inputType : OptionType.InputType.HIDDEN,
+			defaultValue: 'vm',
+			displayOrder : 105,
+			required : false,
+		])
+		OptionType logTypeCode = new OptionType([
+			name : 'logTypeCode',
+			code : 'nutanix-prism-node-log-type-code',
+			fieldName : 'logTypeCode',
+			fieldContext : 'domain',
+			fieldLabel : 'Log Type Code',
+			inputType : OptionType.InputType.HIDDEN,
+			defaultValue: 'vm',
+			displayOrder : 106,
+			required : false,
+		])
+		OptionType showServerLogs = new OptionType([
+			name : 'showServerLogs',
+			code : 'nutanix-prism-node-show-server-logs',
+			fieldName : 'showServerLogs',
+			fieldContext : 'domain',
+			fieldLabel : 'Show Server Logs',
+			inputType : OptionType.InputType.HIDDEN,
+			defaultValue: true,
+			displayOrder : 107,
+			required : false,
+		])
+		return [imageOption, logFolder, configFolder, deployFolder, checkTypeCode, statTypeCode, showServerLogs, logTypeCode]
 	}
 
 	@Override
