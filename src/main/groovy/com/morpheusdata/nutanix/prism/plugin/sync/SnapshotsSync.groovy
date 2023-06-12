@@ -126,7 +126,7 @@ class SnapshotsSync {
 
 	private Map getAllVms() {
 		log.debug "getAllVms: ${cloud}"
-		def vmIds = morpheusContext.computeServer.listSyncProjections(cloud.id).map{it.id}.toList().blockingGet()
+		def vmIds = morpheusContext.computeServer.listIdentityProjections(cloud.id, null).map{it.id}.toList().blockingGet()
 		def vmsMap = morpheusContext.computeServer.listById(vmIds).toMap {it.externalId}.blockingGet()
 		vmsMap
 	}

@@ -41,7 +41,7 @@ class VirtualMachinesSync {
 
 			def listResults = NutanixPrismComputeUtility.listVMs(apiClient, authConfig)
 			if(listResults.success) {
-				def domainRecords = morpheusContext.computeServer.listSyncProjections(cloud.id).filter { ComputeServerIdentityProjection projection ->
+				def domainRecords = morpheusContext.computeServer.listIdentityProjections(cloud.id, null).filter { ComputeServerIdentityProjection projection ->
 					projection.computeServerTypeCode != 'nutanix-prism-hypervisor'
 				}
 				def blackListedNames = domainRecords.filter {it.status == 'provisioning'}.map {it.name}.toList().blockingGet()
@@ -269,7 +269,7 @@ class VirtualMachinesSync {
 
 	private Map getAllHosts() {
 		log.debug "getAllHosts: ${cloud}"
-		def hostIdentitiesMap = morpheusContext.computeServer.listSyncProjections(cloud.id).filter {
+		def hostIdentitiesMap = morpheusContext.computeServer.listIdentityProjections(cloud.id, null).filter {
 			it.computeServerTypeCode == 'nutanix-prism-hypervisor'
 		}.toMap {it.externalId }.blockingGet()
 		hostIdentitiesMap

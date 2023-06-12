@@ -66,7 +66,7 @@ class HostsSync {
 				if (diskResults.success) {
 					def cloudHostDisks = diskResults?.data
 					
-					def domainRecords = morpheusContext.computeServer.listSyncProjections(cloud.id).filter { ComputeServerIdentityProjection projection ->
+					def domainRecords = morpheusContext.computeServer.listIdentityProjections(cloud.id, null).filter { ComputeServerIdentityProjection projection ->
 						if (projection.category == "nutanix.prism.host.${cloud.id}") {
 							return true
 						}

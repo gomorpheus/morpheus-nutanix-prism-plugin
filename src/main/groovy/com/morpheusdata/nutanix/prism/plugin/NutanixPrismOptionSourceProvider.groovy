@@ -119,16 +119,41 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 	}
 
 	def nutanixPrismCategories(args){
-		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
-		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
-		def options = morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).map{  [name: it.externalId, value: it.externalId] }.toList().blockingGet().sort({it.name})
-		options
+		def cloudId = getCloudId(args)
+		if(cloudId) {
+			Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
+			def options = morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).map { [name: it.externalId, value: it.externalId] }.toList().blockingGet().sort({ it.name })
+			return options
+		} else {
+			return []
+		}
 	}
 
 	def nutanixPrismCluster(args){
-		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
-		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
-		def options = morpheusContext.cloud.pool.listSyncProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}").map {[name: it.name, value: it.externalId]}.toSortedList {it.name}.blockingGet()
-		options
+		def cloudId = getCloudId(args)
+		if(cloudId) {
+			Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
+			def options = morpheusContext.cloud.pool.listSyncProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}").map {[name: it.name, value: it.externalId]}.toSortedList {it.name}.blockingGet()
+			return options
+		} else {
+			return []
+		}
+	}
+
+	private static getCloudId(args) {
+		def cloudId = null
+		if(args?.size() > 0) {
+			def firstArg =  args.getAt(0)
+			if(firstArg?.zoneId) {
+				cloudId = firstArg.zoneId.toLong()
+				return cloudId
+			}
+			if(firstArg?.domain?.zone?.id) {
+				cloudId = firstArg.domain.zone.id.toLong()
+				return cloudId
+			}
+		}
+		return cloudId
+
 	}
 }
