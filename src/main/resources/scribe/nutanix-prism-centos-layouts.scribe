@@ -61,6 +61,7 @@ resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	portCount = 1
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	serverType = "vm"
 	containers = [
 		workload-type-set.nutanix-prism-centos-7_3-set
@@ -144,6 +145,7 @@ resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	portCount = 1
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	serverType = "vm"
 	containers = [
 		workload-type-set.nutanix-prism-centos-7_5-set
@@ -227,6 +229,7 @@ resource "instance-type-layout" "nutanix-prism-centos-8-stream-single" {
 	portCount = 1
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	serverType = "vm"
 	containers = [
 		workload-type-set.nutanix-prism-centos-8-stream-set
@@ -310,6 +313,7 @@ resource "instance-type-layout" "nutanix-prism-centos-9-stream-single" {
 	portCount = 1
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	serverType = "vm"
 	containers = [
 		workload-type-set.nutanix-prism-centos-9-stream-set

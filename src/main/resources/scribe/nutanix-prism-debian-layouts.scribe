@@ -63,6 +63,7 @@ resource "instance-type-layout" "nutanix-prism-debian-10-single" {
 	serverType = "vm"
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-debian-10-set
 	]
@@ -147,6 +148,7 @@ resource "instance-type-layout" "nutanix-prism-debian-11-single" {
 	serverType = "vm"
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-debian-11-set
 	]

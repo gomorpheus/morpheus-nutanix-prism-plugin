@@ -81,6 +81,7 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 	serverType = "vm"
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-ubuntu-18_04-set
 	]
@@ -167,6 +168,7 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-20_04-single" {
 	serverType = "vm"
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-ubuntu-20_04-set
 	]
@@ -252,6 +254,7 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-22_04-single" {
 	serverType = "vm"
 	enabled = true
 	creatable = true
+	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-ubuntu-22_04-set
 	]

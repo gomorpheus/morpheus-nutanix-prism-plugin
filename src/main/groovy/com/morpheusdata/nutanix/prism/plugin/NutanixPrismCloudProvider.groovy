@@ -177,7 +177,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		unmanagedType.name = 'Nutanix Prism Instance'
 		unmanagedType.code = 'nutanix-prism-unmanaged'
 		unmanagedType.description = 'Nutanix Prism Instance'
-		unmanagedType.reconfigureSupported = true
+		unmanagedType.reconfigureSupported = false
 		unmanagedType.hasAutomation = true
 		unmanagedType.supportsConsoleKeymap = true
 		unmanagedType.platform = PlatformType.linux
