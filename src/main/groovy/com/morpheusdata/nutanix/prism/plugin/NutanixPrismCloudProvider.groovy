@@ -141,11 +141,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		serverType.name = 'Nutanix Prism Central Server'
 		serverType.code = 'nutanix-prism-server'
 		serverType.description = 'Nutanix Prism Central Server'
-		serverType.reconfigureSupported = false
+		serverType.reconfigureSupported = true
 		serverType.hasAutomation = false
 		serverType.supportsConsoleKeymap = true
 		serverType.platform = PlatformType.none
-		serverType.managed = false
+		serverType.managed = true
 		serverType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		serverType.nodeType = 'morpheus-vm-node'
 
