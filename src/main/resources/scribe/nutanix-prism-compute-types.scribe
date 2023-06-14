@@ -47,6 +47,10 @@ resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
 	type = "nutanix-prism-vm"
 	groupType = "docker-cluster"
 	computeServers = ["docker-nutanix-prism-ubuntu-16.04-set"]
+	optionTypes = [
+		{code = "nutanix-prism-provision-cluster"},
+		{code = "nutanix-prism-provision-categories"},
+	]
 	provisionType = "nutanix-prism-provision-provider"
 }
 
@@ -161,6 +165,8 @@ resource "compute-type-layout" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-sin
 	groupType = "kubernetes-cluster"
 	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = [
+		{code = "nutanix-prism-provision-cluster"},
+		{code = "nutanix-prism-provision-categories"},
 		{code = "kubernetes.master.podCidr"},
 		{code = "kubernetes.master.serviceCidr"}
 	]
