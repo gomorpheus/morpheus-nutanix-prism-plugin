@@ -1572,12 +1572,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			diskList << diskConfig
 		}
 		def nicList = []
-		def networkIds = config.networkInterfaces.collect {
+		def serverInterfaces = server.interfaces?.sort {it.displayOrder}
+		def networkIds = serverInterfaces.collect {
 			it.network?.id?.toLong()
 		}
 		networkIds = networkIds.unique()
 		def networks = morpheusContext.network.listById(networkIds).toMap { it.id.toLong()}.blockingGet()
-		def serverInterfaces = server.interfaces?.sort {it.displayOrder}
 		serverInterfaces?.each { networkInterface ->
 			def netId = networkInterface?.network?.id?.toLong()
 			def net = netId ? networks[netId] : null
