@@ -1722,8 +1722,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			Map proxyConfiguration = workloadRequest?.proxyConfiguration ?: hostRequest?.proxyConfiguration ?: null
 			client.networkProxy = buildNetworkProxy(proxyConfiguration)
 
-
-			if(runConfig.cloneContainerId) {
+			if(runConfig.snapshotId) {
+				createResults = NutanixPrismComputeUtility.cloneSnapshot(client, authConfig, runConfig, runConfig.snapshotId as String)
+				log.debug("clone snapshot results: ${createResults}")
+			} else if(runConfig.cloneContainerId) {
 				sourceWorkload = morpheusContext.workload.get(runConfig.cloneContainerId).blockingGet()
 				def sourceServer = sourceWorkload?.server
 				def vmUuid = sourceServer?.externalId
@@ -1764,7 +1766,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				if(taskResults.success) {
 					if(createResults.data?.task_uuid) {
 						def sourceServer = sourceWorkload?.server
-						if(server?.serverOs?.platform != 'windows') {
+						if(sourceServer && server?.serverOs?.platform != 'windows') {
 							getPlugin().morpheus.executeCommandOnServer(sourceServer, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
 						}
 						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}.uuid

@@ -116,7 +116,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 		def snapshotName = "${server.name}.${server.id}.${System.currentTimeMillis()}".toString()
 
 		if(server.serverOs?.platform != 'windows') {
-			getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old ; sync', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
+			def x = getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old; sudo rm -f /etc/machine-id; sudo touch /etc/machine-id ; sync ; sync ; sleep 5', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
 		}
 
 		def snapshotResult = NutanixPrismComputeUtility.createSnapshot(client, authConfig, server.resourcePool?.externalId, vmUuid, snapshotName)
@@ -224,7 +224,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 
 			if([BackupStatusUtility.FAILED, BackupStatusUtility.CANCELLED, BackupStatusUtility.SUCCEEDED].contains(rtn.data.backupResult.status)) {
 				if(computeServer && computeServer.sourceImage && computeServer.sourceImage.isCloudInit && computeServer.serverOs?.platform != 'windows') {
-					getPlugin().morpheus.executeCommandOnServer(computeServer, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, computeServer.sshUsername, computeServer.sshPassword, null, null, null, null, true, true).blockingGet()
+					getPlugin().morpheus.executeCommandOnServer(computeServer, "sleep 5; sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, computeServer.sshUsername, computeServer.sshPassword, null, null, null, null, true, true).blockingGet()
 				}
 			}
 		} catch(Exception e) {

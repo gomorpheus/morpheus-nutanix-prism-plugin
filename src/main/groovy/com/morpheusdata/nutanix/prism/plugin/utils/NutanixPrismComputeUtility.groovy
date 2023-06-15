@@ -196,7 +196,39 @@ class NutanixPrismComputeUtility {
 		if(results?.success) {
 			return ServiceResponse.success(results.data)
 		} else {
-			return ServiceResponse.error("Error creating vm for ${runConfig.name}", null, results.data)
+			return ServiceResponse.error("Error cloning vm for ${runConfig.name}", null, results.data)
+		}
+	}
+
+	static ServiceResponse cloneSnapshot(HttpApiClient client, Map authConfig, Map runConfig, String snapshotUuid) {
+		log.debug("cloneSnapshot")
+
+		def clusterUuid = runConfig.clusterReference?.uuid
+
+		def body = [
+			spec_list: [
+				[
+					name: runConfig.name,
+					num_vcpus: runConfig.numSockets,
+					memory_mb: runConfig.maxMemory,
+					num_cores_per_vcpu: runConfig.coresPerSocket,
+					override_network_config: false
+				]
+			],
+			vm_customization_config: [
+			   userdata: runConfig.cloudInitUserData,
+			   fresh_install: false
+			]
+
+		]
+
+
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2BasePath}/${snapshotUuid}/clone", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], body: body, ignoreSSL: true), 'POST')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error cloning snapshot vm for ${runConfig.name}", null, results.data)
 		}
 	}
 
