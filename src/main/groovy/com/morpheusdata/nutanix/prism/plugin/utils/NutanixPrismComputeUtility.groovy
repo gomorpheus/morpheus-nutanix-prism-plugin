@@ -503,36 +503,6 @@ class NutanixPrismComputeUtility {
 	}
 
 
-//
-//	static ServiceResponse restoreSnapshot(opts) {
-//		def rtn = [success: false]
-//		def apiUrl = getNutanixApiUrl(opts.zone)
-//		def username = getNutanixUsername(opts.zone)
-//		def password = getNutanixPassword(opts.zone)
-//		def vmUuid
-//		def vmResult = loadVirtualMachine(opts, opts.vmId)
-//		if(vmResult?.success){
-//			vmUuid = vmResult.vmDetails.vmId
-//
-//			def body = [restore_network_configuration: true, snapshot_uuid: opts.snapshotId, uuid: vmUuid]
-//			log.info("Create snapshot body: ${body}")
-//			def headers = buildHeaders(null, username, password)
-//			def requestOpts = [headers:headers, body: body, proxySettings: opts.proxySettings]
-//			def results = ApiUtility.callJsonApi(apiUrl, v2Api + 'vms/' + vmUuid + '/restore' , null, null, requestOpts, 'POST')
-//			rtn.success = results?.success && results?.error != true
-//			if(rtn.success == true) {
-//				rtn.results = results.data
-//				log.info("restoreSnapshot: ${rtn.results}")
-//			}
-//		} else {
-//			rtn.msg = "VM not found: ${opts.vmId}"
-//		}
-//		return rtn
-//	}
-//
-
-
-
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
 		log.debug("listNetworks")
 		return callListApi(client, 'subnet', 'subnets/list', authConfig)
