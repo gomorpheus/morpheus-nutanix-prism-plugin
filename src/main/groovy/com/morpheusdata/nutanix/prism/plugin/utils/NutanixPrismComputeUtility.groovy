@@ -223,7 +223,7 @@ class NutanixPrismComputeUtility {
 		]
 
 
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/${snapshotUuid}/clone", authConfig.username, authConfig.password,
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots/${snapshotUuid}/clone", authConfig.username, authConfig.password,
 			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], body: body, ignoreSSL: true), 'POST')
 		if(results?.success) {
 			return ServiceResponse.success(results.data)
