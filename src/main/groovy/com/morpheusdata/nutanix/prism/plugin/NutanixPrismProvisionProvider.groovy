@@ -1448,10 +1448,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		}
 		def maxStorage = rootVolume.getMaxStorage()
 		def numSockets = maxCores / coresPerSocket
-		
+
+		def serverConfig = server.getConfigMap()
+//		if(!serverConfig?.clusterName && server.serverGroup) {
+//			def serverGroupConfig = server.serverGroup.getConfigMap()
+//			serverConfig.clusterName = serverGroupConfig.clusterName
+//			serverConfig.categories = serverGroupConfig.categories
+//		}
 
 
-		def runConfig = [:] + opts + buildRunConfig(server, imageExternalId, hostRequest.networkConfiguration, server.getConfigMap())
+		def runConfig = [:] + opts + buildRunConfig(server, imageExternalId, hostRequest.networkConfiguration, serverConfig)
 		runConfig += [
 			name              : server.name,
 			accountId         : server.account.id,

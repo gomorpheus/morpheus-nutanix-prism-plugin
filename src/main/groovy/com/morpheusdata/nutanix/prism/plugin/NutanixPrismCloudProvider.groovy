@@ -215,6 +215,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeMasterType.agentType = ComputeServerType.AgentType.host
 		kubeMasterType.clusterType = ComputeServerType.ClusterType.kubernetes
 		kubeMasterType.computeTypeCode = 'kube-master'
+		kubeMasterType.nodeType = 'kube-master'
 
 		ComputeServerType kubeWorkerType = new ComputeServerType()
 		kubeWorkerType.name = 'Nutanix Prism Kubernetes Worker'
@@ -230,6 +231,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeWorkerType.agentType = ComputeServerType.AgentType.host
 		kubeWorkerType.clusterType = ComputeServerType.ClusterType.kubernetes
 		kubeWorkerType.computeTypeCode = 'kube-worker'
+		kubeWorkerType.nodeType = 'kube-worker'
 
 		[hypervisorType, serverType, vmType, windowsType, unmanagedType, linuxDockerType, kubeMasterType, ]
 	}
