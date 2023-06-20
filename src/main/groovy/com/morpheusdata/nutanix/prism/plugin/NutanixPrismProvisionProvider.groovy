@@ -299,10 +299,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		return "vm"
 	}
 
-//	@Override
-//	String getDeployTargetService() {
-//		return "vmDeployTargetService"
-//	}
+	@Override
+	String getDeployTargetService() {
+		return "vmDeployTargetService"
+	}
 
 	@Override
 	Boolean hasCloneTemplate() {
@@ -1450,11 +1450,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		def numSockets = maxCores / coresPerSocket
 
 		def serverConfig = server.getConfigMap()
-//		if(!serverConfig?.clusterName && server.serverGroup) {
-//			def serverGroupConfig = server.serverGroup.getConfigMap()
-//			serverConfig.clusterName = serverGroupConfig.clusterName
-//			serverConfig.categories = serverGroupConfig.categories
-//		}
+		if(!serverConfig?.clusterName && server.serverGroup) {
+			def serverGroupConfig = server.serverGroup.getConfigMap()
+			serverConfig.clusterName = serverGroupConfig.clusterName
+			serverConfig.categories = serverGroupConfig.categories
+		}
 
 
 		def runConfig = [:] + opts + buildRunConfig(server, imageExternalId, hostRequest.networkConfiguration, serverConfig)
@@ -1723,6 +1723,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			//main create or clone
 			log.debug("create server: ${runConfig}")
 			def createResults
+			def needsNewCloudInit = false
 
 			HttpApiClient client = new HttpApiClient()
 			Map proxyConfiguration = workloadRequest?.proxyConfiguration ?: hostRequest?.proxyConfiguration ?: null
@@ -1730,6 +1731,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 			if(runConfig.snapshotId) {
 				createResults = NutanixPrismComputeUtility.cloneSnapshot(client, authConfig, runConfig, runConfig.snapshotId as String)
+				needsNewCloudInit = true
 				log.debug("clone snapshot results: ${createResults}")
 			} else if(runConfig.cloneContainerId) {
 				sourceWorkload = morpheusContext.workload.get(runConfig.cloneContainerId).blockingGet()
@@ -1781,6 +1783,27 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 						server = saveAndGet(server)
 					}
 					def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
+					if(needsNewCloudInit) {
+						//upload cloud-init iso
+						def applianceServerUrl = workloadRequest?.cloudConfigOpts?.applianceUrl ?: hostRequest?.cloudConfigOpts?.applianceUrl ?: null
+						if(applianceServerUrl) {
+							def fileName = "morpheus_${server.id}.iso"
+							def fileUrl = applianceServerUrl + (applianceServerUrl.endsWith('/') ? '' : '/') + 'api/cloud-config/' + server.apiKey
+							def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", fileUrl)
+							def imageExternalId
+							if (imageResults.success) {
+								imageExternalId = imageResults.data.metadata.uuid
+								waitForImageComplete(client, authConfig, imageExternalId)
+							} else {
+								log.debug "Error configuring cloud-init - failed to upload iso"
+							}
+							def cloudInitResults = NutanixPrismComputeUtility.cloudInitViaCD(client, authConfig, server.externalId, imageExternalId, vmResource.data)
+							vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
+							log.debug("cloudInitResults: ${cloudInitResults}")
+						} else {
+							log.debug "Error configuring cloud-init - no appliance url"
+						}
+					}
 					def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
 					log.debug("start: ${startResults.success}")
 					if (startResults.success) {

@@ -590,6 +590,25 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse cloudInitViaCD(HttpApiClient client, Map authConfig, String vmUuid, String imageUuid, Map vmBody) {
+		log.debug("cloudInitViaCD")
+		def cdromDisk = vmBody?.spec?.resources?.disk_list?.find { it.device_properties?.device_type == 'CDROM' }
+
+		if(cdromDisk) {
+			cdromDisk.data_source_reference = [kind: 'image', uuid: imageUuid]
+		} else {
+			vmBody?.spec?.resources?.disk_list?.add([
+					device_properties: [
+							device_type: 'CDROM'
+					],
+					data_source_reference: [kind: 'image', uuid: imageUuid]
+			])
+		}
+
+		return updateVm(client, authConfig, vmUuid, vmBody)
+	}
+
+
 	private static ServiceResponse callListApi(HttpApiClient client, String kind, String path, Map authConfig) {
 		log.debug("callListApi: kind ${kind}, path: ${path}")
 		def rtn = new ServiceResponse(success: false)
