@@ -233,7 +233,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeWorkerType.computeTypeCode = 'kube-worker'
 		kubeWorkerType.nodeType = 'kube-worker'
 
-		[hypervisorType, serverType, vmType, windowsType, unmanagedType, linuxDockerType, kubeMasterType, ]
+		[hypervisorType, serverType, vmType, windowsType, unmanagedType, linuxDockerType, kubeMasterType, kubeWorkerType]
 	}
 
 	@Override

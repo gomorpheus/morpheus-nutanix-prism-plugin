@@ -119,6 +119,9 @@ class ImagesSync {
 		addList?.each {
 			def imageConfig = buildVirtualImageConfig(it)
 			def add = new VirtualImage(imageConfig)
+			def locationConfig = buildLocationConfig(add)
+			VirtualImageLocation location = new VirtualImageLocation(locationConfig)
+			add.imageLocations = [location]
 			addExternalIds << add.externalId
 			adds << add
 		}
@@ -127,29 +130,6 @@ class ImagesSync {
 		log.debug "About to create ${adds.size()} virtualImages"
 		morpheusContext.virtualImage.create(adds, cloud).blockingGet()
 
-		// Fetch the images that we just created
-		def imageMap = morpheusContext.virtualImage.listSyncProjections(cloud.id).filter { VirtualImageIdentityProjection proj ->
-			addExternalIds.contains(proj.externalId)
-		}.toMap { it.externalId  }.blockingGet()
-
-		// Now add the locations
-		def locationAdds = []
-		adds?.each { add ->
-			log.debug "Adding location for ${add.externalId}"
-			VirtualImageIdentityProjection virtualImageLocationProj = imageMap[add.externalId]
-			if(virtualImageLocationProj) {
-				def locationConfig = buildLocationConfig(virtualImageLocationProj)
-				VirtualImageLocation location = new VirtualImageLocation(locationConfig)
-				locationAdds << location
-			} else {
-				log.warn "Unable to find virtualImage for ${add.externalId}"
-			}
-		}
-
-		if(locationAdds) {
-			log.debug "About to create ${locationAdds.size()} locations"
-			morpheusContext.virtualImage.location.create(locationAdds, cloud).blockingGet()
-		}
 	}
 
 	private addMissingVirtualImageLocationsForImages(List<SyncTask.UpdateItem<VirtualImage, Map>> addItems) {
