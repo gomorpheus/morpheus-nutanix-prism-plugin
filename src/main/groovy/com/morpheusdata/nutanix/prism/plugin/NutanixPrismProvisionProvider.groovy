@@ -459,7 +459,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			log.error("validateWorkload error: ${e}", e)
 		}
 		return rtn
-		return ServiceResponse.error()
 	}
 
 	@Override
