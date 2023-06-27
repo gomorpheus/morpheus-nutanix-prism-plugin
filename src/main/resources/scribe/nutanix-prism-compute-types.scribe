@@ -40,7 +40,7 @@ resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
 	name = "Nutanix Prism Central Docker Ubuntu 16.04"
 	sortOrder = 5
 	computeVersion = "16.04"
-	description = "This will provision a single docker host vm in nutanix prism central"
+	description = "This will provision a single docker host vm in nutanix prism central."
 	serverCount = 1
 	memoryRequirement = 1024 * 1024 * 1024
 	hasAutoScale = true

@@ -446,7 +446,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			}
 
 			def validateTemplate = opts.template != null
-			NutanixPrismOptionSourceProvider optionSourceProvider = plugin.getProviderByCode('nutanix-prism-option-source')
 			def validationResults = NutanixPrismComputeUtility.validateServerConfig(morpheusContext, apiInfo.apiUrl, apiInfo.apiUsername, apiInfo.apiPassword,
 					[validateTemplate:validateTemplate] + opts)
 			if(!validationResults.success) {
