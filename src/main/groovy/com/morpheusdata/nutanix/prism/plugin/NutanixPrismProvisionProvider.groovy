@@ -666,7 +666,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			if (hostResponse.success != true) {
 				return new ServiceResponse(success: false, msg: hostResponse.message ?: 'vm config error', error: hostResponse.message, data: hostResponse)
 			} else {
-				return new ServiceResponse<WorkloadResponse>(success: true, data: hostResponse)
+				return new ServiceResponse<HostResponse>(success: true, data: hostResponse)
 			}
 		} catch(e) {
 			log.error "runHost: ${e}", e
@@ -1062,7 +1062,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 				if(deleteResults.success == true) {
 					log.info("resize network delete complete: ${deleteResults.success}")
 					resizeRequest.interfacesDelete?.each { ComputeServerInterface networkDelete ->
-						morpheusContext.computeServer.computeServerInterface.remove([networkDelete]).blockingGet()
+						morpheusContext.computeServer.computeServerInterface.remove([networkDelete], server).blockingGet()
 					}
 				}
 			}
@@ -1576,15 +1576,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			diskList << diskConfig
 		}
 		def nicList = []
-		def serverInterfaces = server.interfaces?.sort {it.displayOrder}
-		def networkIds = serverInterfaces.collect {
-			it.network?.id?.toLong()
-		}
-		networkIds = networkIds.unique()
-		def networks = morpheusContext.network.listById(networkIds).toMap { it.id.toLong()}.blockingGet()
-		serverInterfaces?.each { networkInterface ->
-			def netId = networkInterface?.network?.id?.toLong()
-			def net = netId ? networks[netId] : null
+		if(networkConfiguration.primaryInterface) {
+			def networkInterface = networkConfiguration.primaryInterface
+			def net = networkInterface.network
 			if(net) {
 				def networkConfig = [
 						is_connected    : true,
@@ -1602,6 +1596,29 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 					]
 				}
 				nicList << networkConfig
+			}
+		}
+		if(networkConfiguration.extraInterfaces.size() > 0) {
+			networkConfiguration.extraInterfaces.each { networkInterface ->
+				def net = networkInterface.network
+				if(net) {
+					def networkConfig = [
+						is_connected    : true,
+						subnet_reference: [
+							uuid: net.externalId,
+							name: net.name,
+							kind: "subnet"
+						]
+					]
+					if(networkInterface.ipAddress) {
+						networkConfig["ip_endpoint_list"] = [
+							[
+								"ip": networkInterface.ipAddress
+							]
+						]
+					}
+					nicList << networkConfig
+				}
 			}
 		}
 
@@ -1914,27 +1931,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		def resourcePoolProjectionIds = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').map{it.id}.toList().blockingGet()
 		def resourcePoolsMap = morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId}.blockingGet()
 		resourcePoolsMap
-	}
-
-	protected HostResponse workloadResponseToHostResponse(WorkloadResponse workloadResponse) {
-		HostResponse hostResponse = new HostResponse([
-			unattendCustomized: workloadResponse.unattendCustomized,
-			externalId        : workloadResponse.externalId,
-			publicIp          : workloadResponse.publicIp,
-			privateIp         : workloadResponse.privateIp,
-			installAgent      : workloadResponse.installAgent,
-			noAgent           : workloadResponse.noAgent,
-			createUsers       : workloadResponse.createUsers,
-			success           : workloadResponse.success,
-			customized        : workloadResponse.customized,
-			licenseApplied    : workloadResponse.licenseApplied,
-			poolId            : workloadResponse.poolId,
-			hostname          : workloadResponse.hostname,
-			message           : workloadResponse.message,
-			skipNetworkWait   : workloadResponse.skipNetworkWait
-		])
-
-		return hostResponse
 	}
 
 }

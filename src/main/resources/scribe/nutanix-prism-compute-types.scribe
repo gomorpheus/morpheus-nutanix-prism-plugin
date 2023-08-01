@@ -57,7 +57,7 @@ resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
 
 //kubernetes
 resource "workload-type" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism" {
-	code = "kubernetes-1.26_.1-ubuntu-20.04-nutanix-prism"
+	code = "kubernetes-1.26.1-ubuntu-20.04-nutanix-prism"
 	shortName = "kubernetes-ubuntu"
 	name = "Kubernetes 1.26 Cluster on Ubuntu 20.04"
 	containerVersion = "1.26.1"
@@ -86,7 +86,7 @@ resource "workload-type" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism" {
 }
 
 resource "workload-type" "kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism" {
-	code = "kubernetes-1.26_.1-ubuntu-20.04-worker-nutanix-prism"
+	code = "kubernetes-1.26.1-ubuntu-20.04-worker-nutanix-prism"
 	shortName = "kubernetes-worker-ubuntu"
 	name = "Kubernetes 1.26 Worker on Ubuntu 20.04"
 	containerVersion = "1.26.1"
@@ -148,6 +148,7 @@ resource "compute-type-set" "kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism
 resource "compute-type-layout" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-single" {
 	code = "kubernetes-1.26.1-ubuntu-20.04-nutanix-prism-single"
 	name = "MKS Kubernetes 1.26 Cluster on Ubuntu 20.04"
+	enabled = true
 	sortOrder = 10
 	computeVersion = "20.04"
 	clusterVersion = "1.26.1"
