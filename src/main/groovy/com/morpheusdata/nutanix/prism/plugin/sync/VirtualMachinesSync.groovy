@@ -30,7 +30,7 @@ class VirtualMachinesSync {
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
 		this.createNew = createNew
-		this.netTypes = nutanixPrismPlugin.getCloudProvider().getProvisioningProvider('nutanix-prism-provision-provider').getComputeServerInterfaceTypes()
+		this.netTypes = nutanixPrismPlugin.getCloudProvider().nutanixPrismProvisionProvider().getComputeServerInterfaceTypes()
 	}
 
 	def execute() {
