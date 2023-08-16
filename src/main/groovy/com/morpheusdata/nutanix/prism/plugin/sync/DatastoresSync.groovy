@@ -80,6 +80,7 @@ class DatastoresSync {
 					}
 					morpheusContext.cloud.datastore.create(adds).blockingGet()
 				}.onUpdate { List<SyncTask.UpdateItem<Datastore, Map>> updateItems ->
+					def updatedItems = []
 					for(item in updateItems) {
 						def masterItem = item.masterItem
 						Datastore existingItem = item.existingItem
@@ -121,8 +122,11 @@ class DatastoresSync {
 							save=true
 						}
 						if(save) {
-							morpheusContext.cloud.datastore.save([existingItem]).blockingGet()
+							updatedItems << existingItem
 						}
+					}
+					if(updatedItems.size() > 0 ) {
+						morpheusContext.cloud.datastore.save(updatedItems).blockingGet()
 					}
 				}.onDelete { removeItems ->
 					if(removeItems) {
