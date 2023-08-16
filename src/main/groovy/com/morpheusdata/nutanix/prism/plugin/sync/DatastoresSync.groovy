@@ -126,10 +126,7 @@ class DatastoresSync {
 					}
 				}.onDelete { removeItems ->
 					if(removeItems) {
-						def datastores = morpheusContext.cloud.datastore.listById(removeItems.collect { it.id }).toList().blockingGet()
-						datastores.each { Datastore removeItem ->
-							morpheusContext.cloud.datastore.remove([removeItem], removeItem.zonePool).blockingGet()
-						}
+						morpheusContext.cloud.datastore.remove(removeItems,null).blockingGet()
 					}
 				}.start()
 			}
