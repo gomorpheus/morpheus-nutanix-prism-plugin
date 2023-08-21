@@ -89,7 +89,7 @@ jar {
 				'Morpheus-Color': '#ffffff',
 				'Morpheus-Labels': 'Plugin, Cloud',
 				'Morpheus-Repo': 'https://github.com/gomorpheus/morpheus-nutanix-prism-plugin',
-				'Morpheus-Min-Appliance-Version': "6.0.6"
+				'Morpheus-Min-Appliance-Version': "6.2.2"
 		)
 	}
 }
@@ -115,7 +115,7 @@ tasks.assemble.dependsOn tasks.shadowJar
 tasks.register('moveToPlugin') {
 	doLast {
 		ant.move file: "${buildDir}/libs/${project.name}-${version}-all.jar",
-				todir: "../morpheus-plugins"
+			todir: "../morpheus-plugin-core/plugins"
 	}
 }
 

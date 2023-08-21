@@ -4,6 +4,12 @@ import com.bertramlabs.plugins.karman.CloudFile
 import com.morpheusdata.core.AbstractProvisionProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.providers.ComputeProvisionProvider
+import com.morpheusdata.core.providers.HostProvisionProvider
+import com.morpheusdata.core.providers.HypervisorConsoleProvider
+import com.morpheusdata.core.providers.ProvisionProvider
+import com.morpheusdata.core.providers.ResourceProvisionProvider
+import com.morpheusdata.core.providers.WorkloadProvisionProvider
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.Cloud
@@ -35,6 +41,7 @@ import com.morpheusdata.model.VirtualImageLocation
 import com.morpheusdata.model.Workload
 import com.morpheusdata.model.projection.SnapshotIdentityProjection
 import com.morpheusdata.model.provisioning.HostRequest
+import com.morpheusdata.model.provisioning.InstanceRequest
 import com.morpheusdata.model.provisioning.NetworkConfiguration
 import com.morpheusdata.model.provisioning.WorkloadRequest
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
@@ -42,6 +49,8 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.request.ResizeRequest
 import com.morpheusdata.request.UpdateModel
 import com.morpheusdata.response.HostResponse
+import com.morpheusdata.response.PrepareInstanceResponse
+import com.morpheusdata.response.ProvisionResponse
 import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.response.WorkloadResponse
 import groovy.json.JsonSlurper
@@ -51,7 +60,7 @@ import org.apache.http.client.utils.URIBuilder
 import java.util.concurrent.TimeUnit
 
 @Slf4j
-class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
+class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements HostProvisionProvider, WorkloadProvisionProvider, WorkloadProvisionProvider.ResizeFacet, HostProvisionProvider.ResizeFacet, ProvisionProvider.SnapshotFacet, ProvisionProvider.HypervisorConsoleFacet, ResourceProvisionProvider {
 
 	NutanixPrismPlugin plugin
 	MorpheusContext morpheusContext
@@ -59,6 +68,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	NutanixPrismProvisionProvider(NutanixPrismPlugin plugin, MorpheusContext context) {
 		this.plugin = plugin
 		this.morpheusContext = context
+	}
+
+	@Override
+	Boolean createServer() {
+		return true
 	}
 
 	@Override
@@ -264,10 +278,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 		[computeServerInterface]
 	}
 
-	@Override
-	Boolean hasSnapshots() {
-		return true
-	}
 
 	@Override
 	Boolean hasDatastores() {
@@ -458,12 +468,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			log.error("validateWorkload error: ${e}", e)
 		}
 		return rtn
-	}
-
-	@Override
-	ServiceResponse validateInstance(Instance instance, Map opts) {
-		log.debug "validateInstance: ${instance} ${opts}"
-		return ServiceResponse.success()
 	}
 
 	@Override
@@ -1137,6 +1141,31 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 	@Override
 	ServiceResponse createWorkloadResources(Workload workload, Map opts) {
 		return ServiceResponse.success()
+	}
+
+	@Override
+	ServiceResponse validateInstance(Instance instance, Map map) {
+		return ServiceResponse.success()
+	}
+
+	@Override
+	ServiceResponse<ProvisionResponse> updateInstance(Instance instance, InstanceRequest instanceRequest, Map map) {
+		return null
+	}
+
+	@Override
+	ServiceResponse<PrepareInstanceResponse> prepareInstance(Instance instance, InstanceRequest instanceRequest, Map map) {
+		return null
+	}
+
+	@Override
+	ServiceResponse<ProvisionResponse> runInstance(Instance instance, InstanceRequest instanceRequest, Map map) {
+		return null
+	}
+
+	@Override
+	ServiceResponse destroyInstance(Instance instance, Map map) {
+		return null
 	}
 
 	@Override
