@@ -48,11 +48,9 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.request.ResizeRequest
 import com.morpheusdata.request.UpdateModel
-import com.morpheusdata.response.HostResponse
 import com.morpheusdata.response.PrepareInstanceResponse
 import com.morpheusdata.response.ProvisionResponse
 import com.morpheusdata.response.ServiceResponse
-import com.morpheusdata.response.WorkloadResponse
 import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
 import org.apache.http.client.utils.URIBuilder
@@ -512,13 +510,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
-	ServiceResponse<WorkloadResponse> runWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
+	ServiceResponse<ProvisionResponse> runWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
 		log.debug "runWorkload ${workload.configs} ${opts}"
 
 		def rtn = [success:false]
 
 		HttpApiClient client
-		WorkloadResponse workloadResponse = new WorkloadResponse(success: true, installAgent: false)
+		ProvisionResponse provisionResponse = new ProvisionResponse(success: true, installAgent: false)
 		ComputeServer server = workload.server
 		try {
 			Cloud cloud = server.cloud
@@ -538,23 +536,23 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 				server.sshUsername = runConfig.userConfig.sshUsername
 				server.sshPassword = runConfig.userConfig.sshPassword
-				workloadResponse.createUsers = runConfig.userConfig.createUsers
+				provisionResponse.createUsers = runConfig.userConfig.createUsers
 
-				runVirtualMachine(cloud, runConfig, workloadResponse,  workloadRequest, null)
+				runVirtualMachine(cloud, runConfig, provisionResponse,  workloadRequest, null)
 
 			} else {
 				server.statusMessage = 'Error on vm image'
 			}
 
-			if (workloadResponse.success != true) {
-				return new ServiceResponse(success: false, msg: workloadResponse.message ?: 'vm config error', error: workloadResponse.message, data: workloadResponse)
+			if (provisionResponse.success != true) {
+				return new ServiceResponse(success: false, msg: provisionResponse.message ?: 'vm config error', error: provisionResponse.message, data: provisionResponse)
 			} else {
-				return new ServiceResponse<WorkloadResponse>(success: true, data: workloadResponse)
+				return new ServiceResponse<ProvisionResponse>(success: true, data: provisionResponse)
 			}
 		} catch(e) {
 			log.error "runWorkload: ${e}", e
-			workloadResponse.setError(e.message)
-			return new ServiceResponse(success: false, msg: e.message, error: e.message, data: workloadResponse)
+			provisionResponse.setError(e.message)
+			return new ServiceResponse(success: false, msg: e.message, error: e.message, data: provisionResponse)
 		} finally {
 			if(client) {
 				client.shutdownClient()
@@ -627,12 +625,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
-	ServiceResponse<HostResponse> runHost(ComputeServer server, HostRequest hostRequest, Map opts) {
+	ServiceResponse<ProvisionResponse> runHost(ComputeServer server, HostRequest hostRequest, Map opts) {
 		log.debug("runHost: ${server} ${hostRequest} ${opts}")
 
 		def rtn = [success:false]
 
-		HostResponse hostResponse = new HostResponse(success: true, installAgent: false)
+		ProvisionResponse provisionResponse = new ProvisionResponse(success: true, installAgent: false)
 
 		HttpApiClient client
 		try {
@@ -652,30 +650,28 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			runConfig.virtualImageId = server.sourceImage?.id
 			runConfig.userConfig = hostRequest.usersConfiguration
 
-			WorkloadResponse workloadResponse = new WorkloadResponse(success: true, installAgent: false)
 			if(imageExternalId) {
 
 				server.sshUsername = runConfig.userConfig.sshUsername
 				server.sshPassword = runConfig.userConfig.sshPassword
-				workloadResponse.createUsers = runConfig.userConfig.createUsers
+				provisionResponse.createUsers = runConfig.userConfig.createUsers
 
-				runVirtualMachine(cloud, runConfig, workloadResponse, null, hostRequest)
+				runVirtualMachine(cloud, runConfig, provisionResponse, null, hostRequest)
 
 			} else {
 				server.statusMessage = 'Error on vm image'
 			}
 
-			hostResponse = workloadResponseToHostResponse(workloadResponse)
 
-			if (hostResponse.success != true) {
-				return new ServiceResponse(success: false, msg: hostResponse.message ?: 'vm config error', error: hostResponse.message, data: hostResponse)
+			if (provisionResponse.success != true) {
+				return new ServiceResponse(success: false, msg: provisionResponse.message ?: 'vm config error', error: provisionResponse.message, data: provisionResponse)
 			} else {
-				return new ServiceResponse<HostResponse>(success: true, data: hostResponse)
+				return new ServiceResponse<ProvisionResponse>(success: true, data: provisionResponse)
 			}
 		} catch(e) {
 			log.error "runHost: ${e}", e
-			hostResponse.setError(e.message)
-			return new ServiceResponse(success: false, msg: e.message, error: e.message, data: hostResponse)
+			provisionResponse.setError(e.message)
+			return new ServiceResponse(success: false, msg: e.message, error: e.message, data: provisionResponse)
 		} finally {
 			if(client) {
 				client.shutdownClient()
@@ -870,8 +866,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 
 	@Override
-	ServiceResponse<WorkloadResponse> getServerDetails(ComputeServer server) {
-		WorkloadResponse rtn = new WorkloadResponse()
+	ServiceResponse<ProvisionResponse> getServerDetails(ComputeServer server) {
+		ProvisionResponse rtn = new ProvisionResponse()
 		def serverUuid = server.externalId
 		if(server && server.uuid) {
 			Cloud cloud = server.cloud
@@ -1678,23 +1674,23 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		return runConfig
 	}
 
-	private void runVirtualMachine(Cloud cloud, Map runConfig, WorkloadResponse workloadResponse, WorkloadRequest workloadRequest, HostRequest hostRequest) {
+	private void runVirtualMachine(Cloud cloud, Map runConfig, ProvisionResponse provisionResponse, WorkloadRequest workloadRequest, HostRequest hostRequest) {
 		log.debug "runVirtualMachine: ${runConfig}"
 		try {
 
 			runConfig.template = runConfig.imageId
-			insertVm(cloud, runConfig, workloadResponse, workloadRequest, hostRequest)
-			if(workloadResponse.success) {
-				finalizeVm(runConfig, workloadResponse)
+			insertVm(cloud, runConfig, provisionResponse, workloadRequest, hostRequest)
+			if(provisionResponse.success) {
+				finalizeVm(runConfig, provisionResponse)
 			}
 
 		} catch(e) {
 			log.error("runVirtualMachine error:${e}", e)
-			workloadResponse.setError('failed to upload image file')
+			provisionResponse.setError('failed to upload image file')
 		}
 	}
 
-	def insertVm(Cloud cloud, Map runConfig, WorkloadResponse workloadResponse, WorkloadRequest workloadRequest, HostRequest hostRequest) {
+	def insertVm(Cloud cloud, Map runConfig, ProvisionResponse provisionResponse, WorkloadRequest workloadRequest, HostRequest hostRequest) {
 		log.debug "insertVm: ${runConfig}"
 
 		Map authConfig = plugin.getAuthConfig(cloud)
@@ -1751,10 +1747,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			Map cloudConfigOpts = workloadRequest?.cloudConfigOpts ?: hostRequest?.cloudConfigOpts ?: null
 
 			// Inform Morpheus to install the agent (or not) after the server is created
-			workloadResponse.noAgent = runConfig.noAgent
-			workloadResponse.installAgent = runConfig.installAgent
+			provisionResponse.noAgent = runConfig.noAgent
+			provisionResponse.installAgent = runConfig.installAgent
 
-			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, workloadResponse.installAgent: ${workloadResponse.installAgent}, workloadResponse.noAgent: ${workloadResponse.noAgent}"
+			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, provisionResponse.installAgent: ${provisionResponse.installAgent}, provisionResponse.noAgent: ${provisionResponse.noAgent}"
 
 			//cloud_init && sysprep
 			if(virtualImage?.isCloudInit && server.cloudConfigUser) {
@@ -1802,7 +1798,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				if(createResults.data?.metadata?.uuid) {
 					//update server ids
 					server.externalId = createResults.data.metadata.uuid
-					workloadResponse.externalId = server.externalId
+					provisionResponse.externalId = server.externalId
 					server.internalId = server.externalId
 					server = saveAndGet(server)
 				}
@@ -1822,7 +1818,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							getPlugin().morpheus.executeCommandOnServer(sourceServer, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
 						}
 						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}.uuid
-						workloadResponse.externalId = server.externalId
+						provisionResponse.externalId = server.externalId
 						server.internalId = server.externalId
 						server = saveAndGet(server)
 					}
@@ -1895,7 +1891,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								}
 								morpheusContext.storageVolume.save(volumes).blockingGet()
 								server = saveAndGet(server)
-								workloadResponse.success = true
+								provisionResponse.success = true
 							} else {
 								server.statusMessage = 'Failed to load server details'
 								server = saveAndGet(server)
@@ -1906,7 +1902,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						server = saveAndGet(server)
 					}
 				} else {
-					workloadResponse.setError("Failed to create server - task error:  ${taskResults}")
+					provisionResponse.setError("Failed to create server - task error:  ${taskResults}")
 				}
 
 			} else {
@@ -1916,20 +1912,20 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					server.internalId = createResults.results.server.instanceUuid
 					server = saveAndGet(server)
 				}
-				workloadResponse.setError('Failed to create server')
+				provisionResponse.setError('Failed to create server')
 			}
 
 		} catch (e) {
 			log.error("runException: ${e}", e)
-			workloadResponse.setError('Error running vm')
+			provisionResponse.setError('Error running vm')
 		}
 	}
 
-	def finalizeVm(Map runConfig, WorkloadResponse workloadResponse) {
-		log.debug("runTask onComplete: runConfig:${runConfig}, workloadResponse: ${workloadResponse}")
+	def finalizeVm(Map runConfig, ProvisionResponse provisionResponse) {
+		log.debug("runTask onComplete: runConfig:${runConfig}, provisionResponse: ${provisionResponse}")
 		ComputeServer server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
 		try {
-			if(workloadResponse.success == true) {
+			if(provisionResponse.success == true) {
 				server.statusDate = new Date()
 				server.osDevice = '/dev/sda'
 				server.dataDevice = '/dev/sda'
@@ -1940,7 +1936,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			}
 		} catch(e) {
 			log.error("finalizeVm error: ${e}", e)
-			workloadResponse.setError('failed to run server: ' + e)
+			provisionResponse.setError('failed to run server: ' + e)
 		}
 	}
 
