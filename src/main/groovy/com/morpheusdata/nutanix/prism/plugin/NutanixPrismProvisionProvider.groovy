@@ -6,9 +6,9 @@ import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.core.providers.ComputeProvisionProvider
 import com.morpheusdata.core.providers.HostProvisionProvider
-import com.morpheusdata.core.providers.HypervisorConsoleProvider
 import com.morpheusdata.core.providers.ProvisionProvider
 import com.morpheusdata.core.providers.ResourceProvisionProvider
+import com.morpheusdata.core.providers.VmProvisionProvider
 import com.morpheusdata.core.providers.WorkloadProvisionProvider
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
@@ -58,7 +58,7 @@ import org.apache.http.client.utils.URIBuilder
 import java.util.concurrent.TimeUnit
 
 @Slf4j
-class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements HostProvisionProvider, WorkloadProvisionProvider, WorkloadProvisionProvider.ResizeFacet, HostProvisionProvider.ResizeFacet, ProvisionProvider.SnapshotFacet, ProvisionProvider.HypervisorConsoleFacet, ResourceProvisionProvider {
+class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements VmProvisionProvider, WorkloadProvisionProvider.ResizeFacet, HostProvisionProvider.ResizeFacet, ProvisionProvider.SnapshotFacet, ProvisionProvider.HypervisorConsoleFacet, ResourceProvisionProvider {
 
 	NutanixPrismPlugin plugin
 	MorpheusContext morpheusContext
