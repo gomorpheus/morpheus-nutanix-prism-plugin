@@ -68,10 +68,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		this.morpheusContext = context
 	}
 
-	@Override
-	Boolean createServer() {
-		return true
-	}
 
 	@Override
 	Icon getCircularIcon() {

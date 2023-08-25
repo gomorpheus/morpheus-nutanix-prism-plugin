@@ -115,7 +115,7 @@ tasks.assemble.dependsOn tasks.shadowJar
 tasks.register('moveToPlugin') {
 	doLast {
 		ant.move file: "${buildDir}/libs/${project.name}-${version}-all.jar",
-			todir: "../morpheus-plugin-core/plugins"
+			todir: "../morpheus-plugins"
 	}
 }
 
