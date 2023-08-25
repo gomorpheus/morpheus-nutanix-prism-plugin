@@ -38,7 +38,7 @@ class VirtualPrivateCloudSync {
 			def masterData = getVPCs(authConfig)
 			if(masterData.success) {
 
-				Observable<ComputeZonePoolIdentityProjection> domainRecords = morpheusContext.cloud.pool.listSyncProjections(cloud.id, getVPC(cloud))
+				Observable<ComputeZonePoolIdentityProjection> domainRecords = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, getVPC(cloud), null)
 				SyncTask<ComputeZonePoolIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, masterData.data)
 				syncTask.addMatchFunction { ComputeZonePoolIdentityProjection domainObject, Map apiItem ->
 					domainObject.externalId == apiItem.externalId
@@ -50,7 +50,7 @@ class VirtualPrivateCloudSync {
 					addMissingVPCs(itemsToAdd)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ComputeZonePoolIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<ComputeZonePoolIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
-					morpheusContext.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {ComputeZonePool computeZonePool ->
+					morpheusContext.async.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {ComputeZonePool computeZonePool ->
 						SyncTask.UpdateItemDto<ComputeZonePool, Map> matchItem = updateItemMap[computeZonePool.id]
 						return new SyncTask.UpdateItem<ComputeZonePool,Map>(existingItem:computeZonePool, masterItem:matchItem.masterItem)
 					}
@@ -85,7 +85,7 @@ class VirtualPrivateCloudSync {
 		}
 
 		if(adds) {
-			morpheusContext.cloud.pool.create(adds).blockingGet()
+			morpheusContext.async.cloud.pool.create(adds).blockingGet()
 		}
 	}
 
@@ -107,13 +107,13 @@ class VirtualPrivateCloudSync {
 			}
 		}
 		if(updates) {
-			morpheusContext.cloud.pool.save(updates).blockingGet()
+			morpheusContext.async.cloud.pool.save(updates).blockingGet()
 		}
 	}
 
 	private removeMissingVPCs(List<ComputeZonePoolIdentityProjection> removeList) {
 		log.debug "removeMissingVPCs: ${removeList?.size()}"
-		morpheusContext.cloud.pool.remove(removeList).blockingGet()
+		morpheusContext.async.cloud.pool.remove(removeList).blockingGet()
 	}
 
 

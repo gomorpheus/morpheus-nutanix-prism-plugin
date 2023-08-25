@@ -22,7 +22,7 @@ class NutanixPrismOptionSourceProviderSpec extends Specification {
 		context = Mock(MorpheusContext)
 		cloudContext = Mock(MorpheusCloudService)
 		poolContext = Mock(MorpheusComputeZonePoolService)
-		context.getCloud() >> cloudContext
+		context.async.getCloud() >> cloudContext
 		cloudContext.getPool() >> poolContext
 		plugin = Mock(NutanixPrismPlugin)
 		nutanixPrismCloudProvider = new NutanixPrismCloudProvider(plugin, context)

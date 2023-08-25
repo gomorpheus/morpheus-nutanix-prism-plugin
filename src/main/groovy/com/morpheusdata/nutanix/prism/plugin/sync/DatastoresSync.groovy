@@ -36,20 +36,20 @@ class DatastoresSync {
 			def authConfig = plugin.getAuthConfig(cloud)
 
 			// Fetch our known clusters
-			def clusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
+			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { ComputeZonePoolIdentityProjection projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
 			}.toList().blockingGet()
 
 			def listResults = NutanixPrismComputeUtility.listDatastores(apiClient, authConfig)
 			if(listResults.success == true) {
 
-				Observable domainRecords = morpheusContext.cloud.datastore.listSyncProjections(cloud.id)
+				Observable domainRecords = morpheusContext.async.cloud.datastore.listSyncProjections(cloud.id)
 				SyncTask<DatastoreIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, listResults?.data)
 				syncTask.addMatchFunction { DatastoreIdentityProjection domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.entity_id
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<DatastoreIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<DatastoreIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
-					morpheusContext.cloud.datastore.listById(updateItems?.collect { it.existingItem.id }).map { Datastore datastore ->
+					morpheusContext.async.cloud.datastore.listById(updateItems?.collect { it.existingItem.id }).map { Datastore datastore ->
 						SyncTask.UpdateItemDto<DatastoreIdentityProjection, Map> matchItem = updateItemMap[datastore.id]
 						return new SyncTask.UpdateItem<Datastore, Map>(existingItem: datastore, masterItem: matchItem.masterItem)
 					}
@@ -78,7 +78,7 @@ class DatastoresSync {
 						adds << add
 
 					}
-					morpheusContext.cloud.datastore.create(adds).blockingGet()
+					morpheusContext.async.cloud.datastore.create(adds).blockingGet()
 				}.onUpdate { List<SyncTask.UpdateItem<Datastore, Map>> updateItems ->
 					def updatedItems = []
 					for(item in updateItems) {
@@ -126,11 +126,11 @@ class DatastoresSync {
 						}
 					}
 					if(updatedItems.size() > 0 ) {
-						morpheusContext.cloud.datastore.save(updatedItems).blockingGet()
+						morpheusContext.async.cloud.datastore.save(updatedItems).blockingGet()
 					}
 				}.onDelete { removeItems ->
 					if(removeItems) {
-						morpheusContext.cloud.datastore.remove(removeItems,null).blockingGet()
+						morpheusContext.async.cloud.datastore.remove(removeItems,null).blockingGet()
 					}
 				}.start()
 			}

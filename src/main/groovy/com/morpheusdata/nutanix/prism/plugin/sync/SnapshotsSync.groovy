@@ -31,7 +31,7 @@ class SnapshotsSync {
 		log.debug "BEGIN: execute SnapshotsSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def clusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}").map{it.externalId}.toList().blockingGet()
+			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}", null).map{it.externalId}.toList().blockingGet()
 			def allResults = []
 			def success = true
 			for(int i = 0; i < clusters.size(); i++ ) {
@@ -43,7 +43,7 @@ class SnapshotsSync {
 			}
 			if (success) {
 				Map vms = getAllVms()
-				Observable domainRecords = morpheusContext.snapshot.listSyncProjections(cloud.id)
+				Observable domainRecords = morpheusContext.async.snapshot.listIdentityProjections(cloud.id, null)
 				SyncTask<SnapshotIdentityProjection, Map, Snapshot> syncTask = new SyncTask<>(domainRecords, allResults)
 				syncTask.addMatchFunction { SnapshotIdentityProjection domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.uuid
@@ -55,7 +55,7 @@ class SnapshotsSync {
 					removeMissingSnapshots(removeItems)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<SnapshotIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<SnapshotIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
-					morpheusContext.snapshot.listByIds(updateItems.collect { it.existingItem.id } as List<Long>).map {Snapshot snapshot ->
+					morpheusContext.async.snapshot.listByIds(updateItems.collect { it.existingItem.id } as List<Long>).map {Snapshot snapshot ->
 						SyncTask.UpdateItemDto<Snapshot, Map> matchItem = updateItemMap[snapshot.id]
 						return new SyncTask.UpdateItem<Snapshot,Map>(existingItem:snapshot, masterItem:matchItem.masterItem)
 					}
@@ -87,11 +87,11 @@ class SnapshotsSync {
 			]
 
 			def add = new Snapshot(snapshotConfig)
-			Snapshot savedSnapshot = morpheusContext.snapshot.create(add).blockingGet()
+			Snapshot savedSnapshot = morpheusContext.async.snapshot.create(add).blockingGet()
 			if (!savedSnapshot) {
 				log.error "Error in creating snapshot ${add}"
 			} else if(vm) {
-				morpheusContext.snapshot.addSnapshot(savedSnapshot, vm).blockingGet()
+				morpheusContext.async.snapshot.addSnapshot(savedSnapshot, vm).blockingGet()
 			}
 		}
 	}
@@ -115,19 +115,19 @@ class SnapshotsSync {
 			}
 		}
 		if(updates) {
-			morpheusContext.snapshot.save(updates).blockingGet()
+			morpheusContext.async.snapshot.save(updates).blockingGet()
 		}
 	}
 
 	private removeMissingSnapshots(List<SnapshotIdentityProjection> removeList) {
 		log.debug "removeMissingSnapshots: ${removeList?.size()}"
-		morpheusContext.snapshot.removeSnapshots(removeList).blockingGet()
+		morpheusContext.async.snapshot.removeSnapshots(removeList).blockingGet()
 	}
 
 	private Map getAllVms() {
 		log.debug "getAllVms: ${cloud}"
-		def vmIds = morpheusContext.computeServer.listIdentityProjections(cloud.id, null).map{it.id}.toList().blockingGet()
-		def vmsMap = morpheusContext.computeServer.listById(vmIds).toMap {it.externalId}.blockingGet()
+		def vmIds = morpheusContext.async.computeServer.listIdentityProjections(cloud.id, null).map{it.id}.toList().blockingGet()
+		def vmsMap = morpheusContext.async.computeServer.listById(vmIds).toMap {it.externalId}.blockingGet()
 		vmsMap
 	}
 

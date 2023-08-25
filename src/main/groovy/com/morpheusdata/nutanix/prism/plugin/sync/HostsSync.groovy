@@ -47,10 +47,10 @@ class HostsSync {
 			queryResults.serverType = new ComputeServerType(code: 'nutanix-prism-hypervisor')
 			queryResults.serverOs = new OsType(code: 'esxi.6')
 
-			def poolListProjections = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { poolProjection ->
+			def poolListProjections = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { poolProjection ->
 				return poolProjection.internalId != null && poolProjection.type == 'Cluster'
 			}.toList().blockingGet()
-			queryResults.clusters = morpheusContext.cloud.pool.listById(poolListProjections.collect { it.id }).toList().blockingGet()
+			queryResults.clusters = morpheusContext.async.cloud.pool.listById(poolListProjections.collect { it.id }).toList().blockingGet()
 
 			def cloudItems = []
 			def listResultSuccess = false
@@ -66,7 +66,7 @@ class HostsSync {
 				if (diskResults.success) {
 					def cloudHostDisks = diskResults?.data
 					
-					def domainRecords = morpheusContext.computeServer.listIdentityProjections(cloud.id, null).filter { ComputeServerIdentityProjection projection ->
+					def domainRecords = morpheusContext.async.computeServer.listIdentityProjections(cloud.id, null).filter { ComputeServerIdentityProjection projection ->
 						if (projection.category == "nutanix.prism.host.${cloud.id}") {
 							return true
 						}
@@ -77,7 +77,7 @@ class HostsSync {
 						domainObject.externalId == cloudItem?.uuid
 					}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ComputeServerIdentityProjection, Map>> updateItems ->
 						Map<Long, SyncTask.UpdateItemDto<ComputeServerIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
-						morpheusContext.computeServer.listById(updateItems?.collect { it.existingItem.id }).map { ComputeServer server ->
+						morpheusContext.async.computeServer.listById(updateItems?.collect { it.existingItem.id }).map { ComputeServer server ->
 							SyncTask.UpdateItemDto<ComputeServerIdentityProjection, Map> matchItem = updateItemMap[server.id]
 							return new SyncTask.UpdateItem<ComputeServer, Map>(existingItem: server, masterItem: matchItem.masterItem)
 						}
@@ -129,7 +129,7 @@ class HostsSync {
 				]
 
 				def newServer = new ComputeServer(serverConfig)
-				if(!morpheusContext.computeServer.create([newServer]).blockingGet()){
+				if(!morpheusContext.async.computeServer.bulkCreate([newServer]).blockingGet()){
 					log.error "Error in creating host server ${newServer}"
 				}
 
@@ -155,7 +155,7 @@ class HostsSync {
 		def volumeType = new StorageVolumeType(code: 'nutanix-prism-host-disk')
 
 		def clusterExternalIds = updateList.collect{ it.masterItem.cluster_uuid }.unique()
-		List<ComputeZonePoolIdentityProjection> zoneClusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, null).filter {
+		List<ComputeZonePoolIdentityProjection> zoneClusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, null, null).filter {
 			it.type == 'Cluster' && it.externalId in clusterExternalIds
 		}.toList().blockingGet()
 
@@ -182,7 +182,7 @@ class HostsSync {
 				}
 
 				if(save) {
-					morpheusContext.computeServer.save([currentServer]).blockingGet()
+					morpheusContext.async.computeServer.bulkSave([currentServer]).blockingGet()
 				}
 				def (maxStorage,usedStorage) = syncHostVolumes(currentServer, volumeType, cloudHostDisks)
 
@@ -201,7 +201,7 @@ class HostsSync {
 
 	private removeMissingHosts(Cloud cloud, List removeList) {
 		log.debug "removeMissingHosts: ${cloud} ${removeList.size()}"
-		morpheusContext.computeServer.remove(removeList).blockingGet()
+		morpheusContext.async.computeServer.bulkRemove(removeList).blockingGet()
 	}
 
 	private syncHostVolumes(ComputeServer server, StorageVolumeType volumeType, List cloudHostDisks) {
@@ -262,17 +262,17 @@ class HostsSync {
 		
 		if(saveList?.size() > 0) {
 			log.debug "Saving ${saveList.size()} storage volumes"
-			morpheusContext.storageVolume.save(saveList).blockingGet()
+			morpheusContext.async.storageVolume.save(saveList).blockingGet()
 		}
 		
 		if(syncLists.removeList?.size() > 0) {
 			log.debug "Removing ${syncLists.removeList.size()} storage volumes"
-			morpheusContext.storageVolume.remove(syncLists.removeList, server, false).blockingGet()
+			morpheusContext.async.storageVolume.remove(syncLists.removeList, server, false).blockingGet()
 		}
 
 		if(addList?.size() > 0) {
 			log.debug "Adding ${addList.size()} storage volumes"
-			morpheusContext.storageVolume.create(addList, server).blockingGet()
+			morpheusContext.async.storageVolume.create(addList, server).blockingGet()
 		}
 
 		return [totalMaxStorage, totalUsedStorage]
@@ -335,7 +335,7 @@ class HostsSync {
 
 			if(updates == true) {
 				server.capacityInfo = capacityInfo
-				morpheusContext.computeServer.save([server]).blockingGet()
+				morpheusContext.async.computeServer.bulkSave([server]).blockingGet()
 			}
 		} catch(e) {
 			log.warn("error updating host stats: ${e}", e)

@@ -34,11 +34,12 @@ class NetworksSync {
 		try {
 			def networkTypes = plugin.cloudProvider.getNetworkTypes()
 
-			def clusters = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
+
+			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { ComputeZonePoolIdentityProjection projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
 			}.toList().blockingGet()
 
-			def vpcs = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').filter { ComputeZonePoolIdentityProjection projection ->
+			def vpcs = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { ComputeZonePoolIdentityProjection projection ->
 				return projection.type == 'VPC' && projection.internalId != null
 			}.toList().blockingGet()
 
@@ -46,13 +47,13 @@ class NetworksSync {
 			def listResults = NutanixPrismComputeUtility.listNetworks(apiClient, authConfig)
 			if (listResults.success) {
 
-				def domainRecords = morpheusContext.cloud.network.listSyncProjections(cloud.id)
+				def domainRecords = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id)
 				SyncTask<NetworkIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, listResults.data)
 				syncTask.addMatchFunction { NetworkIdentityProjection domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.metadata.uuid
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<NetworkIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<NetworkIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
-					morpheusContext.cloud.network.listById(updateItems?.collect { it.existingItem.id }).map { Network network ->
+					morpheusContext.async.cloud.network.listById(updateItems?.collect { it.existingItem.id }).map { Network network ->
 						SyncTask.UpdateItemDto<NetworkIdentityProjection, Map> matchItem = updateItemMap[network.id]
 						return new SyncTask.UpdateItem<NetworkIdentityProjection, Map>(existingItem: network, masterItem: matchItem.masterItem)
 					}
@@ -94,7 +95,7 @@ class NetworksSync {
 						networkAdds << networkAdd
 					}
 					//create networks
-					morpheusContext.cloud.network.create(networkAdds).blockingGet()
+					morpheusContext.async.cloud.network.create(networkAdds).blockingGet()
 				}.onUpdate { List<SyncTask.UpdateItem<Network, Map>> updateItems ->
 					List<Network> itemsToUpdate = []
 					for (item in updateItems) {
@@ -137,11 +138,11 @@ class NetworksSync {
 						}
 					}
 					if (itemsToUpdate.size() > 0) {
-						morpheusContext.cloud.network.save(itemsToUpdate).blockingGet()
+						morpheusContext.async.cloud.network.save(itemsToUpdate).blockingGet()
 					}
 
 				}.onDelete { removeItems ->
-					morpheusContext.cloud.network.remove(removeItems).blockingGet()
+					morpheusContext.async.cloud.network.remove(removeItems).blockingGet()
 				}.start()
 
 			}

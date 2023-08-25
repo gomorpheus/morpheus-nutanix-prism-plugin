@@ -151,12 +151,12 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			ComputeServer computeServer
 			def cloudId = backupResult.zoneId ?: backupResult.backup?.zoneId
 			if(cloudId) {
-				Cloud cloud = plugin.morpheus.cloud.getCloudById(cloudId).blockingGet()
+				Cloud cloud = plugin.morpheus.async.cloud.getCloudById(cloudId).blockingGet()
 				HttpApiClient client = new HttpApiClient()
 				Map authConfig = plugin.getAuthConfig(cloud)
 				def computeServerId = backupResult.serverId ?: backupResult.backup?.computeServerId
 				if(computeServerId) {
-					computeServer = getPlugin().morpheus.computeServer.get(computeServerId).blockingGet()
+					computeServer = getPlugin().morpheus.async.computeServer.get(computeServerId).blockingGet()
 					String taskId = backupResult.internalId ?: backupResult.getConfigProperty("backupRequestId")?.toString()
 
 					log.debug("refreshBackupResult snapshot task ID: ${taskId}")
@@ -246,11 +246,11 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			def computeServerId = backupResult.serverId ?: backupResult.backup?.computeServerId
 			log.info("deleteBackupResult zoneId: ${cloudId}, snapshotId: ${snapshotId}")
 			if(snapshotId && cloudId && computeServerId) {
-				Cloud cloud = plugin.morpheus.cloud.getCloudById(cloudId).blockingGet()
+				Cloud cloud = plugin.morpheus.async.cloud.get(cloudId).blockingGet()
 				HttpApiClient client = new HttpApiClient()
 				Map authConfig = plugin.getAuthConfig(cloud)
 				if(cloud && computeServerId) {
-					def computeServer = getPlugin().morpheus.computeServer.get(computeServerId).blockingGet()
+					def computeServer = getPlugin().morpheus.async.computeServer.get(computeServerId).blockingGet()
 					def resp = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, computeServer?.resourcePool?.externalId, snapshotId)
 					log.debug("Delete snapshot resp: ${resp}")
 					if(resp.success) { //ignore snapshots already removed
@@ -303,7 +303,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			def config = backupResult.getConfigMap()
 			def snapshotId = backupResult.externalId ?: config.snapshotId
 			if(snapshotId) {
-				def sourceWorkload = plugin.morpheus.workload.get(opts?.containerId ?: backupResult.containerId).blockingGet()
+				def sourceWorkload = plugin.morpheus.async.workload.get(opts?.containerId ?: backupResult.containerId).blockingGet()
 				ComputeServer computeServer = sourceWorkload.server
 				Cloud cloud = computeServer.cloud
 				HttpApiClient client = new HttpApiClient()
@@ -342,7 +342,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 		ServiceResponse<BackupRestoreResponse> rtn = ServiceResponse.prepare(new BackupRestoreResponse(backupRestore))
 		def taskId = backupRestore.externalStatusRef
 		if(taskId) {
-			def sourceWorkload = plugin.morpheus.workload.get(backupResult.containerId).blockingGet()
+			def sourceWorkload = plugin.morpheus.async.workload.get(backupResult.containerId).blockingGet()
 			def computeServer = sourceWorkload.server
 			def cloud = computeServer.cloud
 			HttpApiClient client = new HttpApiClient()

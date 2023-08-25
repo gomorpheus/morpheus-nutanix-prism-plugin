@@ -36,7 +36,7 @@ class ClustersSync {
 				def masterHosts = listResults?.data?.findAll { cloudItem ->
 					cloudItem.status?.resources?.config?.service_list?.contains('AOS')
 				} ?: []
-				Observable<ComputeZonePoolIdentityProjection> domainRecords = morpheusContext.cloud.pool.listSyncProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}")
+				Observable<ComputeZonePoolIdentityProjection> domainRecords = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, "nutanix.prism.cluster.${cloud.id}", null)
 				SyncTask<ComputeZonePoolIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, masterHosts)
 				syncTask.addMatchFunction { ComputeZonePoolIdentityProjection domainObject, Map apiItem ->
 					domainObject.externalId == apiItem.metadata.uuid
@@ -48,7 +48,7 @@ class ClustersSync {
 					addMissingResourcePools(itemsToAdd)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ComputeZonePoolIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<ComputeZonePoolIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
-					morpheusContext.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {ComputeZonePool computeZonePool ->
+					morpheusContext.async.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {ComputeZonePool computeZonePool ->
 						SyncTask.UpdateItemDto<ComputeZonePool, Map> matchItem = updateItemMap[computeZonePool.id]
 						return new SyncTask.UpdateItem<ComputeZonePool,Map>(existingItem:computeZonePool, masterItem:matchItem.masterItem)
 					}
@@ -86,7 +86,7 @@ class ClustersSync {
 		}
 
 		if(adds) {
-			morpheusContext.cloud.pool.create(adds).blockingGet()
+			morpheusContext.async.cloud.pool.create(adds).blockingGet()
 		}
 	}
 
@@ -108,12 +108,12 @@ class ClustersSync {
 			}
 		}
 		if(updates) {
-			morpheusContext.cloud.pool.save(updates).blockingGet()
+			morpheusContext.async.cloud.pool.save(updates).blockingGet()
 		}
 	}
 
 	private removeMissingResourcePools(List<ComputeZonePoolIdentityProjection> removeList) {
 		log.debug "removeMissingResourcePools: ${removeList?.size()}"
-		morpheusContext.cloud.pool.remove(removeList).blockingGet()
+		morpheusContext.async.cloud.pool.remove(removeList).blockingGet()
 	}
 }

@@ -37,7 +37,7 @@ class CategoriesSync {
 			def authConfig = plugin.getAuthConfig(cloud)
 			def masterData = getCategoriesAndValues(authConfig)
 			if(masterData.success) {
-				Observable<ReferenceDataSyncProjection> domainRecords = morpheusContext.cloud.listReferenceDataByCategory(cloud, getCategory(cloud))
+				Observable<ReferenceDataSyncProjection> domainRecords = morpheusContext.async.referenceData.listByCategory(getCategory(cloud))
 				SyncTask<ReferenceDataSyncProjection, Map, com.morpheusdata.model.ReferenceData> syncTask = new SyncTask<>(domainRecords, masterData.data)
 				syncTask.addMatchFunction { ReferenceDataSyncProjection domainObject, Map data ->
 					domainObject.externalId == data.display
@@ -49,7 +49,7 @@ class CategoriesSync {
 					addMissingCategories(itemsToAdd)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ReferenceDataSyncProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<ReferenceDataSyncProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
-					morpheusContext.cloud.listReferenceDataById(updateItems.collect { it.existingItem.id } as List<Long>).map {ReferenceData referenceData ->
+					morpheusContext.async.referenceData.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {ReferenceData referenceData ->
 						SyncTask.UpdateItemDto<ReferenceData, Map> matchItem = updateItemMap[referenceData.id]
 						return new SyncTask.UpdateItem<ReferenceData,Map>(existingItem:referenceData, masterItem:matchItem.masterItem)
 					}
@@ -80,13 +80,13 @@ class CategoriesSync {
 		}
 
 		if(adds) {
-			morpheusContext.cloud.create(adds, cloud, getCategory(cloud)).blockingGet()
+			morpheusContext.async.referenceData.create(adds).blockingGet()
 		}
 	}
 
 	private removeMissingCategories(List<ReferenceData> removeList) {
 		log.debug "removeMissingCategories: ${removeList?.size}"
-		morpheusContext.cloud.remove(removeList).blockingGet()
+		morpheusContext.async.referenceData.remove(removeList).blockingGet()
 	}
 	
 	private getCategoriesAndValues(authConfig) {

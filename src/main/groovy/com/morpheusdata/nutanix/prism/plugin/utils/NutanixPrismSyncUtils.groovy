@@ -135,16 +135,16 @@ class NutanixPrismSyncUtils {
 			if(saveList) {
 				rtn.changed = true
 				log.debug "Found ${saveList?.size()} volumes to update"
-				morpheusContext.storageVolume.save(saveList).blockingGet()
+				morpheusContext.async.storageVolume.save(saveList).blockingGet()
 			}
 
 			// The removes
 			if(syncLists.removeList) {
 				rtn.changed = true
 				if(locationOrServer instanceof ComputeServer) {
-					morpheusContext.storageVolume.remove(syncLists.removeList, locationOrServer, false).blockingGet()
+					morpheusContext.async.storageVolume.remove(syncLists.removeList, locationOrServer, false).blockingGet()
 				} else {
-					morpheusContext.storageVolume.remove(syncLists.removeList, locationOrServer).blockingGet()
+					morpheusContext.async.storageVolume.remove(syncLists.removeList, locationOrServer).blockingGet()
 				}
 			}
 
@@ -153,7 +153,7 @@ class NutanixPrismSyncUtils {
 			if(newVolumes) {
 				rtn.changed = true
 				newVolumes?.each { rtn.maxStorage += it.maxStorage }
-				morpheusContext.storageVolume.create(newVolumes, locationOrServer).blockingGet()
+				morpheusContext.async.storageVolume.create(newVolumes, locationOrServer).blockingGet()
 			}
 		} catch(e) {
 			log.error "Error in syncVolumes: ${e}", e
@@ -320,13 +320,13 @@ class NutanixPrismSyncUtils {
 				}
 			}
 			if(saveList?.size() > 0) {
-				morpheusContext.computeServer.computeServerInterface.save(saveList).blockingGet()
+				morpheusContext.async.computeServer.computeServerInterface.save(saveList).blockingGet()
 				rtn = true
 			}
 
 			// Remove old ones
 			if(syncLists.removeList?.size() > 0) {
-				morpheusContext.computeServer.computeServerInterface.remove(syncLists.removeList, server).blockingGet()
+				morpheusContext.async.computeServer.computeServerInterface.remove(syncLists.removeList, server).blockingGet()
 				rtn = true
 			}
 
@@ -348,7 +348,7 @@ class NutanixPrismSyncUtils {
 				createList << newInterface
 			}
 			if(createList?.size() > 0) {
-				morpheusContext.computeServer.computeServerInterface.create(createList, server).blockingGet()
+				morpheusContext.async.computeServer.computeServerInterface.create(createList, server).blockingGet()
 				rtn = true
 			}
 		} catch(e) {

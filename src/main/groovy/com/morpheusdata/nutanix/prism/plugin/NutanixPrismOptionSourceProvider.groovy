@@ -48,18 +48,18 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		log.debug "nutanixPrismProvisionImage: ${args}"
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
-		Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
+		Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
 		def regionCode = tmpCloud.regionCode
 
 		// Grab the projections.. doing a filter pass first
 		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
-		def virtualImageIds = morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { it.deleted == false }.map{it.id}.toList().blockingGet()
+		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false }.map{it.id}.toList().blockingGet()
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
 			def invalidStatus = ['Saving', 'Failed', 'Converting']
 
-			morpheusContext.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
+			morpheusContext.async.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
 				if (!(img.status in invalidStatus) &&
 						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
 					if(img.category == "nutanix.prism.image.${cloudId}" ||
@@ -93,12 +93,12 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 		// Grab the projections.. doing a filter pass first
 		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
-		def virtualImageIds = morpheusContext.virtualImage.listSyncProjections(accountId, imageTypes).filter { it.deleted == false}.map{it.id}.toList().blockingGet()
+		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false}.map{it.id}.toList().blockingGet()
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
 			def invalidStatus = ['Saving', 'Failed', 'Converting']
-			morpheusContext.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
+			morpheusContext.async.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
 				if (!(img.status in invalidStatus) &&
 						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
 					if(img.category?.startsWith('nutanix.prism.image')) {
@@ -121,8 +121,8 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 	def nutanixPrismCategories(args){
 		def cloudId = getCloudId(args)
 		if(cloudId) {
-			Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
-			def options = morpheusContext.cloud.listReferenceDataByCategory(tmpCloud, CategoriesSync.getCategory(tmpCloud)).map { [name: it.externalId, value: it.externalId] }.toList().blockingGet().sort({ it.name })
+			Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
+			def options = morpheusContext.async.referenceData.listByCategory(CategoriesSync.getCategory(tmpCloud)).map { [name: it.externalId, value: it.externalId] }.toList().blockingGet().sort({ it.name })
 			return options
 		} else {
 			return []
@@ -132,8 +132,8 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 	def nutanixPrismCluster(args){
 		def cloudId = getCloudId(args)
 		if(cloudId) {
-			Cloud tmpCloud = morpheusContext.cloud.getCloudById(cloudId).blockingGet()
-			def options = morpheusContext.cloud.pool.listSyncProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}").map {[name: it.name, value: it.externalId]}.toSortedList {it.name}.blockingGet()
+			Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
+			def options = morpheusContext.async.cloud.pool.listIdentityProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}", null).map {[name: it.name, value: it.externalId]}.toSortedList {it.name}.blockingGet()
 			return options
 		} else {
 			return []

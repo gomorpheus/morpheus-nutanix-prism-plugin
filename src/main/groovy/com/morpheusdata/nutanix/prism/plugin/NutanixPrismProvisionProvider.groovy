@@ -364,11 +364,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						description    : opts.description
 				]
 				def add = new Snapshot(snapshotConfig)
-				Snapshot savedSnapshot = morpheusContext.snapshot.create(add).blockingGet()
+				Snapshot savedSnapshot = morpheusContext.async.snapshot.create(add).blockingGet()
 				if (!savedSnapshot) {
 					return ServiceResponse.error("Error saving snapshot")
 				} else {
-					morpheusContext.snapshot.addSnapshot(savedSnapshot, server).blockingGet()
+					morpheusContext.async.snapshot.addSnapshot(savedSnapshot, server).blockingGet()
 				}
 				return ServiceResponse.success()
 			} else {
@@ -407,7 +407,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	@Override
 	ServiceResponse deleteSnapshot(Snapshot snapshot, Map opts) {
 		HttpApiClient client = new HttpApiClient()
-		ComputeServer server = morpheusContext.computeServer.get(opts.serverId).blockingGet()
+		ComputeServer server = morpheusContext.async.computeServer.get(opts.serverId).blockingGet()
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		log.debug("Deleting Nutanix Prism Central Snapshot ${snapshot.name}")
 		def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
@@ -435,7 +435,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		} else {
 			return ServiceResponse.error("API error reverting snapshot", null, taskResults)
 		}
-		return ServiceResponse.error()
 	}
 
 	@Override
@@ -443,7 +442,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		log.debug("validateWorkload: ${opts}")
 		ServiceResponse rtn = new ServiceResponse(true, null, [:], null)
 		try {
-			Cloud cloud = morpheusContext.cloud.getCloudById(opts.zoneId?.toLong()).blockingGet()
+			Cloud cloud = morpheusContext.async.cloud.get(opts.zoneId?.toLong()).blockingGet()
 			def apiInfo = [:]
 			if(opts.hostId) {
 				apiInfo = plugin.getAuthConfig(cloud)
@@ -482,7 +481,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			} else {
 				VirtualImage virtualImage
 				try {
-					virtualImage = morpheusContext.virtualImage.get(virtualImageId).blockingGet()
+					virtualImage = morpheusContext.async.virtualImage.get(virtualImageId).blockingGet()
 				} catch(e) {
 					log.error "error in get image: ${e}"
 				}
@@ -580,7 +579,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			if(server.internalIp != privateIp) {
 				server.internalIp = privateIp
 				server.externalIp = publicIp
-				morpheusContext.computeServer.save([server]).blockingGet()
+				morpheusContext.async.computeServer.bulkSave([server]).blockingGet()
 			}
 		} catch(e) {
 			rtn.success = false
@@ -599,9 +598,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			VirtualImage virtualImage
 			Long computeTypeSetId = server.typeSet?.id
 			if(computeTypeSetId) {
-				ComputeTypeSet computeTypeSet = morpheus.computeTypeSet.get(computeTypeSetId).blockingGet()
+				ComputeTypeSet computeTypeSet = morpheus.async.computeTypeSet.get(computeTypeSetId).blockingGet()
 				if(computeTypeSet.containerType) {
-					ContainerType containerType = morpheus.containerType.get(computeTypeSet.containerType.id).blockingGet()
+					ContainerType containerType = morpheus.async.containerType.get(computeTypeSet.containerType.id).blockingGet()
 					virtualImage = containerType.virtualImage
 				}
 			}
@@ -699,7 +698,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			if(server.internalIp != privateIp) {
 				server.internalIp = privateIp
 				server.externalIp = publicIp
-				morpheusContext.computeServer.save([server]).blockingGet()
+				morpheusContext.async.computeServer.bulkSave([server]).blockingGet()
 			}
 		} catch(e) {
 			rtn.success = false
@@ -889,7 +888,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	ServiceResponse resizeWorkload(Instance instance, Workload workload, ResizeRequest resizeRequest, Map opts) {
-		def server = morpheusContext.computeServer.get(workload.server.id).blockingGet()
+		def server = morpheusContext.async.computeServer.get(workload.server.id).blockingGet()
 		if(server) {
 			return internalResizeServer(server, resizeRequest)
 		} else {
@@ -948,7 +947,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				if(deleteResults.success == true) {
 					log.info("resize volume delete complete: ${deleteResults.success}")
 					resizeRequest.volumesDelete?.each { StorageVolume volume ->
-						morpheusContext.storageVolume.remove([volume], server, true).blockingGet()
+						morpheusContext.async.storageVolume.remove([volume], server, true).blockingGet()
 					}
 				}
 			}
@@ -968,7 +967,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					def result = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
 					if (result.success) {
 						existing.maxStorage = updateProps.maxStorage
-						morpheusContext.storageVolume.save([existing]).blockingGet()
+						morpheusContext.async.storageVolume.save([existing]).blockingGet()
 					} else {
 						rtn.setError(result.msg ?: "Failed to expand Disk: ${existing.name}")
 						log.warn("error resizing disk: ${result.msg}")
@@ -983,12 +982,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				datastoreIds << volumeAdd.datastoreId.toLong()
 				def storageVolumeTypeId = volumeAdd.storageType.toLong()
 				if(!storageVolumeTypes[storageVolumeTypeId]) {
-					storageVolumeTypes[storageVolumeTypeId] = morpheusContext.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
+					storageVolumeTypes[storageVolumeTypeId] = morpheusContext.async.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
 				}
 
 			}
 			datastoreIds = datastoreIds.unique()
-			def datastores = morpheusContext.cloud.datastore.listById(datastoreIds).toMap {it.id.toLong()}.blockingGet()
+			def datastores = morpheusContext.async.cloud.datastore.listById(datastoreIds).toMap {it.id.toLong()}.blockingGet()
 			resizeRequest.volumesAdd?.each { Map volumeAdd ->
 				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 				vmBody = serverDetails?.data
@@ -1035,9 +1034,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
 					newVolume.externalId = newDisk.uuid
 					newVolume.type = new StorageVolumeType(id: volumeAdd.storageType.toLong())
-					morpheusContext.storageVolume.create([newVolume], server).blockingGet()
+					morpheusContext.async.storageVolume.create([newVolume], server).blockingGet()
 					// Need to refetch the server
-					server = morpheusContext.computeServer.get(server.id).blockingGet()
+					server = morpheusContext.async.computeServer.get(server.id).blockingGet()
 				} else {
 					//do stuff here to bubble up results
 					rtn.setError("error adding disk: ${addDiskResults?.msg}")
@@ -1058,7 +1057,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				if(deleteResults.success == true) {
 					log.info("resize network delete complete: ${deleteResults.success}")
 					resizeRequest.interfacesDelete?.each { ComputeServerInterface networkDelete ->
-						morpheusContext.computeServer.computeServerInterface.remove([networkDelete], server).blockingGet()
+						morpheusContext.async.computeServer.computeServerInterface.remove([networkDelete], server).blockingGet()
 					}
 				}
 			}
@@ -1072,7 +1071,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				vmBody = serverDetails?.data
 				def newIndex = networkAdd?.network?.isPrimary ? 0 : server.interfaces?.size()
 
-				Network newNetwork = morpheusContext.network.listById([networkAdd.network.id.toLong()]).firstOrError().blockingGet()
+				Network newNetwork = morpheusContext.async.network.listById([networkAdd.network.id.toLong()]).firstOrError().blockingGet()
 
 				def networkConfig = [
 						is_connected    : true,
@@ -1111,9 +1110,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							displayOrder    : newIndex,
 							primaryInterface: networkAdd?.network?.isPrimary ? true : false
 					])
-					morpheusContext.computeServer.computeServerInterface.create([newInterface], server).blockingGet()
+					morpheusContext.async.computeServer.computeServerInterface.create([newInterface], server).blockingGet()
 					// Need to refetch the server
-					server = morpheusContext.computeServer.get(server.id).blockingGet()
+					server = morpheusContext.async.computeServer.get(server.id).blockingGet()
 				} else {
 					//do stuff here to bubble up results
 					rtn.setError("error adding disk: ${addDiskResults?.msg}")
@@ -1281,11 +1280,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	protected ComputeServer saveAndGet(ComputeServer server) {
-		def saveSuccessful = morpheusContext.computeServer.save([server]).blockingGet()
+		def saveSuccessful = morpheusContext.async.computeServer.bulkSave([server]).blockingGet()
 		if(!saveSuccessful) {
 			log.warn("Error saving server: ${server?.id}" )
 		}
-		return morpheusContext.computeServer.get(server.id).blockingGet()
+		return morpheusContext.async.computeServer.get(server.id).blockingGet()
 	}
 
 	private NetworkProxy buildNetworkProxy(ProxyConfiguration proxyConfiguration) {
@@ -1311,7 +1310,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			if (virtualImage) {
 				VirtualImageLocation virtualImageLocation
 				try {
-					virtualImageLocation = morpheusContext.virtualImage.location.findVirtualImageLocation(virtualImage.id, cloud.id, cloud.regionCode, null, false).blockingGet()
+					virtualImageLocation = morpheusContext.async.virtualImage.location.findVirtualImageLocation(virtualImage.id, cloud.id, cloud.regionCode, null, false).blockingGet()
 					if (!virtualImageLocation) {
 						imageExternalId = null
 					} else {
@@ -1330,7 +1329,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			if (!imageExternalId) { //If its userUploaded and still needs uploaded
 				// Create the image
-				def cloudFiles = morpheusContext.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
+				def cloudFiles = morpheusContext.async.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
 				def imageFile = cloudFiles?.find { cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2") }
 				def contentLength = imageFile?.getContentLength()
 				// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
@@ -1348,7 +1347,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
 						internalId  : imageExternalId,
 					])
-					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
+					morpheusContext.async.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
 					if (letNutanixDownloadImage == false) {
 						waitForImageComplete(client, authConfig, imageExternalId, false)
 						def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream, contentLength)
@@ -1364,7 +1363,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
 						internalId  : imageExternalId,
 					])
-					morpheusContext.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
+					morpheusContext.async.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
 					throw new Exception("Error in creating the image: ${imageResults.msg}")
 				}
 
@@ -1504,7 +1503,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 
 		def datastoreId = rootVolume.datastore?.id
-		def rootDatastore = morpheusContext.cloud.datastore.listById([datastoreId.toLong()]).firstOrError().blockingGet()
+		def rootDatastore = morpheusContext.async.cloud.datastore.listById([datastoreId.toLong()]).firstOrError().blockingGet()
 		if(!rootDatastore) {
 			log.error("buildRunConfig error: Datastore option is invalid for selected host")
 			throw new Exception("There are no available datastores to use based on provisioning options for the target host.")
@@ -1512,7 +1511,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 		if(rootVolume) {
 			rootVolume.datastore = rootDatastore
-			morpheusContext.storageVolume.save([rootVolume]).blockingGet()
+			morpheusContext.async.storageVolume.save([rootVolume]).blockingGet()
 		}
 
 		// Network stuff
@@ -1545,12 +1544,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			datastoreIds << volume.datastore?.id?.toLong()
 			def storageVolumeTypeId = volume.type?.id?.toLong()
 			if(!storageVolumeTypes[storageVolumeTypeId]) {
-				storageVolumeTypes[storageVolumeTypeId] = morpheusContext.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
+				storageVolumeTypes[storageVolumeTypeId] = morpheusContext.async.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
 			}
 
 		}
 		datastoreIds = datastoreIds.unique()
-		def datastores = morpheusContext.cloud.datastore.listById(datastoreIds).toMap {it.id.toLong()}.blockingGet()
+		def datastores = morpheusContext.async.cloud.datastore.listById(datastoreIds).toMap {it.id.toLong()}.blockingGet()
 
 		//categories
 		def categories = config.categories?.collect {
@@ -1694,16 +1693,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			//prep for insert
 
 			Process process = workloadRequest?.process ?: hostRequest?.process ?: null
-			morpheusContext.process.startProcessStep(process , new ProcessEvent(type: ProcessEvent.ProcessType.provisionConfig), 'configuring')
+			morpheusContext.async.process.startProcessStep(process , new ProcessEvent(type: ProcessEvent.ProcessType.provisionConfig), 'configuring')
 
 
 
-			ComputeServer server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
+			ComputeServer server = morpheusContext.async.computeServer.get(runConfig.serverId as Long).blockingGet()
 			Workload sourceWorkload
 			VirtualImage virtualImage
 			if(runConfig.virtualImageId) {
 				try {
-					virtualImage = morpheusContext.virtualImage.get(runConfig.virtualImageId).blockingGet()
+					virtualImage = morpheusContext.async.virtualImage.get(runConfig.virtualImageId as Long).blockingGet()
 				} catch(e) {
 					log.debug "Error in getting virtualImage ${runConfig.virtualImageId}, ${e}"
 				}
@@ -1738,7 +1737,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			log.debug("create server")
 
-			morpheusContext.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionDeploy), 'deploying vm')
+			morpheusContext.async.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionDeploy), 'deploying vm')
 
 			Map cloudConfigOpts = workloadRequest?.cloudConfigOpts ?: hostRequest?.cloudConfigOpts ?: null
 
@@ -1770,7 +1769,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				needsNewCloudInit = true
 				log.debug("clone snapshot results: ${createResults}")
 			} else if(runConfig.cloneContainerId) {
-				sourceWorkload = morpheusContext.workload.get(runConfig.cloneContainerId).blockingGet()
+				sourceWorkload = morpheusContext.async.workload.get(runConfig.cloneContainerId).blockingGet()
 				def sourceServer = sourceWorkload?.server
 				def vmUuid = sourceServer?.externalId
 				if(server.serverOs?.platform != 'windows') {
@@ -1786,9 +1785,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			//check success
 			if(createResults.success == true && (createResults.data?.metadata?.uuid || createResults.data?.task_uuid)) {
 
-				server = morpheusContext.computeServer.get(server.id).blockingGet()
+				server = morpheusContext.async.computeServer.get(server.id).blockingGet()
 				if(virtualImage) {
-					virtualImage = morpheusContext.virtualImage.get(virtualImage.id).blockingGet()
+					virtualImage = morpheusContext.async.virtualImage.get(virtualImage.id).blockingGet()
 				}
 
 				if(createResults.data?.metadata?.uuid) {
@@ -1803,7 +1802,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				//TODO tagging? No direct mapping
 				//applyTags(workload, client)
 
-				morpheusContext.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
+				morpheusContext.async.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
 				def taskId = createResults.data?.status?.execution_context?.task_uuid ?: createResults.data?.task_uuid
 				def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
@@ -1885,7 +1884,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 									volume.deviceDisplayName = deviceName
 									volumeCount++
 								}
-								morpheusContext.storageVolume.save(volumes).blockingGet()
+								morpheusContext.async.storageVolume.save(volumes).blockingGet()
 								server = saveAndGet(server)
 								provisionResponse.success = true
 							} else {
@@ -1903,7 +1902,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			} else {
 				if(createResults.results?.server?.id) {
-					server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
+					server = morpheusContext.async.computeServer.get(runConfig.serverId as Long).blockingGet()
 					server.externalId = createResults.results.server.id
 					server.internalId = createResults.results.server.instanceUuid
 					server = saveAndGet(server)
@@ -1919,7 +1918,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	def finalizeVm(Map runConfig, ProvisionResponse provisionResponse) {
 		log.debug("runTask onComplete: runConfig:${runConfig}, provisionResponse: ${provisionResponse}")
-		ComputeServer server = morpheusContext.computeServer.get(runConfig.serverId).blockingGet()
+		ComputeServer server = morpheusContext.async.computeServer.get(runConfig.serverId as Long).blockingGet()
 		try {
 			if(provisionResponse.success == true) {
 				server.statusDate = new Date()
@@ -1949,8 +1948,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	private Map getAllResourcePools(Cloud cloud) {
 		log.debug "getAllResourcePools: ${cloud}"
-		def resourcePoolProjectionIds = morpheusContext.cloud.pool.listSyncProjections(cloud.id, '').map{it.id}.toList().blockingGet()
-		def resourcePoolsMap = morpheusContext.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId}.blockingGet()
+		def resourcePoolProjectionIds = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).map{it.id}.toList().blockingGet()
+		def resourcePoolsMap = morpheusContext.async.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId}.blockingGet()
 		resourcePoolsMap
 	}
 

@@ -49,13 +49,13 @@ class ImagesSync {
 			if (listResults.success) {
 				def masterImages = listResults?.data?.findAll { it.status.resources.image_type != 'ISO_IMAGE' }
 
-				Observable domainRecords = morpheusContext.virtualImage.location.listSyncProjections(cloud.id)
+				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(cloud.id, null)
 				SyncTask<VirtualImageLocationIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, masterImages)
 				syncTask.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.metadata.uuid
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
-					morpheusContext.virtualImage.location.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImageLocation virtualImageLocation ->
+					morpheusContext.async.virtualImage.location.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImageLocation virtualImageLocation ->
 						SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map> matchItem = updateItemMap[virtualImageLocation.id]
 						return new SyncTask.UpdateItem<Datastore, Map>(existingItem: virtualImageLocation, masterItem: matchItem.masterItem)
 					}
@@ -82,7 +82,7 @@ class ImagesSync {
 		def allowedImageTypes = ['qcow2']
 
 		def uniqueIds = [] as Set
-		Observable domainRecords = morpheusContext.virtualImage.listSyncProjections(cloud.id).filter { VirtualImageIdentityProjection proj ->
+		Observable domainRecords = morpheusContext.async.virtualImage.listIdentityProjections(cloud.id).filter { VirtualImageIdentityProjection proj ->
 			def include = proj.imageType in allowedImageTypes && proj.name in names && (proj.systemImage || (!proj.ownerId || proj.ownerId == cloud.owner.id))
 			if(include) {
 				def uniqueKey = "${proj.imageType.toString()}:${proj.name}".toString()
@@ -98,7 +98,7 @@ class ImagesSync {
 			domainObject.name == cloudItem.status.name
 		}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItems ->
 			Map<Long, SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
-			morpheusContext.virtualImage.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImage virtualImage ->
+			morpheusContext.async.virtualImage.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImage virtualImage ->
 				SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map> matchItem = updateItemMap[virtualImage.id]
 				return new SyncTask.UpdateItem<VirtualImage, Map>(existingItem: virtualImage, masterItem: matchItem.masterItem)
 			}
@@ -128,7 +128,7 @@ class ImagesSync {
 
 		// Create em all!
 		log.debug "About to create ${adds.size()} virtualImages"
-		morpheusContext.virtualImage.create(adds, cloud).blockingGet()
+		morpheusContext.async.virtualImage.create(adds, cloud).blockingGet()
 
 	}
 
@@ -145,7 +145,7 @@ class ImagesSync {
 
 		if(locationAdds) {
 			log.debug "About to create ${locationAdds.size()} locations"
-			morpheusContext.virtualImage.location.create(locationAdds, cloud).blockingGet()
+			morpheusContext.async.virtualImage.location.create(locationAdds, cloud).blockingGet()
 		}
 	}
 
@@ -158,16 +158,16 @@ class ImagesSync {
 		def externalIds = updateList?.findAll{ it.existingItem.externalId }?.collect{ it.existingItem.externalId }
 		List<VirtualImage> existingItems = []
 		if(imageIds && externalIds) {
-			def tmpImgProjs = morpheusContext.virtualImage.listSyncProjections(cloud.id).filter { img ->
+			def tmpImgProjs = morpheusContext.async.virtualImage.listIdentityProjections(cloud.id).filter { img ->
 				img.id in imageIds || (!img.systemImage && img.externalId != null && img.externalId in externalIds)
 			}.toList().blockingGet()
 			if(tmpImgProjs) {
-				existingItems = morpheusContext.virtualImage.listById(tmpImgProjs.collect { it.id }).filter { img ->
+				existingItems = morpheusContext.async.virtualImage.listById(tmpImgProjs.collect { it.id }).filter { img ->
 					img.id in imageIds || img.imageLocations.size() == 0
 				}.toList().blockingGet()
 			}
 		} else if(imageIds) {
-			existingItems = morpheusContext.virtualImage.listById(imageIds).toList().blockingGet()
+			existingItems = morpheusContext.async.virtualImage.listById(imageIds).toList().blockingGet()
 		}
 
 		List<VirtualImageLocation> locationsToCreate = []
@@ -234,19 +234,19 @@ class ImagesSync {
 
 		}
 		if(locationsToCreate.size() > 0 ) {
-			morpheusContext.virtualImage.location.create(locationsToCreate, cloud).blockingGet()
+			morpheusContext.async.virtualImage.location.create(locationsToCreate, cloud).blockingGet()
 		}
 		if(locationsToUpdate.size() > 0 ) {
-			morpheusContext.virtualImage.location.save(locationsToUpdate, cloud).blockingGet()
+			morpheusContext.async.virtualImage.location.save(locationsToUpdate, cloud).blockingGet()
 		}
 		if(imagesToUpdate.size() > 0 ) {
-			morpheusContext.virtualImage.save(imagesToUpdate, cloud).blockingGet()
+			morpheusContext.async.virtualImage.save(imagesToUpdate, cloud).blockingGet()
 		}
 	}
 
 	private removeMissingVirtualImageLocations(List removeList) {
 		log.debug "removeMissingVirtualImageLocations: ${removeList?.size()}"
-		morpheusContext.virtualImage.location.remove(removeList).blockingGet()
+		morpheusContext.async.virtualImage.location.remove(removeList).blockingGet()
 	}
 
 	private buildVirtualImageConfig(Map cloudItem) {

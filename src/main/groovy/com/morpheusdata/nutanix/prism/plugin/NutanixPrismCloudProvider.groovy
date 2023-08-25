@@ -1,7 +1,7 @@
 package com.morpheusdata.nutanix.prism.plugin
 
 import com.morpheusdata.core.backup.AbstractBackupProvider
-import com.morpheusdata.core.CloudProvider
+import com.morpheusdata.core.providers.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.core.providers.ProvisionProvider
@@ -345,7 +345,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				def username
 				def password
 				if(validateCloudRequest.credentialType?.toString().isNumber()) {
-					AccountCredential accountCredential = morpheus.accountCredential.get(validateCloudRequest.credentialType.toLong()).blockingGet()
+					AccountCredential accountCredential = morpheus.async.accountCredential.get(validateCloudRequest.credentialType.toLong()).blockingGet()
 					password = accountCredential.data.password
 					username = accountCredential.data.username
 				} else if(validateCloudRequest.credentialType == 'username-password') {
@@ -580,11 +580,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		def regionCode = checksum.encodeHex().toString()
 		if (cloud.regionCode != regionCode) {
 			cloud.regionCode = regionCode
-			morpheusContext.cloud.save(cloud).blockingGet()
+			morpheusContext.async.cloud.save(cloud).blockingGet()
 		}
 	}
 
 	NutanixPrismProvisionProvider nutanixPrismProvisionProvider() {
-		this.plugin.getProviderByCode('nutanix-prism-provision-provider')
+		this.plugin.getProviderByCode('nutanix-prism-provision-provider') as NutanixPrismProvisionProvider
 	}
 }
