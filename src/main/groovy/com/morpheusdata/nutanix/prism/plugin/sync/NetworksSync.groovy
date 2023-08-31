@@ -5,9 +5,9 @@ import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Account
 import com.morpheusdata.model.Cloud
-import com.morpheusdata.model.ComputeZonePool
+import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.Network
-import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
+import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.model.projection.NetworkIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
@@ -35,11 +35,11 @@ class NetworksSync {
 			def networkTypes = plugin.cloudProvider.getNetworkTypes()
 
 
-			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { ComputeZonePoolIdentityProjection projection ->
+			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
 			}.toList().blockingGet()
 
-			def vpcs = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { ComputeZonePoolIdentityProjection projection ->
+			def vpcs = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
 				return projection.type == 'VPC' && projection.internalId != null
 			}.toList().blockingGet()
 
@@ -48,7 +48,7 @@ class NetworksSync {
 			if (listResults.success) {
 
 				def domainRecords = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id)
-				SyncTask<NetworkIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, listResults.data)
+				SyncTask<NetworkIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, listResults.data)
 				syncTask.addMatchFunction { NetworkIdentityProjection domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.metadata.uuid
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<NetworkIdentityProjection, Map>> updateItems ->
@@ -90,7 +90,7 @@ class NetworksSync {
 
 						Network networkAdd = new Network(networkConfig)
 						if(clusterId) {
-							networkConfig.assignedZonePools = [new ComputeZonePool(id: clusterId)]
+							networkConfig.assignedZonePools = [new CloudPool(id: clusterId)]
 						}
 						networkAdds << networkAdd
 					}
@@ -129,7 +129,7 @@ class NetworksSync {
 								save = true
 							}
 							if (clusterId && !existingItem.assignedZonePools?.find { it.id == clusterId }) {
-								existingItem.assignedZonePools += new ComputeZonePool(id: clusterId)
+								existingItem.assignedZonePools += new CloudPool(id: clusterId)
 								save = true
 							}
 							if (save) {

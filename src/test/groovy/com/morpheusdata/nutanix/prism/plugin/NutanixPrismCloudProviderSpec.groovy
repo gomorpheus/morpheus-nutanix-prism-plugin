@@ -2,7 +2,7 @@ package com.morpheusdata.nutanix.prism.plugin
 
 import com.morpheusdata.core.cloud.MorpheusCloudService
 import com.morpheusdata.core.MorpheusContext
-import com.morpheusdata.core.cloud.MorpheusComputeZonePoolService
+import com.morpheusdata.core.cloud.MorpheusCloudPoolService
 import spock.lang.Specification
 import spock.lang.Subject
 
@@ -13,13 +13,13 @@ class NutanixPrismCloudProviderSpec extends Specification {
 
 	MorpheusContext context
 	MorpheusCloudService cloudContext
-	MorpheusComputeZonePoolService poolContext
+	MorpheusCloudPoolService poolContext
 	NutanixPrismPlugin plugin
 
 	void setup() {
 		context = Mock(MorpheusContext)
 		cloudContext = Mock(MorpheusCloudService)
-		poolContext = Mock(MorpheusComputeZonePoolService)
+		poolContext = Mock(MorpheusCloudPoolService)
 		context.async.getCloud() >> cloudContext
 		cloudContext.getPool() >> poolContext
 		plugin = Mock(NutanixPrismPlugin)

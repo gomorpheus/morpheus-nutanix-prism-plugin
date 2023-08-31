@@ -5,10 +5,10 @@ import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Account
 import com.morpheusdata.model.Cloud
-import com.morpheusdata.model.ComputeZonePool
+import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.Datastore
-import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
-import com.morpheusdata.model.projection.DatastoreIdentityProjection
+import com.morpheusdata.model.projection.CloudPoolIdentity
+import com.morpheusdata.model.projection.DatastoreIdentity
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import groovy.util.logging.Slf4j
@@ -36,7 +36,7 @@ class DatastoresSync {
 			def authConfig = plugin.getAuthConfig(cloud)
 
 			// Fetch our known clusters
-			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { ComputeZonePoolIdentityProjection projection ->
+			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
 			}.toList().blockingGet()
 
@@ -44,13 +44,13 @@ class DatastoresSync {
 			if(listResults.success == true) {
 
 				Observable domainRecords = morpheusContext.async.cloud.datastore.listSyncProjections(cloud.id)
-				SyncTask<DatastoreIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, listResults?.data)
-				syncTask.addMatchFunction { DatastoreIdentityProjection domainObject, Map cloudItem ->
+				SyncTask<DatastoreIdentity, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, listResults?.data)
+				syncTask.addMatchFunction { DatastoreIdentity domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.entity_id
-				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<DatastoreIdentityProjection, Map>> updateItems ->
-					Map<Long, SyncTask.UpdateItemDto<DatastoreIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
+				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<DatastoreIdentity, Map>> updateItems ->
+					Map<Long, SyncTask.UpdateItemDto<DatastoreIdentity, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 					morpheusContext.async.cloud.datastore.listById(updateItems?.collect { it.existingItem.id }).map { Datastore datastore ->
-						SyncTask.UpdateItemDto<DatastoreIdentityProjection, Map> matchItem = updateItemMap[datastore.id]
+						SyncTask.UpdateItemDto<DatastoreIdentity, Map> matchItem = updateItemMap[datastore.id]
 						return new SyncTask.UpdateItem<Datastore, Map>(existingItem: datastore, masterItem: matchItem.masterItem)
 					}
 				}.onAdd { itemsToAdd ->
@@ -74,7 +74,7 @@ class DatastoresSync {
 								online      : online
 						]
 						Datastore add = new Datastore(datastoreConfig)
-						add.assignedZonePools = [new ComputeZonePool(id: cluster?.id)]
+						add.assignedZonePools = [new CloudPool(id: cluster?.id)]
 						adds << add
 
 					}
@@ -118,7 +118,7 @@ class DatastoresSync {
 							save = true
 						}
 						if(cluster?.id && !existingItem.assignedZonePools?.find{it.id == cluster?.id}) {
-							existingItem.assignedZonePools += new ComputeZonePool(id: cluster.id)
+							existingItem.assignedZonePools += new CloudPool(id: cluster.id)
 							save=true
 						}
 						if(save) {
