@@ -50,7 +50,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_3-set" {
 resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	code = "nutanix-prism-centos-7.3-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 10
+	sortOrder = 73
 	instanceVersion = "7.3"
 	description = "This will provision a single vm"
 	instanceType {
@@ -134,7 +134,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_5-set" {
 resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	code = "nutanix-prism-centos-7.5-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 20
+	sortOrder = 75
 	instanceVersion = "7.5"
 	description = "This will provision a single vm"
 	instanceType {
@@ -183,6 +183,22 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-8-stream" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "virtual-image" "nutanix-prism-image-morpheus-centos-8-stream-20230822" {
+	code = "nutanix.prism.image.morpheus.centos.8-stream.20230822"
+	category = "nutanix.prism.image.morpheus.centos"
+	name = "Morpheus CentOS 8-stream 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/centos-8-stream/morpheus-centos-8-stream-x86_64-20230822.qcow2"
+	imagePath = "qemu/20230822/centos-8-stream"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "cent.8.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
 
 resource "workload-type" "nutanix-prism-centos-8-stream" {
 	code = "nutanix-prism-centos-8-stream"
@@ -199,7 +215,7 @@ resource "workload-type" "nutanix-prism-centos-8-stream" {
 	providerType = "nutanix-prism"
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-8-stream
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-8-stream-20230822
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 	commEnabled = true
@@ -218,7 +234,7 @@ resource "workload-type-set" "nutanix-prism-centos-8-stream-set" {
 resource "instance-type-layout" "nutanix-prism-centos-8-stream-single" {
 	code = "nutanix-prism-centos-8-stream-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 30
+	sortOrder = 89
 	instanceVersion = "8-stream"
 	description = "This will provision a single vm"
 	instanceType {
@@ -267,6 +283,22 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-9-stream" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "virtual-image" "nutanix-prism-image-morpheus-centos-9-stream-20230822" {
+	code = "nutanix.prism.image.morpheus.centos.9-stream.20230822"
+	category = "nutanix.prism.image.morpheus.centos"
+	name = "Morpheus CentOS 9-stream 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/centos-9-stream/morpheus-centos-9-stream-x86_64-20230822.qcow2"
+	imagePath = "qemu/20230822/centos-9-stream"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "cent.9.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
 
 resource "workload-type" "nutanix-prism-centos-9-stream" {
 	code = "nutanix-prism-centos-9-stream"
@@ -283,7 +315,7 @@ resource "workload-type" "nutanix-prism-centos-9-stream" {
 	providerType = "nutanix-prism"
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-9-stream
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-9-stream-20230822
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 	commEnabled = true
@@ -302,7 +334,7 @@ resource "workload-type-set" "nutanix-prism-centos-9-stream-set" {
 resource "instance-type-layout" "nutanix-prism-centos-9-stream-single" {
 	code = "nutanix-prism-centos-9-stream-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 40
+	sortOrder = 99
 	instanceVersion = "9-stream"
 	description = "This will provision a single vm"
 	instanceType {

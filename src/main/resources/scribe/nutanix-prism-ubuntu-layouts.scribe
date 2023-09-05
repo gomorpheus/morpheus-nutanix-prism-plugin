@@ -33,6 +33,22 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-18_04-20230131" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-18_04-20230822" {
+	code = "nutanix.prism.image.morpheus.ubuntu.18.04.20230822"
+	category = "nutanix.prism.image.morpheus.ubuntu"
+	name = "Morpheus Ubuntu 18.04 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/ubuntu-18/morpheus-ubuntu-18_04-amd64-20230822.qcow2"
+	imagePath = "qemu/20230822/ubuntu-18"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "ubuntu.18.04.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
 
 resource "workload-type" "nutanix-prism-ubuntu-18_04" {
 	code = "nutanix-prism-ubuntu-18.04"
@@ -53,7 +69,7 @@ resource "workload-type" "nutanix-prism-ubuntu-18_04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-18_04-20230131
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-18_04-20230822
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -69,7 +85,7 @@ resource "workload-type-set" "nutanix-prism-ubuntu-18_04-set" {
 resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 	code = "nutanix-prism-ubuntu-18.04-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 20
+	sortOrder = 18
 	instanceVersion = "18.04"
 	description = "This will provision a single vm"
 	instanceType {
@@ -120,6 +136,21 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20230131" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20230822" {
+	code = "nutanix.prism.image.morpheus.ubuntu.20.04.20230822.ubuntu.20.04"
+	category = "nutanix.prism.image.morpheus.ubuntu"
+	name = "Morpheus Ubuntu 20.04.04 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/ubuntu-20/morpheus-ubuntu-20_04-amd64-20230822.qcow2"
+	imagePath = "qemu/20230822/ubuntu-20"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "ubuntu.20.04.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
 
 resource "workload-type" "nutanix-prism-ubuntu-20_04" {
 	code = "nutanix-prism-ubuntu-20.04"
@@ -140,7 +171,7 @@ resource "workload-type" "nutanix-prism-ubuntu-20_04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20230131
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20230822
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -156,7 +187,7 @@ resource "workload-type-set" "nutanix-prism-ubuntu-20_04-set" {
 resource "instance-type-layout" "nutanix-prism-ubuntu-20_04-single" {
 	code = "nutanix-prism-ubuntu-20.04-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 30
+	sortOrder = 20
 	instanceVersion = "20.04"
 	description = "This will provision a single vm"
 	instanceType {
@@ -206,6 +237,22 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20230307" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20230822" {
+	code = "nutanix.prism.image.morpheus.ubuntu.22.04.20230822"
+	category = "nutanix.prism.image.morpheus.ubuntu"
+	name = "Morpheus Ubuntu 22.04 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/ubuntu-22/morpheus-ubuntu-22_04-amd64-20230822.qcow2"
+	imagePath = "qemu/20230822/ubuntu-22"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "ubuntu.22.04.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
 
 resource "workload-type" "nutanix-prism-ubuntu-22_04" {
 	code = "nutanix-prism-ubuntu-22.04"
@@ -226,7 +273,7 @@ resource "workload-type" "nutanix-prism-ubuntu-22_04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20230307
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20230822
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -242,7 +289,7 @@ resource "workload-type-set" "nutanix-prism-ubuntu-22_04-set" {
 resource "instance-type-layout" "nutanix-prism-ubuntu-22_04-single" {
 	code = "nutanix-prism-ubuntu-22.04-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 40
+	sortOrder = 22
 	instanceVersion = "22.04"
 	description = "This will provision a single vm"
 	instanceType {
