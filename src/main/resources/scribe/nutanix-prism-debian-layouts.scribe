@@ -15,6 +15,22 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20230308" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20230822" {
+	code = "nutanix.prism.image.morpheus.debian.10.20230822"
+	category = "nutanix.prism.image.morpheus.debian"
+	name = "Morpheus Debian 10 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/debian-10/morpheus-debian-10-amd64-20230822.qcow2"
+	imagePath = "qemu/20230822/debian-10"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "debian.10.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
 
 resource "workload-type" "nutanix-prism-debian-10" {
 	code = "nutanix-prism-debian-10"
@@ -35,7 +51,7 @@ resource "workload-type" "nutanix-prism-debian-10" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-10-20230308
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-10-20230822
 	provisionType  = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -100,6 +116,21 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20230308" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20230822" {
+	code = "nutanix.prism.image.morpheus.debian.11.20230822"
+	category = "nutanix.prism.image.morpheus.debian"
+	name = "Morpheus Debian 11 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/debian-11/morpheus-debian-11-amd64-20230822.qcow2"
+	imagePath = "qemu/20230822/debian-11"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "debian.11.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
 
 resource "workload-type" "nutanix-prism-debian-11" {
 	code = "nutanix-prism-debian-11"
@@ -120,7 +151,7 @@ resource "workload-type" "nutanix-prism-debian-11" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-11-20230308
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-11-20230822
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -136,7 +167,7 @@ resource "workload-type-set" "nutanix-prism-debian-11-set" {
 resource "instance-type-layout" "nutanix-prism-debian-11-single" {
 	code = "nutanix-prism-debian-11-single"
 	name = "Nutanix Prism Central VM"
-	sortOrder = 20
+	sortOrder = 11
 	instanceVersion = "11"
 	description = "This will provision a single vm"
 	instanceType {
@@ -167,3 +198,88 @@ resource "scale-action" "nutanix-prism-debian-11-single" {
 		code = "generic-remove-node"
 	}
 }
+
+//12
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-12-20230822" {
+	code = "nutanix.prism.image.morpheus.debian.12.20230822"
+	category = "nutanix.prism.image.morpheus.debian"
+	name = "Morpheus Debian 12 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/debian-12/morpheus-debian-12-amd64-20230822.qcow2"
+	imagePath = "qemu/20230822/debian-12"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "debian.12.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+resource "workload-type" "nutanix-prism-debian-12" {
+	code = "nutanix-prism-debian-12"
+	shortName = "debian"
+	name = "Debian 12"
+	ports = [22]
+	containerVersion = "12"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "debian"
+	showServerLogs = true
+	category = "debian"
+	cloneType = "debian"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	containerPorts = [{code = "debian.22"}]
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-12-20230822
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+}
+
+resource "workload-type-set" "nutanix-prism-debian-12-set" {
+	code = "nutanix-prism-debian-12-set"
+	containerType = workload-type.nutanix-prism-debian-12
+	priorityOrder = 0
+	dynamicCount = true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-debian-12-single" {
+	code = "nutanix-prism-debian-12-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 12
+	instanceVersion = "12"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "debian"
+	}
+	serverCount = 1
+	hasAutoScale = true
+	portCount = 1
+	serverType = "vm"
+	enabled = true
+	creatable = true
+	supportsConvertToManaged = true
+	containers = [
+		workload-type-set.nutanix-prism-debian-12-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-debian-12-single" {
+	code = "nutanix-prism-debian-12-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-debian-12-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
+
