@@ -1,7 +1,7 @@
 package com.morpheusdata.nutanix.prism.plugin
 
 import com.morpheusdata.core.backup.AbstractBackupProvider
-import com.morpheusdata.core.providers.CloudProvider
+import com.morpheusdata.core.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
 import com.morpheusdata.core.providers.ProvisionProvider

@@ -13,6 +13,7 @@ import com.morpheusdata.core.providers.WorkloadProvisionProvider
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.Cloud
+import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.ComputeCapacityInfo
 import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerInterface
@@ -49,6 +50,7 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.request.ResizeRequest
 import com.morpheusdata.request.UpdateModel
 import com.morpheusdata.response.PrepareInstanceResponse
+import com.morpheusdata.response.PrepareWorkloadResponse
 import com.morpheusdata.response.ProvisionResponse
 import com.morpheusdata.response.ServiceResponse
 import groovy.json.JsonSlurper
@@ -470,7 +472,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
-	public ServiceResponse prepareWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
+	ServiceResponse prepareWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
 		log.debug "prepareWorkload: ${workload} ${workloadRequest} ${opts}"
 
 		def rtn = [success: false, msg: null]
@@ -1503,7 +1505,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 
 		def datastoreId = rootVolume.datastore?.id
-		def rootDatastore = morpheusContext.async.cloud.datastore.listById([datastoreId.toLong()]).firstOrError().blockingGet()
+		def rootDatastore = morpheusContext.async.cloud.datastore.listById([datastoreId?.toLong()]).firstOrError().blockingGet()
 		if(!rootDatastore) {
 			log.error("buildRunConfig error: Datastore option is invalid for selected host")
 			throw new Exception("There are no available datastores to use based on provisioning options for the target host.")
@@ -1852,13 +1854,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							if (serverDetail.success == true) {
 
 								Map resourcePools = getAllResourcePools(server.cloud)
-								ComputeZonePool resourcePool = resourcePools[serverDetail?.virtualMachine?.status?.cluster_reference?.uuid]
+								CloudPool resourcePool = resourcePools[serverDetail?.virtualMachine?.status?.cluster_reference?.uuid]
 
 								def privateIp = serverDetail.ipAddress
 								def publicIp = serverDetail.ipAddress
 								server.internalIp = privateIp
 								server.externalIp = publicIp
-								server.resourcePool = resourcePool
+								server.resourcePool = new ComputeZonePool(id: resourcePool.id)
 
 								//update disks
 								def disks = serverDetail.diskList

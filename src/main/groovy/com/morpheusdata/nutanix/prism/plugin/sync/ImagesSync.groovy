@@ -1,24 +1,15 @@
 package com.morpheusdata.nutanix.prism.plugin.sync
 
 import com.morpheusdata.core.MorpheusContext
-import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Account
 import com.morpheusdata.model.Cloud
-import com.morpheusdata.model.ComputeZonePool
+import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.ImageType
-import com.morpheusdata.model.Network
-import com.morpheusdata.model.StorageController
-import com.morpheusdata.model.StorageControllerType
-import com.morpheusdata.model.StorageVolume
-import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.VirtualImageLocation
-import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
-import com.morpheusdata.model.projection.NetworkIdentityProjection
-import com.morpheusdata.model.projection.StorageControllerIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageLocationIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
@@ -50,9 +41,9 @@ class ImagesSync {
 				def masterImages = listResults?.data?.findAll { it.status.resources.image_type != 'ISO_IMAGE' }
 
 				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(cloud.id, null)
-				SyncTask<VirtualImageLocationIdentityProjection, Map, ComputeZonePool> syncTask = new SyncTask<>(domainRecords, masterImages)
+				SyncTask<VirtualImageLocationIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterImages)
 				syncTask.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
-					domainObject.externalId == cloudItem?.metadata.uuid
+					domainObject.externalId == cloudItem?.metadata?.uuid
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 					morpheusContext.async.virtualImage.location.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImageLocation virtualImageLocation ->
@@ -74,7 +65,7 @@ class ImagesSync {
 		log.debug "END: execute ImagesSync: ${cloud.id}"
 	}
 
-	def addMissingVirtualImageLocations(List objList) {
+	def addMissingVirtualImageLocations(Collection<Map> objList) {
 		log.debug "addMissingVirtualImageLocations: ${objList?.size()}"
 
 		def names = objList.collect{it.status.name}?.unique()
@@ -110,7 +101,7 @@ class ImagesSync {
 		}.start()
 	}
 
-	private addMissingVirtualImages(List addList) {
+	private addMissingVirtualImages(Collection<Map> addList) {
 		log.debug "addMissingVirtualImages ${addList?.size()}"
 		Account account = cloud.account
 		def regionCode = cloud.regionCode

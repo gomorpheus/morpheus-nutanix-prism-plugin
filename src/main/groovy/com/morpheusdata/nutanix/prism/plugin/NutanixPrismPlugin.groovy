@@ -22,14 +22,14 @@ class NutanixPrismPlugin extends Plugin {
 		this.setName('Nutanix Prism Central')
 		def nutanixProvision = new NutanixPrismProvisionProvider(this, this.morpheus)
 		def nutanixPrismCloud = new NutanixPrismCloudProvider(this, this.morpheus)
-		cloudProviderCode = nutanixPrismCloud.code
+		def backupProvider = new NutanixPrismBackupProvider(this, morpheus)
 		def nutanixPrismOptionSourceProvider = new NutanixPrismOptionSourceProvider(this, morpheus)
 
-		this.pluginProviders.put(nutanixProvision.code, nutanixProvision)
-		this.pluginProviders.put(nutanixPrismCloud.code, nutanixPrismCloud)
-		this.pluginProviders.put(nutanixPrismOptionSourceProvider.code, nutanixPrismOptionSourceProvider)
+		registerProviders(
+			nutanixPrismCloud, nutanixProvision, nutanixPrismOptionSourceProvider, backupProvider
+		)
 
-		NutanixPrismBackupProvider backupProvider = new NutanixPrismBackupProvider(this, morpheus)
+		cloudProviderCode = nutanixPrismCloud.code
 		pluginProviders.put(backupProvider.code, backupProvider)
 	}
 

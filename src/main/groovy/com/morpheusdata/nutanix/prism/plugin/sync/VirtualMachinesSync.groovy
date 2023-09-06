@@ -101,8 +101,7 @@ class VirtualMachinesSync {
 
 		for(cloudItem in addList) {
 			try {
-				ComputeZonePool resourcePool = resourcePools[cloudItem.status?.cluster_reference?.uuid]
-				def doCreate = resourcePool.inventory != false && !blackListedNames?.contains(cloudItem.status.name)
+				def doCreate = !blackListedNames?.contains(cloudItem.status.name)
 				if(doCreate) {
 					def vmConfig = buildVmConfig(cloudItem, resourcePools, hosts)
 					vmConfig.plan = SyncUtils.findServicePlanBySizing(plans, vmConfig.maxMemory, vmConfig.maxCores, null, fallbackPlan, null, cloud.account)
@@ -384,7 +383,7 @@ class VirtualMachinesSync {
 	}
 
 	private buildVmConfig(Map cloudItem, Map resourcePools, Map hosts) {
-		ComputeZonePool resourcePool = resourcePools[cloudItem.status?.cluster_reference?.uuid]
+		CloudPool resourcePool = resourcePools[cloudItem.status?.cluster_reference?.uuid]
 		def ipAddress = cloudItem.status.resources.nic_list?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
 		def vmConfig = [
 				account          : cloud.account,
@@ -400,7 +399,7 @@ class VirtualMachinesSync {
 				managed          : false,
 				serverType       : 'vm',
 				status           : 'provisioned',
-				resourcePool     : resourcePool,
+				resourcePool     : new ComputeZonePool(id: resourcePool.id),
 				uniqueId         : cloudItem.metadata.uuid,
 				internalId       : cloudItem.metadata.uuid,
 				powerState       : cloudItem.status.resources.power_state == 'ON' ? ComputeServer.PowerState.on : ComputeServer.PowerState.off,

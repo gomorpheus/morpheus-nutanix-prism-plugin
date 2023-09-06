@@ -1,10 +1,10 @@
 package com.morpheusdata.nutanix.prism.plugin.sync
 
 import com.morpheusdata.core.MorpheusContext
-import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Cloud
+import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.ComputeCapacityInfo
 import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerType
@@ -13,13 +13,10 @@ import com.morpheusdata.model.OsType
 import com.morpheusdata.model.StorageVolume
 import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.projection.ComputeServerIdentityProjection
-import com.morpheusdata.model.projection.ComputeZonePoolIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
-import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
-import io.reactivex.Observable
 
 @Slf4j
 class HostsSync {
@@ -114,7 +111,7 @@ class HostsSync {
 						category         : "nutanix.prism.host.${cloud.id}",
 						cloud            : cloud,
 						name             : cloudItem.name,
-						resourcePool     : clusterObj,
+						resourcePool     : new ComputeZonePool(id: clusterObj.id),
 						externalId       : cloudItem.uuid,
 						uniqueId         : cloudItem.uuid,
 						sshUsername      : 'root',
@@ -155,7 +152,7 @@ class HostsSync {
 		def volumeType = new StorageVolumeType(code: 'nutanix-prism-host-disk')
 
 		def clusterExternalIds = updateList.collect{ it.masterItem.cluster_uuid }.unique()
-		List<ComputeZonePoolIdentityProjection> zoneClusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, null, null).filter {
+		List<CloudPool> zoneClusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, null, null).filter {
 			it.type == 'Cluster' && it.externalId in clusterExternalIds
 		}.toList().blockingGet()
 

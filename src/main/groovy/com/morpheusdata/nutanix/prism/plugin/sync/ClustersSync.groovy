@@ -77,7 +77,7 @@ class ClustersSync {
 					cloud     : cloud,
 					category  : "nutanix.prism.cluster.${cloud.id}",
 					code      : "nutanix.prism.cluster.${cloud.id}.${cloudItem.metadata.uuid}",
-					readOnly  : true
+					readOnly  : true,
 			]
 
 			def add = new CloudPool(poolConfig)
@@ -85,7 +85,7 @@ class ClustersSync {
 		}
 
 		if(adds) {
-			morpheusContext.async.cloud.pool.create(adds).blockingGet()
+			morpheusContext.async.cloud.pool.bulkCreate(adds).blockingGet()
 		}
 	}
 
@@ -107,12 +107,12 @@ class ClustersSync {
 			}
 		}
 		if(updates) {
-			morpheusContext.async.cloud.pool.save(updates).blockingGet()
+			morpheusContext.async.cloud.pool.bulkSave(updates).blockingGet()
 		}
 	}
 
 	private removeMissingResourcePools(List<CloudPoolIdentity> removeList) {
 		log.debug "removeMissingResourcePools: ${removeList?.size()}"
-		morpheusContext.async.cloud.pool.remove(removeList).blockingGet()
+		morpheusContext.async.cloud.pool.bulkRemove(removeList).blockingGet()
 	}
 }

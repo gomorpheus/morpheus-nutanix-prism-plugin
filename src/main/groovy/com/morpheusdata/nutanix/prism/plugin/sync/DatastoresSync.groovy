@@ -6,6 +6,7 @@ import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Account
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.CloudPool
+import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.model.projection.DatastoreIdentity
@@ -71,14 +72,16 @@ class DatastoresSync {
 								type        : 'generic',
 								category    : "nutanix-prism-datastore.${cloud.id}",
 								drsEnabled  : false,
-								online      : online
+								online      : online,
+								refType     : "ComputeZone",
+							    refId       : cloud.id
 						]
 						Datastore add = new Datastore(datastoreConfig)
-						add.assignedZonePools = [new CloudPool(id: cluster?.id)]
+						add.assignedZonePools = [new ComputeZonePool(id: cluster?.id)]
 						adds << add
 
 					}
-					morpheusContext.async.cloud.datastore.create(adds).blockingGet()
+					morpheusContext.async.cloud.datastore.bulkCreate(adds).blockingGet()
 				}.onUpdate { List<SyncTask.UpdateItem<Datastore, Map>> updateItems ->
 					def updatedItems = []
 					for(item in updateItems) {
@@ -126,7 +129,7 @@ class DatastoresSync {
 						}
 					}
 					if(updatedItems.size() > 0 ) {
-						morpheusContext.async.cloud.datastore.save(updatedItems).blockingGet()
+						morpheusContext.async.cloud.datastore.bulkSave(updatedItems).blockingGet()
 					}
 				}.onDelete { removeItems ->
 					if(removeItems) {
