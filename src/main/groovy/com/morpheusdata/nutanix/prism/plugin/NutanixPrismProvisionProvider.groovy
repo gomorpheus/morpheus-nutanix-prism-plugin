@@ -531,10 +531,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			runConfig.userConfig = workloadRequest.usersConfiguration
 			if(imageExternalId) {
 
-				server.sshUsername = runConfig.userConfig.sshUsername
-				server.sshPassword = runConfig.userConfig.sshPassword
 				provisionResponse.createUsers = runConfig.userConfig.createUsers
-
 				runVirtualMachine(cloud, runConfig, provisionResponse,  workloadRequest, null)
 
 			} else {
@@ -649,10 +646,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			if(imageExternalId) {
 
-				server.sshUsername = runConfig.userConfig.sshUsername
-				server.sshPassword = runConfig.userConfig.sshPassword
 				provisionResponse.createUsers = runConfig.userConfig.createUsers
-
 				runVirtualMachine(cloud, runConfig, provisionResponse, null, hostRequest)
 
 			} else {
@@ -1715,8 +1709,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 
 			//update server
-			server.sshUsername = runConfig.userConfig.sshUsername
-			server.sshPassword = runConfig.userConfig.sshPassword
 			server.sourceImage = virtualImage
 			server.serverOs = runConfig.serverOs
 			server.osType = runConfig.osType

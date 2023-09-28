@@ -135,7 +135,7 @@ class NutanixPrismSyncUtils {
 			if(saveList) {
 				rtn.changed = true
 				log.debug "Found ${saveList?.size()} volumes to update"
-				morpheusContext.async.storageVolume.save(saveList).blockingGet()
+				morpheusContext.async.storageVolume.bulkSave(saveList).blockingGet()
 			}
 
 			// The removes

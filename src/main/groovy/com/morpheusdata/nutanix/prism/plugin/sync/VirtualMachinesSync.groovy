@@ -1,6 +1,8 @@
 package com.morpheusdata.nutanix.prism.plugin.sync
 
+import com.morpheusdata.core.BulkSaveResult
 import com.morpheusdata.core.MorpheusContext
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
@@ -127,7 +129,7 @@ class VirtualMachinesSync {
 		}
 	}
 
-	protected updateMatchedVirtualMachines(Cloud cloud, List plans, Map hosts, Map resourcePools, Map networks, Map osTypes, List updateList, Map usageLists) {
+	protected updateMatchedVirtualMachines(Cloud cloud, List plans, Map hosts, Map resourcePools, Map networks, Map osTypes, List<SyncTask.UpdateItem<ComputeServer, Instance>> updateList, Map usageLists) {
 		log.debug "updateMatchedVirtualMachines: ${cloud} ${updateList?.size()}"
 
 		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
@@ -135,7 +137,8 @@ class VirtualMachinesSync {
 
 		// Gather up all the Workloads that may pertain to the servers we are sync'ing
 		def managedServerIds = servers?.findAll{it.computeServerType?.managed }?.collect{it.id}
-		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.async.cloud.listCloudWorkloadProjections(cloud.id).filter {it.serverId in (managedServerIds ?: []) }.toMap {it.serverId}.blockingGet()
+		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.async.workload.list(new DataQuery().withFilter('server.id', managedServerIds)).toMap {it.serverId}.blockingGet()
+		List<ComputeServer> serversToSave = []
 		def statsData = []
 		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, updateList?.collect{ it.masterItem.metadata.uuid } )
 		for(update in updateList) {
@@ -229,7 +232,7 @@ class VirtualMachinesSync {
 						}
 
 						if (save) {
-							morpheusContext.async.computeServer.bulkSave([currentServer]).blockingGet()
+							serversToSave << currentServers
 						}
 
 					} catch (ex) {
@@ -239,6 +242,28 @@ class VirtualMachinesSync {
 			} catch(e) {
 				log.error "Error in updating server: $e", e
 			}
+		}
+
+		if(serversToSave) {
+			BulkSaveResult<ComputeServer> saveResult = morpheusContext.async.computeServer.bulkSave(serversToSave).blockingGet()
+			serversToSave = []
+
+			for(ComputeServer currentServer : saveResult.persistedItems) {
+				Instance cloudItem = updateList.find { it.existingItem.id == currentServer.id }.masterItem
+				def postSaveResults = performPostSaveSync(cloudItem, currentServer, volumeMap)
+
+				//check for restart usage records
+				if(postSaveResults.saveRequired) {
+					if (!usageLists.stopUsageIds.contains(currentServer.id) && !usageLists.startUsageIds.contains(currentServer.id)) {
+						usageLists.restartUsageIds << currentServer.id
+					}
+					serversToSave << currentServer
+				}
+			}
+		}
+
+		if(serversToSave) {
+			morpheusContext.async.computeServer.bulkSave(serversToSave).blockingGet()
 		}
 		if(statsData) {
 			for(statData in statsData) {
