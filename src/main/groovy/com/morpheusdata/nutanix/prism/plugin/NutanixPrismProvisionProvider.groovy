@@ -1408,8 +1408,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		def config = new JsonSlurper().parseText(workload.configs)
 
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildWorkloadRunConfig- ${server} ${server.sourceImage?.dump()} ${server.sourceImage?.uefi}\u001B[0m"
-
 		def uefi = server.sourceImage?.uefi ?: workload.getConfigProperty('uefi')
 
 		def runConfig = [:] + opts + buildRunConfig(server, imageExternalId, workloadRequest.networkConfiguration, config)
