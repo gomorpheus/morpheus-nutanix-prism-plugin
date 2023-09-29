@@ -13,7 +13,6 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 		option-type.nutanix-prism-provision-image,
 		option-type.nutanix-prism-provision-uefi,
 		option-type.nutanix-prism-provision-secure-boot
-
 	]
 	pluginIconPath = "nutanix-prism.svg"
 	pluginIconHidpiPath= "nutanix-prism.svg"
@@ -59,4 +58,5 @@ resource "instance-type-layout" "nutanix-prism-1_0-single" {
 		workload-type-set.nutanix-prism-1_0-set
 	]
 	provisionType = "nutanix-prism-provision-provider"
+	optionTypes = []
 }
