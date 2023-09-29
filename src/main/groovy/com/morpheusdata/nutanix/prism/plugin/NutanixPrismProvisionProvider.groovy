@@ -1408,6 +1408,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 
 		def config = new JsonSlurper().parseText(workload.configs)
 
+		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildWorkloadRunConfig- ${server} ${server.sourceImage?.dump()} ${server.sourceImage?.uefi}\u001B[0m"
+
+		def uefi = server.sourceImage?.uefi ?: workload.getConfigProperty('uefi')
+
 		def runConfig = [:] + opts + buildRunConfig(server, imageExternalId, workloadRequest.networkConfiguration, config)
 		runConfig += [
 			workloadId        : workload.id,
@@ -1423,7 +1427,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider {
 			workloadConfig    : workload.getConfigMap(),
 			timezone          : (workload.getConfigProperty('timezone') ?: cloud.timezone),
 			proxySettings     : workloadRequest.proxyConfiguration,
-			uefi              : workload.getConfigProperty('uefi'),
+			uefi              : uefi,
 			secureBoot        : workload.getConfigProperty('secureBoot'),
 			noAgent           : (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
 			installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
