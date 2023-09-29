@@ -16,6 +16,7 @@ import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.ComputeCapacityInfo
 import com.morpheusdata.model.ComputeServer
+import com.morpheusdata.model.ComputeServerType
 import com.morpheusdata.model.ComputeServerInterface
 import com.morpheusdata.model.ComputeServerInterfaceType
 import com.morpheusdata.model.ComputeTypeLayout
@@ -472,14 +473,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
-	ServiceResponse prepareWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
+	ServiceResponse<PrepareWorkloadResponse> prepareWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
 		log.debug "prepareWorkload: ${workload} ${workloadRequest} ${opts}"
 
-		def rtn = [success: false, msg: null]
+		ServiceResponse<PrepareWorkloadResponse> resp = new ServiceResponse<>()
+		resp.data = new PrepareWorkloadResponse(workload: workload, options: [sendIp:false], disableCloudInit: false)
 		try {
 			Long virtualImageId = workload.getConfigProperty('imageId')?.toLong() ?: workload?.workloadType?.virtualImage?.id
 			if(!virtualImageId) {
-				rtn.msg = "No virtual image selected"
+				resp.msg = "No virtual image selected"
 			} else {
 				VirtualImage virtualImage
 				try {
@@ -488,22 +490,22 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					log.error "error in get image: ${e}"
 				}
 				if(!virtualImage) {
-					rtn.msg = "No virtual image found for ${virtualImageId}"
+					resp.msg = "No virtual image found for ${virtualImageId}"
 				} else {
 					workload.server.sourceImage = virtualImage
 					saveAndGet(workload.server)
-					rtn.success = true
+					resp.success = true
 				}
 			}
 		} catch(e) {
-			rtn.msg = "Error in PrepareWorkload: ${e}"
-			log.error "${rtn.msg}, ${e}", e
+			resp.msg = "Error in PrepareWorkload: ${e}"
+			log.error "${resp.msg}, ${e}", e
 
 		}
-		if(!rtn.success) {
-			log.error "prepareWorkload: error - ${rtn.msg}"
+		if(!resp.success) {
+			log.error "prepareWorkload: error - ${resp.msg}"
 		}
-		new ServiceResponse(rtn.success, rtn.msg, null, null)
+		return resp
 	}
 
 	@Override
@@ -1723,7 +1725,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			}
 
 
-			def newType = findVmNodeServerTypeForCloud(server.cloud.id, server.osType, 'nutanix-prism-provision-provider')
+			ComputeServerType newType = findVmNodeServerType(server.cloud.id, server.osType, 'nutanix-prism-provision-provider')
 			if(newType && server.computeServerType != newType) {
 				server.computeServerType = newType
 			}
@@ -1744,11 +1746,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, provisionResponse.installAgent: ${provisionResponse.installAgent}, provisionResponse.noAgent: ${provisionResponse.noAgent}"
 
 			//cloud_init && sysprep
-			if(virtualImage?.isCloudInit && server.cloudConfigUser) {
-				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
-			} else if (virtualImage?.isSysprep && server.cloudConfigUser) {
+			if(virtualImage?.isCloudInit && workloadRequest.cloudConfigUser) {
+				runConfig.cloudInitUserData = workloadRequest.cloudConfigUser.encodeAsBase64()
+			} else if (virtualImage?.isSysprep && workloadRequest.cloudConfigUser) {
 				runConfig.isSysprep = true
-				runConfig.cloudInitUserData = server.cloudConfigUser.encodeAsBase64()
+				runConfig.cloudInitUserData = workloadRequest.cloudConfigUser.encodeAsBase64()
 			}
 
 			//main create or clone
@@ -1948,5 +1950,36 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		def resourcePoolsMap = morpheusContext.async.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId}.blockingGet()
 		resourcePoolsMap
 	}
+
+	private ComputeServerType findVmNodeServerType(Long cloudId, String platform, String provisionTypeCode) {
+		ComputeServerType rtn = null
+		Collection<ComputeServerType> serverTypes = morpheusContext.async.cloud.getComputeServerTypes(cloudId).blockingGet()
+		String nodeType = null
+		if(provisionTypeCode != null) {
+			nodeType = (platform == "windows") ? "morpheus-windows-vm-node" : "morpheus-vm-node";
+		}
+
+		for(ComputeServerType serverType:serverTypes) {
+			if(rtn == null) {
+				if(serverType.getNodeType() == nodeType && serverType.getManaged() == true && (provisionTypeCode == null || serverType.getProvisionTypeCode() == provisionTypeCode)) {
+					rtn = serverType
+				}
+			}
+		}
+
+		// If we still don't have one... leave off the provisionTypeCode when searching
+		if(rtn == null) {
+			for(ComputeServerType serverType:serverTypes) {
+				if(rtn == null) {
+					if(serverType.getNodeType() == nodeType && serverType.getManaged() == true) {
+						rtn = serverType
+					}
+				}
+			}
+		}
+
+		return rtn
+	}
+
 
 }
