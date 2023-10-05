@@ -232,7 +232,7 @@ class VirtualMachinesSync {
 						}
 
 						if (save) {
-							serversToSave << currentServers
+							serversToSave << currentServer
 						}
 
 					} catch (ex) {
