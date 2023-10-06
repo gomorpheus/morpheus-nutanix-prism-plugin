@@ -1865,7 +1865,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								def volumeCount = 0
 								def volumes = server.volumes.sort { it.displayOrder }
 								for (int i = 0; i < volumes.size(); i++) {
-									def volume = volumes[i]
+									def volume = morpheusContext.async.storageVolume.get(volumes[i]?.id).blockingGet()
 									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeCount }
 									volume.externalId = newDisk?.uuid
 
