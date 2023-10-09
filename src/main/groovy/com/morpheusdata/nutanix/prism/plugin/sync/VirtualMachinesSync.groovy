@@ -139,7 +139,6 @@ class VirtualMachinesSync {
 		def managedServerIds = servers?.findAll{it.computeServerType?.managed }?.collect{it.id}
 		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.async.workload.list(new DataQuery().withFilter('server.id', managedServerIds)).toMap {it.serverId}.blockingGet()
 		List<ComputeServer> serversToSave = []
-		def statsData = []
 		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, updateList?.collect{ it.masterItem.metadata.uuid } )
 		for(update in updateList) {
 			try {
@@ -225,11 +224,6 @@ class VirtualMachinesSync {
 								usageLists.restartUsageIds << currentServer.id
 						}
 
-						if ((currentServer.agentInstalled == false || currentServer.powerState == ComputeServer.PowerState.off || currentServer.powerState == ComputeServer.PowerState.paused) && currentServer.status != 'provisioning') {
-							// Simulate stats update
-							statsData += updateVirtualMachineStats(currentServer, tmpWorkloads)
-							save = true
-						}
 
 						if (save) {
 							serversToSave << currentServer
@@ -264,11 +258,6 @@ class VirtualMachinesSync {
 
 		if(serversToSave) {
 			morpheusContext.async.computeServer.bulkSave(serversToSave).blockingGet()
-		}
-		if(statsData) {
-			for(statData in statsData) {
-				morpheusContext.async.stats.updateWorkloadStats(new WorkloadIdentityProjection(id: statData.workload.id), statData.maxMemory, statData.maxUsedMemory, statData.maxStorage, statData.maxUsedStorage, statData.cpuPercent, statData.running)
-			}
 		}
 	}
 
@@ -324,33 +313,6 @@ class VirtualMachinesSync {
 		def servicePlanProjections = morpheusContext.async.servicePlan.listIdentityProjections(provisionType).toList().blockingGet()
 		def plans = morpheusContext.async.servicePlan.listById(servicePlanProjections.collect { it.id }).filter {it.active && it.deleted != true}.toList().blockingGet()
 		plans
-	}
-
-	private def updateVirtualMachineStats(ComputeServer server, Map<Long, WorkloadIdentityProjection> workloads = [:]) {
-		def statsData = []
-		try {
-			def maxUsedStorage = 0
-			if (server.agentInstalled && server.usedStorage) {
-				maxUsedStorage = server.usedStorage
-			}
-			
-			def workload = workloads[server.id]
-			if (workload) {
-				statsData << [
-						workload      : workload,
-//						maxUsedMemory : maxUsedMemory,
-						maxMemory     : server.maxMemory,
-						maxStorage    : server.maxStorage,
-						maxUsedStorage: maxUsedStorage,
-						cpuPercent    : server.usedCpu,
-						running       : server.powerState == ComputeServer.PowerState.on
-				]
-			}
-		} catch (e) {
-			log.warn("error updating vm stats: ${e}", e)
-			return []
-		}
-		return statsData
 	}
 
 	private updateServerContainersAndInstances(ComputeServer currentServer, ServicePlan plan) {
