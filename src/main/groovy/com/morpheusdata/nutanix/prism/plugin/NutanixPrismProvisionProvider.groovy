@@ -1864,6 +1864,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								//some ugly matching
 								def volumeCount = 0
 								def volumes = server.volumes.sort { it.displayOrder }
+								def volumesToSave = []
 								for (int i = 0; i < volumes.size(); i++) {
 									def volume = morpheusContext.async.storageVolume.get(volumes[i]?.id).blockingGet()
 									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeCount }
@@ -1881,8 +1882,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 									volume.deviceName = '/dev/' + deviceName
 									volume.deviceDisplayName = deviceName
 									volumeCount++
+									volumesToSave << volume
 								}
-								morpheusContext.async.storageVolume.save(volumes).blockingGet()
+								morpheusContext.async.storageVolume.bulkSave(volumesToSave).blockingGet()
 								server = saveAndGet(server)
 								provisionResponse.success = true
 							} else {
