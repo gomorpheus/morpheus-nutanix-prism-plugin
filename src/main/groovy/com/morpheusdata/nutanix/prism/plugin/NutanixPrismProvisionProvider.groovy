@@ -358,7 +358,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					createdDate = new Date(milliseconds)
 				}
 				def snapshotConfig = [
-						account        : server.cloud.owner,
+						account        : server.account ?: server.cloud.owner,
 						name           : rawSnapshot?.data?.snapshot_name,
 						externalId     : rawSnapshot?.data?.uuid,
 						cloud          : server.cloud,
