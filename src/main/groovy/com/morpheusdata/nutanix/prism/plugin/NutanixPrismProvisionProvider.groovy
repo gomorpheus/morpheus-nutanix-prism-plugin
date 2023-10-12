@@ -467,7 +467,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
-	ServiceResponse validateDockerHost(ComputeServer server, Map opts) {
+	ServiceResponse validateHost(ComputeServer server, Map opts) {
 		log.debug "validateDockerHost: ${server} ${opts}"
 		return ServiceResponse.success()
 	}
@@ -591,10 +591,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
-	ServiceResponse prepareHost(ComputeServer server, HostRequest hostRequest, Map opts) {
+	ServiceResponse<PrepareHostResponse> prepareHost(ComputeServer server, HostRequest hostRequest, Map opts) {
 		log.debug "prepareHost: ${server} ${hostRequest} ${opts}"
 
-		def rtn = [success: false, msg: null]
+		def prepareResponse = new PrepareHostResponse(computeServer: server, disableCloudInit: false, options: [sendIp: true])
+		ServiceResponse<PrepareHostResponse> rtn = ServiceResponse.prepare(prepareResponse)
+
 		try {
 			VirtualImage virtualImage
 			Long computeTypeSetId = server.typeSet?.id
@@ -617,7 +619,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			log.error("${rtn.msg}, ${e}", e)
 
 		}
-		new ServiceResponse(rtn.success, rtn.msg, null, null)
+		return rtn
 	}
 
 	@Override
