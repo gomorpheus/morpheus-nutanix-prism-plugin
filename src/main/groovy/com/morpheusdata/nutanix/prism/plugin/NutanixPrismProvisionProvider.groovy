@@ -1,6 +1,7 @@
 package com.morpheusdata.nutanix.prism.plugin
 
 import com.bertramlabs.plugins.karman.CloudFile
+import com.morpheusdata.PrepareHostResponse
 import com.morpheusdata.core.AbstractProvisionProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
