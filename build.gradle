@@ -25,6 +25,9 @@ apply plugin: 'com.morpheusdata.morpheus-plugin-gradle'
 group = 'com.morpheusdata'
 ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
 
+sourceCompatibility = '1.11'
+targetCompatibility = '1.11'
+
 repositories {
 	mavenLocal()
 	jcenter()
