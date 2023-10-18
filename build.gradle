@@ -25,9 +25,6 @@ apply plugin: 'com.morpheusdata.morpheus-plugin-gradle'
 group = 'com.morpheusdata'
 ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
 
-sourceCompatibility = '1.11'
-targetCompatibility = '1.11'
-
 repositories {
 	mavenLocal()
 	jcenter()
@@ -60,7 +57,7 @@ dependencies {
 
 	// Include morpheus-core and it's dependencies
 	testImplementation "com.morpheusdata:morpheus-plugin-api:$morphPluginApiVersion"
-	testImplementation 'io.reactivex.rxjava2:rxjava:2.2.0'
+	testImplementation 'io.reactivex.rxjava3:rxjava:3.1.8'
 	testImplementation 'org.apache.httpcomponents:httpclient:4.5.3'
 	testImplementation 'org.apache.httpcomponents:httpcore:4.4.5'
 	testImplementation "org.slf4j:slf4j-parent:$slf4jVersion"
@@ -92,7 +89,7 @@ jar {
 				'Morpheus-Color': '#ffffff',
 				'Morpheus-Labels': 'Plugin, Cloud',
 				'Morpheus-Repo': 'https://github.com/gomorpheus/morpheus-nutanix-prism-plugin',
-				'Morpheus-Min-Appliance-Version': "6.2.3"
+				'Morpheus-Min-Appliance-Version': minversion
 		)
 	}
 }
