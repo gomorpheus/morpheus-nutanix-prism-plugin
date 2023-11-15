@@ -8,6 +8,7 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	hasConfig = false
 	hasSettings = false
 	hasDeployment = false
+	hasAutoScale = true
 	versions = ["1.0"]
 	optionTypes = [
 		option-type.nutanix-prism-provision-image,
@@ -33,6 +34,7 @@ resource "workload-type" "nutanix-prism-provision-provider-1_0" {
 	category = "cloud"
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
+	actions = [{code = "generic-remove-node"}]
 }
 
 resource "workload-type-set" "nutanix-prism-1_0-set" {
@@ -57,6 +59,19 @@ resource "instance-type-layout" "nutanix-prism-1_0-single" {
 	workloads = [
 		workload-type-set.nutanix-prism-1_0-set
 	]
+	actions = [{code = "generic-add-node"}]
 	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = []
+}
+
+resource "scale-action" "nutanix-prism-1_0-single" {
+	code = "nutanix-prism-1_0-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-1_0-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
 }
