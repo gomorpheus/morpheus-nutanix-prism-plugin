@@ -366,8 +366,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 										refType: 'ComputeZone',
 										refId: "${server.cloud.id}",
 										osType: server.serverOs,
-										platform: server.platform,
-										zoneType: 'npc'
+										platform: server.platform
 								   ]
 									def sourceImage = server.sourceImage
 									if (sourceImage) {
