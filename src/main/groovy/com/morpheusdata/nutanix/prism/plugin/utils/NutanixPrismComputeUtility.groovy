@@ -56,14 +56,13 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse createImage(HttpApiClient client, Map authConfig, String imageName, String imageType, String sourceUri) {
+	static ServiceResponse createImage(HttpApiClient client, Map authConfig, String imageName, String imageType, String sourceUri = null, String diskUuid = null) {
 		log.debug("createImage")
 		def body = [
 				spec: [
 				        name: imageName,
 						resources: [
-						        image_type: imageType,
-						        architecture: 'X86_64'
+						        image_type: imageType
 						]
 				],
 				metadata: [
@@ -72,6 +71,12 @@ class NutanixPrismComputeUtility {
 		]
 		if(sourceUri) {
 			body.spec.resources.source_uri = sourceUri
+		}
+		if(diskUuid) {
+			body.spec.resources.data_source_reference = [
+			    "kind": "vm_disk",
+				"uuid": diskUuid
+			]
 		}
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
@@ -116,6 +121,10 @@ class NutanixPrismComputeUtility {
 				resources['machine_type'] = "Q35"
 				resources['boot_config']['boot_type'] = "SECURE_BOOT"
 			}
+		}
+
+		if(runConfig.vtpm) {
+			resources['vtpm_config'] = ['vtpm_enabled': true]
 		}
 
 		if(runConfig.cloudInitUserData) {

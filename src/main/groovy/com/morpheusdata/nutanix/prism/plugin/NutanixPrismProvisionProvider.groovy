@@ -318,6 +318,107 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
+	ServiceResponse cloneToTemplate(Workload workload, Map opts) {
+		def rtn = [success: false, msg: ""]
+		try {
+			//make a snapshot
+			HttpApiClient client = new HttpApiClient()
+			def server = workload.server
+			Map authConfig = plugin.getAuthConfig(server.cloud)
+			log.debug("Executing Nutanix Prism Central snapshot for ${workload?.instance?.name}")
+			def serverId = server?.externalId
+			if(server.sourceImage && server.sourceImage.isCloudInit && server.serverOs?.platform != 'windows') {
+				getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old ; sync', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
+			}
+
+			def vmDetails = NutanixPrismComputeUtility.getVm(client, authConfig, serverId)
+			def diskToClone = vmDetails?.data?.spec?.resources?.disk_list?[0]
+			if(diskToClone && diskToClone.uuid) {
+				def cloneResults = NutanixPrismComputeUtility.createImage(client, authConfig, opts.templateName, "DISK_IMAGE", null, diskToClone.uuid)
+				log.debug("cloneResults: ${cloneResults}")
+				if(cloneResults.success == true) {
+					def cloneTaskId = cloneResults?.data?.status?.execution_context?.task_uuid
+					if (cloneTaskId) {
+						//make a virtual image or let it sync in? - sync for now
+						def cloneTaskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, cloneTaskId)
+						log.debug("cloneTaskResults: ${cloneTaskResults}")
+						if (cloneTaskResults.success == true && cloneTaskResults.error != true) {
+							//get the image id - create the image
+							def imageId = cloneTaskResults?.data?.entity_reference_list?.find { it.kind == 'image' }.uuid
+							def imageResults = NutanixPrismComputeUtility.getImage(client, authConfig, imageId)
+							log.debug("imageResults: ${imageResults}")
+							if (imageResults.success == true) {
+								def vmImage = imageResults?.data
+								if (vmImage) {
+									//create a local image
+									def imageConfig = [
+										owner: workload.account,
+										category: "nutanix.prism.image.${workload.server.cloud.id}",
+										name: opts.templateName,
+										code: "nutanix.prism.image.${workload.server.cloud.id}.${imageId}",
+										status: 'Active',
+										imageType: 'qcow2',
+										remotePath: vmImage?.status.resources?.retrieval_uri_list?.getAt(0) ?: cloudItem.status.resources?.source_uri,
+										bucketId: vmImage?.status.resources?.current_cluster_reference_list?.getAt(0)?.uuid,
+										uniqueId: imageId,
+										externalId: imageId,
+										refType: 'ComputeZone',
+										refId: "${server.cloud.id}",
+										osType: server.serverOs,
+										platform: server.platform,
+										zoneType: 'npc'
+								   ]
+									def sourceImage = server.sourceImage
+									if (sourceImage) {
+										imageConfig += [isCloudInit: sourceImage.isCloudInit, isForceCustomization: sourceImage.isForceCustomization]
+										if (!imageConfig.osType && sourceImage.osType)
+											imageConfig.osType = sourceImage.osType
+										if (!imageConfig.platform && sourceImage.platform)
+											imageConfig.platform = sourceImage.platform
+									}
+									VirtualImage imageToSave = new VirtualImage(imageConfig)
+									def locationConfig = [
+										code: "nutanix.prism.image.${server.cloud.id}.${imageId}",
+										externalId: imageId,
+										externalDiskId: imageId,
+									    refType: 'ComputeZone',
+										refId: server.cloud.id,
+										imageName: opts.templateName
+									]
+									def addLocation = new VirtualImageLocation(locationConfig)
+									imageToSave.imageLocations = [addLocation]
+									morpheusContext.async.virtualImage.create(imageToSave).blockingGet()
+
+
+								}
+							}
+							rtn.success = true
+						} else {
+							//clone failed
+							rtn.msg = 'clone failed'
+
+						}
+					} else {
+						log.error("Error creating image: ${cloneResults.data}")
+						rtn.msg = 'clone failed'
+					}
+				}
+			} else {
+				//clone failed
+				rtn.msg = 'clone failed'
+			}
+			if(server.sourceImage && server.sourceImage.isCloudInit && server.serverOs?.platform != 'windows') {
+				getPlugin().morpheus.executeCommandOnServer(server, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
+				return new ServiceResponse(rtn.success, rtn.msg, null, null)
+			}
+		} catch(e) {
+			log.error("cloneToTemplate error: ${e}", e)
+			return ServiceResponse.error("cloneToTemplate error")
+		}
+
+	}
+
+	@Override
 	ServiceResponse getNoVNCConsoleUrl(ComputeServer server) {
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		def consoleInfo = NutanixPrismComputeUtility.getVMConsoleUrl(authConfig, server.externalId, server?.resourcePool?.externalId)
