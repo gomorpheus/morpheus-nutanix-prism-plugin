@@ -1,10 +1,10 @@
 
-resource "workload-type" "docker-nutanix-prism-ubuntu-16_04" {
-	code = "docker-nutanix-prism-ubuntu-16.04"
+resource "workload-type" "docker-nutanix-prism-ubuntu-18_04" {
+	code = "docker-nutanix-prism-ubuntu-18.04"
 	shortName = "ubuntu"
-	name = "Docker Ubuntu 16.04"
+	name = "Docker Ubuntu 18.04"
 	ports = [22]
-	containerVersion = "16.04"
+	containerVersion = "18.04"
 	entryPoint = ""
 	mountLogs = "/var/log"
 	statTypeCode = "vm"
@@ -17,14 +17,14 @@ resource "workload-type" "docker-nutanix-prism-ubuntu-16_04" {
 	providerType = "nutanix-prism"
 	containerPorts = [{code = "ubuntu.22"}]
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-16_04
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-18_04-20230131
 	provisionType = "nutanix-prism-provision-provider"
 }
 
-resource "compute-type-set" "docker-nutanix-prism-ubuntu-16_04-set" {
-	code = "docker-nutanix-prism-ubuntu-16.04-set"
+resource "compute-type-set" "docker-nutanix-prism-ubuntu-18_04-set" {
+	code = "docker-nutanix-prism-ubuntu-18.04-set"
 	name = "docker host"
-	containerType = workload-type.docker-nutanix-prism-ubuntu-16_04
+	containerType = workload-type.docker-nutanix-prism-ubuntu-18_04
 	computeServerType = compute-server-type.nutanix-prism-linux
 	priorityOrder = 0
 	dynamicCount = true
@@ -35,23 +35,30 @@ resource "compute-type-set" "docker-nutanix-prism-ubuntu-16_04-set" {
 	installStorageRuntime = true
 }
 
-resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
-	code = "docker-nutanix-prism-ubuntu-16.04-single"
-	name = "Nutanix Prism Central Docker Ubuntu 16.04"
+resource "compute-type-layout" "docker-nutanix-prism-ubuntu-18_04-single" {
+	code = "docker-nutanix-prism-ubuntu-18.04-single"
+	name = "Nutanix Prism Central Docker Ubuntu 18.04"
 	sortOrder = 5
-	computeVersion = "16.04"
+	computeVersion = "18.04"
 	description = "This will provision a single docker host vm in nutanix prism central."
 	serverCount = 1
 	memoryRequirement = 1024 * 1024 * 1024
 	hasAutoScale = true
 	type = "nutanix-prism-vm"
 	groupType = "docker-cluster"
-	computeServers = ["docker-nutanix-prism-ubuntu-16.04-set"]
+	computeServers = ["docker-nutanix-prism-ubuntu-18.04-set"]
 	optionTypes = [
 		{code = "nutanix-prism-provision-cluster"},
 		{code = "nutanix-prism-provision-categories"},
 	]
 	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
+	code = "docker-nutanix-prism-ubuntu-16.04-single"
+	name = "Nutanix Prism Central Docker Ubuntu 16.04"
+	enabled = false
+	creatable = false
 }
 
 

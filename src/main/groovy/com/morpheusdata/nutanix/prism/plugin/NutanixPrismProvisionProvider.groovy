@@ -42,6 +42,7 @@ import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.VirtualImageLocation
 import com.morpheusdata.model.Workload
+import com.morpheusdata.model.WorkloadType
 import com.morpheusdata.model.projection.SnapshotIdentityProjection
 import com.morpheusdata.model.provisioning.HostRequest
 import com.morpheusdata.model.provisioning.InstanceRequest
@@ -704,9 +705,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			Long computeTypeSetId = server.typeSet?.id
 			if(computeTypeSetId) {
 				ComputeTypeSet computeTypeSet = morpheus.async.computeTypeSet.get(computeTypeSetId).blockingGet()
-				if(computeTypeSet.containerType) {
-					ContainerType containerType = morpheus.async.containerType.get(computeTypeSet.containerType.id).blockingGet()
-					virtualImage = containerType.virtualImage
+				if(computeTypeSet.workloadType) {
+					WorkloadType workloadType = morpheus.async.workloadType.get(computeTypeSet.workloadType.id).blockingGet()
+					virtualImage = workloadType.virtualImage
 				}
 			}
 			if(!virtualImage) {
@@ -1849,12 +1850,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, provisionResponse.installAgent: ${provisionResponse.installAgent}, provisionResponse.noAgent: ${provisionResponse.noAgent}"
 
+			def cloudConfigUser
 			//cloud_init && sysprep
-			if(virtualImage?.isCloudInit && workloadRequest.cloudConfigUser) {
-				runConfig.cloudInitUserData = workloadRequest.cloudConfigUser.encodeAsBase64()
-			} else if (virtualImage?.isSysprep && workloadRequest.cloudConfigUser) {
+			if(virtualImage?.isCloudInit && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
+				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
+			} else if (virtualImage?.isSysprep && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
 				runConfig.isSysprep = true
-				runConfig.cloudInitUserData = workloadRequest.cloudConfigUser.encodeAsBase64()
+				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
+			}
+			if(cloudConfigUser) {
+				runConfig.cloudInitUserData = cloudConfigUser.encodeAsBase64()
 			}
 
 			//main create or clone
