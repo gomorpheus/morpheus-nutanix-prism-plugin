@@ -3,6 +3,10 @@ package com.morpheusdata.nutanix.prism.plugin
 import com.morpheusdata.core.AbstractOptionSourceProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.data.DataAndFilter
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataOrFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.model.*
 import com.morpheusdata.model.projection.VirtualImageIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
@@ -46,37 +50,51 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	def nutanixPrismProvisionImage(args) {
 		log.debug "nutanixPrismProvisionImage: ${args}"
+		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismProvisionImage- ${args}\u001B[0m"
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 		Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
 		def regionCode = tmpCloud.regionCode
+		
+		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismProvisionImage- ${regionCode}\u001B[0m"
 
 		// Grab the projections.. doing a filter pass first
 		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
 		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false }.map{it.id}.toList().blockingGet()
 
+
 		List options = []
 		if(virtualImageIds.size() > 0) {
-			def invalidStatus = ['Saving', 'Failed', 'Converting']
 
-			morpheusContext.async.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
-				if (!(img.status in invalidStatus) &&
-						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
-					if(img.category == "nutanix.prism.image.${cloudId}" ||
-							(img.refType == 'ComputeZone' && img.refId == cloudId ) ||
-							img.imageLocations.any { it.refId == cloudId && it.refType == 'ComputeZone' }) {
-						options << [name: img.name, value: img.id]
-					}
-					else if(regionCode &&
-							(img.imageRegion == regionCode ||
-									img.userUploaded ||
-									img.imageLocations.any { it.imageRegion == regionCode }
-							)
-					) {
-						options << [name: img.name, value: img.id]
-					}
-				}
+			def query = new DataQuery().withFilters([
+				new DataFilter('status', 'Active'),
+				new DataFilter('id', 'in', virtualImageIds),
+				new DataOrFilter(
+					new DataFilter('owner.id', accountId),
+					new DataFilter('owner.id', null),
+					new DataFilter('visibility', 'public')
+				)
+			]).withJoins('locations')
+			def additionalFilters = new DataOrFilter([
+				new DataFilter('category', "nutanix.prism.image.${cloudId}"),
+				new DataAndFilter(
+					new DataFilter("refType", "ComputeZone"),
+					new DataFilter("refId", cloudId)
+				),
+				new DataAndFilter(
+					new DataFilter("locations.refType", "ComputeZone"),
+					new DataFilter("locations.refId", cloudId)
+				)
+			])
+			if (regionCode) {
+				additionalFilters.withFilters([
+					new DataFilter('userUploaded', true),
+					new DataFilter('imageRegion', regionCode),
+					new DataFilter('locations.imageRegion', regionCode)
+				])
 			}
+			query.withFilters(additionalFilters)
+			options = morpheusContext.async.virtualImage.list(query).map { [name: it.name, value: it.id] }.toList().blockingGet()
 		}
 
 		if(options.size() > 0) {
@@ -97,18 +115,22 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
-			def invalidStatus = ['Saving', 'Failed', 'Converting']
-			morpheusContext.async.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
-				if (!(img.status in invalidStatus) &&
-						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
-					if(img.category?.startsWith('nutanix.prism.image')) {
-						options << [name: img.name, value: img.id]
-					}
-					else if((img.imageType == ImageType.qcow2 || img.imageType == ImageType.vmdk) && img.userUploaded) {
-						options << [name: img.name, value: img.id]
-					}
-				}
-			}
+			options = morpheusContext.async.virtualImage.list(new DataQuery().withFilters([
+				new DataFilter('status', 'Active'),
+				new DataFilter('id', 'in', virtualImageIds),
+				new DataOrFilter(
+					new DataFilter('owner.id', accountId),
+					new DataFilter('owner.id', null),
+					new DataFilter('visibility', 'public')
+				),
+				new DataOrFilter(
+					new DataFilter('category', '=~', 'nutanix.prism.image'),
+					new DataAndFilter(
+						new DataFilter('imageType', 'in', ['qcow2', 'vmdk']),
+						new DataFilter('userUploaded', true)
+					)
+				)
+			])).map {[name: it.name, value: it.id]}.toList().blockingGet()
 		}
 
 		if(options.size() > 0) {
