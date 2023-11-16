@@ -3,6 +3,10 @@ package com.morpheusdata.nutanix.prism.plugin
 import com.morpheusdata.core.AbstractOptionSourceProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.data.DataAndFilter
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataOrFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.model.*
 import com.morpheusdata.model.projection.VirtualImageIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
@@ -58,7 +62,6 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		List options = []
 		if(virtualImageIds.size() > 0) {
 			def invalidStatus = ['Saving', 'Failed', 'Converting']
-
 			morpheusContext.async.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
 				if (!(img.status in invalidStatus) &&
 						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
@@ -97,18 +100,22 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
-			def invalidStatus = ['Saving', 'Failed', 'Converting']
-			morpheusContext.async.virtualImage.listById(virtualImageIds).blockingSubscribe { VirtualImage img ->
-				if (!(img.status in invalidStatus) &&
-						(img.visibility == 'public' || img.ownerId == accountId || img.ownerId == null || img.account.id == accountId)) {
-					if(img.category?.startsWith('nutanix.prism.image')) {
-						options << [name: img.name, value: img.id]
-					}
-					else if((img.imageType == ImageType.qcow2 || img.imageType == ImageType.vmdk) && img.userUploaded) {
-						options << [name: img.name, value: img.id]
-					}
-				}
-			}
+			options = morpheusContext.async.virtualImage.list(new DataQuery().withFilters([
+				new DataFilter('status', 'Active'),
+				new DataFilter('id', 'in', virtualImageIds),
+				new DataOrFilter(
+					new DataFilter('owner.id', accountId),
+					new DataFilter('owner.id', null),
+					new DataFilter('visibility', 'public')
+				),
+				new DataOrFilter(
+					new DataFilter('category', '=~', 'nutanix.prism.image'),
+					new DataAndFilter(
+						new DataFilter('imageType', 'in', ['qcow2', 'vmdk']),
+						new DataFilter('userUploaded', true)
+					)
+				)
+			])).map {[name: it.name, value: it.id]}.toList().blockingGet()
 		}
 
 		if(options.size() > 0) {
