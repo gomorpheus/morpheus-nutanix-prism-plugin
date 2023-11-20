@@ -50,13 +50,10 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	def nutanixPrismProvisionImage(args) {
 		log.debug "nutanixPrismProvisionImage: ${args}"
-		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismProvisionImage- ${args}\u001B[0m"
 		def cloudId = args?.size() > 0 ? args.getAt(0).zoneId.toLong() : null
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 		Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
 		def regionCode = tmpCloud.regionCode
-		
-		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismProvisionImage- ${regionCode}\u001B[0m"
 
 		// Grab the projections.. doing a filter pass first
 		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
