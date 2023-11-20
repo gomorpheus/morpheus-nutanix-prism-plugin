@@ -290,7 +290,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	Boolean hasPlanTagMatch() {
-		return true
+		return false
 	}
 
 	@Override
