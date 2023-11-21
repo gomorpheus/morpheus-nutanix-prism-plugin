@@ -1,0 +1,83 @@
+//15.1
+resource "virtual-image" "nutanix-prism-image-morpheus-opensuse-15_1" {
+	code = "nutanix.prism.image.morpheus.opensuse.15.1"
+	category = "nutanix.prism.image.morpheus.opensuse"
+	name = "Morpheus openSUSE 15.1"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/kvm/opensuse/opensuse-15_1-v1-amd64/morpheus-opensuse-15_1-v1-amd64.qcow2"
+	imagePath = "kvm/opensuse/opensuse-15_1-v1-amd64"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "suse.15.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "workload-type" "nutanix-prism-opensuse-15_1" {
+	code = "nutanix-prism-opensuse-15_1"
+	shortName = "opensuse"
+	name = "openSUSE 15.1"
+	containerVersion = "15.1"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "opensuse"
+	showServerLogs = true
+	category = "opensuse"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-opensuse-15_1
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-opensuse-15_1-set" {
+	code = "nutanix-prism-opensuse-15_1-set"
+	containerType = workload-type.nutanix-prism-opensuse-15_1
+	priorityOrder = 0
+	dynamicCount = true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-opensuse-15_1-single" {
+	code = "nutanix-prism-opensuse-15_1-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 99
+	instanceVersion = "15.1"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "opensuse"
+	}
+	serverCount = 1
+	hasAutoScale = true
+	portCount = 1
+	enabled = true
+	creatable = true
+	supportsConvertToManaged = true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-opensuse-15_1-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-opensuse-15_1-single" {
+	code = "nutanix-prism-opensuse-15_1-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-opensuse-15_1-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}

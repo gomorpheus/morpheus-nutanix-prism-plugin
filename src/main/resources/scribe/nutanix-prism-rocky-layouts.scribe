@@ -1,0 +1,167 @@
+//8
+resource "virtual-image" "nutanix-prism-image-morpheus-rocky-8" {
+	code = "nutanix.prism.image.morpheus.rocky.8.20230822"
+	category = "nutanix.prism.image.morpheus.rocky.8"
+	name = "Morpheus Rocky 8 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/rocky-8/morpheus-rocky-8-x86_64-20230822.qcow2"
+	imagePath = "qemu/20230822/rocky-8"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "rocky.8.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "workload-type" "nutanix-prism-rocky-8" {
+	code = "nutanix-prism-rocky-8"
+	shortName = "rocky"
+	name = "Rocky 8"
+	containerVersion = "8"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "vm"
+	showServerLogs = true
+	category = "rocky"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-rocky-8
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-rocky-8-set" {
+	code = "nutanix-prism-rocky-8-set"
+	containerType = workload-type.nutanix-prism-rocky-8
+	priorityOrder = 0
+	dynamicCount = true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-rocky-8-single" {
+	code = "nutanix-prism-rocky-8-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 89
+	instanceVersion = "8"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "rocky"
+	}
+	serverCount = 1
+	hasAutoScale = true
+	portCount = 1
+	enabled = true
+	creatable = true
+	supportsConvertToManaged = true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-rocky-8-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-rocky-8-single" {
+	code = "nutanix-prism-rocky-8-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-rocky-8-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
+
+//9
+resource "virtual-image" "nutanix-prism-image-morpheus-rocky-9" {
+	code = "nutanix.prism.image.morpheus.rocky.9.20230822"
+	category = "nutanix.prism.image.morpheus.rocky.9"
+	name = "Morpheus Rocky 9 20230822"
+	imageType = "qcow2"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/rocky-9/morpheus-rocky-9-x86_64-20230822.qcow2"
+	imagePath = "qemu/20230822/rocky-9"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "rocky.9.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+
+resource "workload-type" "nutanix-prism-rocky-9" {
+	code = "nutanix-prism-rocky-9"
+	shortName = "rocky"
+	name = "Rocky 9"
+	containerVersion = "9"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "vm"
+	showServerLogs = true
+	category = "rocky"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-rocky-9
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-rocky-9-set" {
+	code = "nutanix-prism-rocky-9-set"
+	containerType = workload-type.nutanix-prism-rocky-9
+	priorityOrder = 0
+	dynamicCount = true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-rocky-9-single" {
+	code = "nutanix-prism-rocky-9-single"
+	name = "Nutanix Prism Central VM"
+	sortOrder = 99
+	instanceVersion = "9"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "rocky"
+	}
+	serverCount = 1
+	hasAutoScale = true
+	portCount = 1
+	enabled = true
+	creatable = true
+	supportsConvertToManaged = true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-rocky-9-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-rocky-9-single" {
+	code = "nutanix-prism-rocky-9-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-rocky-9-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
