@@ -38,6 +38,9 @@ class NutanixPrismComputeUtility {
 		def rtn = [success:false, invalidLogin:false]
 		try {
 			def listResults = listHostsV2(client, authConfig)
+			if(!listResults.success) {
+				rtn.invalidLogin = listResults.data?.invalidLogin
+			}
 			rtn.success = listResults.success
 		} catch(e) {
 			log.error("testConnection to ${authConfig.apiUrl}: ${e}")
@@ -750,6 +753,7 @@ class NutanixPrismComputeUtility {
 				} else {
 					if(!rtn.success) {
 						rtn.msg = results.data.message_list?.collect { it.message }?.join(' ')
+						rtn.data = [invalidLogin: (results.getErrorCode() == "401")]
 					}
 					hasMore = false
 				}

@@ -44,8 +44,9 @@ class NutanixPrismPlugin extends Plugin {
 
 	def getAuthConfig(Cloud cloud) {
 		log.debug "getAuthConfig: ${cloud}"
+		def url = cloud.serviceUrl ?: cloud.configMap.apiUrl
 		def rtn = [
-				apiUrl: getApiUrl(cloud.serviceUrl),
+				apiUrl: getApiUrl(url as String),
 				basePath: 'api/nutanix/v3',
 				v2basePath: 'api/nutanix/v2.0',
 				username: null,
