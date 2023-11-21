@@ -52,12 +52,12 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		OptionType apiUrl = new OptionType(
 				name: 'Api Url',
 				code: 'nutanix-prism-api-url',
-				fieldName: 'serviceUrl',
+				fieldName: 'apiUrl',
 				displayOrder: 0,
 				fieldLabel: 'Api Url',
 				required: true,
 				inputType: OptionType.InputType.TEXT,
-				fieldContext: 'domain'
+				fieldContext: 'config'
 		)
 		OptionType credentials = new OptionType(
 				code: 'nutanix-prism-credential',
@@ -75,23 +75,23 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		OptionType username = new OptionType(
 				name: 'Username',
 				code: 'nutanix-prism-username',
-				fieldName: 'serviceUsername',
+				fieldName: 'username',
 				displayOrder: 20,
 				fieldLabel: 'Username',
 				required: true,
 				inputType: OptionType.InputType.TEXT,
-				fieldContext: 'domain',
+				fieldContext: 'config',
 				localCredential: true
 		)
 		OptionType password = new OptionType(
 				name: 'Password',
 				code: 'nutanix-prism-password',
-				fieldName: 'servicePassword',
+				fieldName: 'password',
 				displayOrder: 25,
 				fieldLabel: 'Password',
 				required: true,
 				inputType: OptionType.InputType.PASSWORD,
-				fieldContext: 'domain',
+				fieldContext: 'config',
 				localCredential: true
 		)
 
@@ -344,31 +344,32 @@ class NutanixPrismCloudProvider implements CloudProvider {
 			if(cloudInfo) {
 				def username
 				def password
+				def url = (cloudInfo.serviceUrl ?: cloudInfo.configMap.apiUrl) as String
 				if(validateCloudRequest.credentialType?.toString().isNumber()) {
 					AccountCredential accountCredential = morpheus.async.accountCredential.get(validateCloudRequest.credentialType.toLong()).blockingGet()
 					password = accountCredential.data.password
 					username = accountCredential.data.username
 				} else if(validateCloudRequest.credentialType == 'username-password') {
-					password = validateCloudRequest.credentialPassword ?: cloudInfo.servicePassword
-					username = validateCloudRequest.credentialUsername ?: cloudInfo.serviceUsername
+					password = validateCloudRequest.credentialPassword ?: cloudInfo.servicePassword ?: cloudInfo.configMap.password
+					username = validateCloudRequest.credentialUsername ?: cloudInfo.serviceUsername ?: cloudInfo.configMap.username
 				} else if(validateCloudRequest.credentialType == 'local') {
 					if(validateCloudRequest.opts?.zone?.servicePassword && validateCloudRequest.opts?.zone?.servicePassword != '************') {
 						password = validateCloudRequest.opts?.zone?.servicePassword
 					} else {
-						password = cloudInfo.servicePassword
+						password = cloudInfo.servicePassword ?: cloudInfo.configMap.password
 					}
-					username = validateCloudRequest.opts?.zone?.serviceUsername ?: cloudInfo.serviceUsername
+					username = validateCloudRequest.opts?.zone?.serviceUsername ?: cloudInfo.serviceUsername ?: cloudInfo.configMap.username
 				}
 
 				if(username?.length() < 1) {
 					return new ServiceResponse(success: false, msg: 'Enter a username')
 				} else if(password?.length() < 1) {
 					return new ServiceResponse(success: false, msg: 'Enter a password')
-				} else if(cloudInfo.serviceUrl?.length() < 1) {
+				} else if(url?.length() < 1) {
 					return new ServiceResponse(success: false, msg: 'Enter an api url')
 				} else {
 					//test api call
-					def apiUrl = plugin.getApiUrl(cloudInfo.serviceUrl)
+					def apiUrl = plugin.getApiUrl(url)
 					//get creds
 					Map authConfig = [apiUrl: apiUrl, basePath: 'api/nutanix/v3', v2basePath: 'api/nutanix/v2.0', username: username, password: password]
 					HttpApiClient apiClient = new HttpApiClient()
@@ -552,9 +553,8 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					(new SnapshotsSync(this.plugin, cloud, client)).execute()
 
 					rtn = ServiceResponse.success()
-				}
-				else {
-					rtn = ServiceResponse.error(testResults.invalidLogin == true ? 'invalid credentials' : 'error connecting')
+				} else {
+					rtn = ServiceResponse.error(testResults.invalidLogin == true ? 'invalid credentials' : 'error connecting', null, [status: Cloud.Status.offline])
 				}
 			} else {
 				rtn = ServiceResponse.error('Nutanix Prism Central is not reachable', null, [status: Cloud.Status.offline])

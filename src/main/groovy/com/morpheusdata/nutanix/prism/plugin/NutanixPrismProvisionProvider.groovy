@@ -290,7 +290,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	Boolean hasPlanTagMatch() {
-		return true
+		return false
 	}
 
 	@Override
@@ -366,7 +366,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 										refType: 'ComputeZone',
 										refId: "${server.cloud.id}",
 										osType: server.serverOs,
-										platform: server.platform
+										platform: server.computeServerType.platform
 								   ]
 									def sourceImage = server.sourceImage
 									if (sourceImage) {
