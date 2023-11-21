@@ -68,12 +68,12 @@ class NutanixPrismPlugin extends Plugin {
 		if(cloud.accountCredentialData && cloud.accountCredentialData.containsKey('username')) {
 			rtn.username = cloud.accountCredentialData['username']
 		} else {
-			rtn.username = cloud.serviceUsername
+			rtn.username = cloud.serviceUsername ?: cloud.configMap.username
 		}
 		if(cloud.accountCredentialData && cloud.accountCredentialData.containsKey('password')) {
 			rtn.password = cloud.accountCredentialData['password']
 		} else {
-			rtn.password = cloud.servicePassword
+			rtn.password = cloud.servicePassword ?: cloud.configMap.password
 		}
 
 		return rtn
