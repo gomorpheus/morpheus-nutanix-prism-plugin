@@ -1,6 +1,9 @@
 package com.morpheusdata.nutanix.prism.plugin.sync
 
 import com.morpheusdata.core.MorpheusContext
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataOrFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Account
@@ -39,11 +42,12 @@ class ImagesSync {
 			def listResults = NutanixPrismComputeUtility.listImages(apiClient, authConfig)
 			if (listResults.success) {
 				def masterImages = listResults?.data?.findAll { it.status.resources.image_type != 'ISO_IMAGE' }
-
 				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(cloud.id, null)
 				SyncTask<VirtualImageLocationIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterImages)
 				syncTask.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
-					domainObject.externalId == cloudItem?.metadata?.uuid
+					def uuid = cloudItem?.metadata?.uuid
+					def name = cloudItem?.spec?.name
+					domainObject.externalId == uuid || domainObject.imageName == name
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 					morpheusContext.async.virtualImage.location.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImageLocation virtualImageLocation ->
@@ -73,17 +77,17 @@ class ImagesSync {
 		def allowedImageTypes = ['qcow2']
 
 		def uniqueIds = [] as Set
-		Observable domainRecords = morpheusContext.async.virtualImage.listIdentityProjections(cloud.id).filter { VirtualImageIdentityProjection proj ->
-			def include = proj.imageType in allowedImageTypes && proj.name in names && (proj.systemImage || (!proj.ownerId || proj.ownerId == cloud.owner.id))
-			if(include) {
-				def uniqueKey = "${proj.imageType.toString()}:${proj.name}".toString()
-				if(!uniqueIds.contains(uniqueKey)) {
-					uniqueIds << uniqueKey
-					return true
-				}
-			}
-			return false
-		}
+		Observable domainRecords = morpheusContext.async.virtualImage.listIdentityProjections(new DataQuery().withFilters([
+			new DataFilter<String>("imageType", "in", allowedImageTypes),
+			new DataFilter<Collection<String>>("name", "in", names),
+			new DataOrFilter(
+				new DataFilter<Boolean>("systemImage", true),
+				new DataOrFilter(
+					new DataFilter("owner", null),
+					new DataFilter<Long>("owner.id", cloud.owner.id)
+				)
+			)
+		]))
 		SyncTask<VirtualImageIdentityProjection, Map, VirtualImage> syncTask = new SyncTask<>(domainRecords, objList)
 		syncTask.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
 			domainObject.name == cloudItem.status.name
@@ -129,7 +133,16 @@ class ImagesSync {
 		def locationAdds = []
 		addItems?.each { add ->
 			VirtualImage virtualImage = add.existingItem
-			def locationConfig = buildLocationConfig(virtualImage)
+			def uuid = add.masterItem.metadata?.uuid
+			def locationConfig = [
+				virtualImage: virtualImage,
+				code        : "nutanix.prism.image.${cloud.id}.${uuid}",
+				internalId  : uuid,
+				externalId  : uuid,
+				imageName   : virtualImage.name,
+				imageRegion : cloud.regionCode,
+				isPublic    : false
+			]
 			VirtualImageLocation location = new VirtualImageLocation(locationConfig)
 			locationAdds << location
 		}

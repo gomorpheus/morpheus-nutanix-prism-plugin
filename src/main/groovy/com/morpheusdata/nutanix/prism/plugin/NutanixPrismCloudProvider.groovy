@@ -146,6 +146,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		serverType.supportsConsoleKeymap = true
 		serverType.platform = PlatformType.none
 		serverType.managed = true
+		serverType.guestVm = true
 		serverType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		serverType.nodeType = 'morpheus-vm-node'
 
@@ -158,6 +159,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		vmType.supportsConsoleKeymap = true
 		vmType.platform = PlatformType.linux
 		vmType.managed = true
+		vmType.guestVm = true
 		vmType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		vmType.nodeType = 'morpheus-vm-node'
 
@@ -170,6 +172,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		windowsType.supportsConsoleKeymap = true
 		windowsType.platform = PlatformType.windows
 		windowsType.managed = true
+		windowsType.guestVm = true
 		windowsType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		windowsType.nodeType = 'morpheus-windows-vm-node'
 
@@ -182,6 +185,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		unmanagedType.supportsConsoleKeymap = true
 		unmanagedType.platform = PlatformType.linux
 		unmanagedType.managed = false
+		unmanagedType.guestVm = true
 		unmanagedType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		unmanagedType.nodeType = 'unmanaged'
 		unmanagedType.managedServerType = 'nutanix-prism-vm'

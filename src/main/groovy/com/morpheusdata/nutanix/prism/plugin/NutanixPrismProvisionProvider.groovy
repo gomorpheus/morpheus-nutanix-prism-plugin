@@ -326,7 +326,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			HttpApiClient client = new HttpApiClient()
 			def server = workload.server
 			Map authConfig = plugin.getAuthConfig(server.cloud)
-			log.debug("Executing Nutanix Prism Central snapshot for ${workload?.instance?.name}")
+			log.debug("Executing Nutanix Prism Central clone to template for ${workload?.instance?.name}")
 			def serverId = server?.externalId
 			if(server.sourceImage && server.sourceImage.isCloudInit && server.serverOs?.platform != 'windows') {
 				getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old ; sync', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
@@ -354,6 +354,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 									//create a local image
 									def imageConfig = [
 										owner: workload.account,
+										account: workload.account,
 										category: "nutanix.prism.image.${workload.server.cloud.id}",
 										name: opts.templateName,
 										code: "nutanix.prism.image.${workload.server.cloud.id}.${imageId}",
@@ -366,7 +367,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 										refType: 'ComputeZone',
 										refId: "${server.cloud.id}",
 										osType: server.serverOs,
-										platform: server.computeServerType.platform
+										platform: server.computeServerType.platform,
+										imageRegion: server.cloud.regionCode
 								   ]
 									def sourceImage = server.sourceImage
 									if (sourceImage) {
@@ -383,11 +385,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 										externalDiskId: imageId,
 									    refType: 'ComputeZone',
 										refId: server.cloud.id,
-										imageName: opts.templateName
+										imageName: opts.templateName,
+										imageRegion: server.cloud.regionCode
 									]
 									def addLocation = new VirtualImageLocation(locationConfig)
 									imageToSave.imageLocations = [addLocation]
-									morpheusContext.async.virtualImage.create(imageToSave).blockingGet()
+									morpheusContext.async.virtualImage.create(imageToSave, server.cloud).blockingGet()
 
 
 								}
