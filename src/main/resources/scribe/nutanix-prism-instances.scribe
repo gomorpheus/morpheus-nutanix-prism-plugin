@@ -26,6 +26,8 @@ resource "workload-type" "nutanix-prism-provision-provider-1_0" {
 	code = "nutanix-prism-provision-provider-1.0"
 	shortName = "nutanix-prism-central"
 	name = "Nutanix Prism Central"
+	account = null
+	account = null
 	ports = []
 	containerVersion = "1.0"
 	serverType = "vm"
@@ -49,6 +51,7 @@ resource "workload-type-set" "nutanix-prism-1_0-set" {
 resource "instance-type-layout" "nutanix-prism-1_0-single" {
  	code = "nutanix-prism-1.0-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 0
 	instanceVersion = "1.0"
 	description = "This will provision a single vm"

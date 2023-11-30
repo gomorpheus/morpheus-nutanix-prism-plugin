@@ -36,6 +36,7 @@ resource "workload-type" "nutanix-prism-debian-10" {
 	code = "nutanix-prism-debian-10"
 	shortName = "debian"
 	name = "Debian 10"
+	account = null
 	ports = [22]
 	containerVersion = "10"
 	entryPoint = ""
@@ -67,6 +68,7 @@ resource "workload-type-set" "nutanix-prism-debian-10-set" {
 resource "instance-type-layout" "nutanix-prism-debian-10-single" {
 	code = "nutanix-prism-debian-10-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 10
 	instanceVersion = "10"
 	description = "This will provision a single vm"
@@ -136,6 +138,7 @@ resource "workload-type" "nutanix-prism-debian-11" {
 	code = "nutanix-prism-debian-11"
 	shortName = "debian"
 	name = "Debian 11"
+	account = null
 	ports = [22]
 	containerVersion = "11"
 	entryPoint = ""
@@ -167,6 +170,7 @@ resource "workload-type-set" "nutanix-prism-debian-11-set" {
 resource "instance-type-layout" "nutanix-prism-debian-11-single" {
 	code = "nutanix-prism-debian-11-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 11
 	instanceVersion = "11"
 	description = "This will provision a single vm"
@@ -220,6 +224,7 @@ resource "workload-type" "nutanix-prism-debian-12" {
 	code = "nutanix-prism-debian-12"
 	shortName = "debian"
 	name = "Debian 12"
+	account = null
 	ports = [22]
 	containerVersion = "12"
 	entryPoint = ""
@@ -251,6 +256,7 @@ resource "workload-type-set" "nutanix-prism-debian-12-set" {
 resource "instance-type-layout" "nutanix-prism-debian-12-single" {
 	code = "nutanix-prism-debian-12-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 12
 	instanceVersion = "12"
 	description = "This will provision a single vm"

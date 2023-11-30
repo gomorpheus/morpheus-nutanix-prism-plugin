@@ -20,6 +20,7 @@ resource "workload-type" "nutanix-prism-centos-7_3" {
 	code = "nutanix-prism-centos-7.3"
 	shortName = "centos"
 	name = "CentOS 7.3"
+	account = null
 	containerVersion = "7.3"
 	entryPoint = ""
 	mountLogs = "/var/log"
@@ -50,6 +51,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_3-set" {
 resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	code = "nutanix-prism-centos-7.3-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 73
 	instanceVersion = "7.3"
 	description = "This will provision a single vm"
@@ -104,6 +106,7 @@ resource "workload-type" "nutanix-prism-centos-7_5" {
 	code = "nutanix-prism-centos-7.5"
 	shortName = "centos"
 	name = "CentOS 7.5"
+	account = null
 	containerVersion = "7.5"
 	entryPoint = ""
 	mountLogs = "/var/log"
@@ -134,6 +137,7 @@ resource "workload-type-set" "nutanix-prism-centos-7_5-set" {
 resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	code = "nutanix-prism-centos-7.5-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 75
 	instanceVersion = "7.5"
 	description = "This will provision a single vm"
@@ -204,6 +208,7 @@ resource "workload-type" "nutanix-prism-centos-8-stream" {
 	code = "nutanix-prism-centos-8-stream"
 	shortName = "centos"
 	name = "CentOS 8-stream"
+	account = null
 	containerVersion = "8-stream"
 	entryPoint = ""
 	mountLogs = "/var/log"
@@ -234,6 +239,7 @@ resource "workload-type-set" "nutanix-prism-centos-8-stream-set" {
 resource "instance-type-layout" "nutanix-prism-centos-8-stream-single" {
 	code = "nutanix-prism-centos-8-stream-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 89
 	instanceVersion = "8-stream"
 	description = "This will provision a single vm"
@@ -304,6 +310,7 @@ resource "workload-type" "nutanix-prism-centos-9-stream" {
 	code = "nutanix-prism-centos-9-stream"
 	shortName = "centos"
 	name = "CentOS 9-stream"
+	account = null
 	containerVersion = "9-stream"
 	entryPoint = ""
 	mountLogs = "/var/log"
@@ -334,6 +341,7 @@ resource "workload-type-set" "nutanix-prism-centos-9-stream-set" {
 resource "instance-type-layout" "nutanix-prism-centos-9-stream-single" {
 	code = "nutanix-prism-centos-9-stream-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 99
 	instanceVersion = "9-stream"
 	description = "This will provision a single vm"

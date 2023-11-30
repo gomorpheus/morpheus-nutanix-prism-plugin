@@ -20,6 +20,7 @@ resource "workload-type" "nutanix-prism-opensuse-15_1" {
 	code = "nutanix-prism-opensuse-15_1"
 	shortName = "opensuse"
 	name = "openSUSE 15.1"
+	account = null
 	containerVersion = "15.1"
 	entryPoint = ""
 	mountLogs = "/var/log"
@@ -50,6 +51,7 @@ resource "workload-type-set" "nutanix-prism-opensuse-15_1-set" {
 resource "instance-type-layout" "nutanix-prism-opensuse-15_1-single" {
 	code = "nutanix-prism-opensuse-15_1-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 99
 	instanceVersion = "15.1"
 	description = "This will provision a single vm"
