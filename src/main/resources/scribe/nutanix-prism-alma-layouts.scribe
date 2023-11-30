@@ -20,6 +20,7 @@ resource "workload-type" "nutanix-prism-almalinux-9" {
 	code = "nutanix-prism-almalinux-9"
 	shortName = "almalinux"
 	name = "AlmaLinux 9"
+	account = null
 	containerVersion = "9"
 	entryPoint = ""
 	mountLogs = "/var/log"
@@ -50,6 +51,7 @@ resource "workload-type-set" "nutanix-prism-almalinux-9-set" {
 resource "instance-type-layout" "nutanix-prism-almalinux-9-single" {
 	code = "nutanix-prism-almalinux-9-single"
 	name = "Nutanix Prism Central VM"
+	account = null
 	sortOrder = 99
 	instanceVersion = "9"
 	description = "This will provision a single vm"
