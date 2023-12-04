@@ -1833,7 +1833,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 
 			ComputeServerType newType = findVmNodeServerType(server.cloud.id, server.osType, 'nutanix-prism-provision-provider')
-			if(newType && server.computeServerType != newType) {
+			if(newType && !server.computeServerType) {
 				server.computeServerType = newType
 			}
 
@@ -2069,7 +2069,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		Collection<ComputeServerType> serverTypes = morpheusContext.async.cloud.getComputeServerTypes(cloudId).blockingGet()
 		String nodeType = null
 		if(provisionTypeCode != null) {
-			nodeType = (platform == "windows") ? "morpheus-windows-vm-node" : "morpheus-vm-node";
+			nodeType = (platform == "windows") ? "morpheus-windows-vm-node" : "morpheus-vm-node"
 		}
 
 		for(ComputeServerType serverType:serverTypes) {
