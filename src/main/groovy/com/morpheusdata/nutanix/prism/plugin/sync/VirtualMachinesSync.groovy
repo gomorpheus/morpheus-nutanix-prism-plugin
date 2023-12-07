@@ -244,11 +244,12 @@ class VirtualMachinesSync {
 			serversToSave = []
 
 			for(ComputeServer currentServer : saveResult.persistedItems) {
-				Instance cloudItem = updateList.find { it.existingItem.id == currentServer.id }.masterItem
-				def postSaveResults = performPostSaveSync(cloudItem, currentServer, volumeMap)
+				Map cloudItem = updateList.find { it.existingItem.id == currentServer.id }.masterItem
+
+				def saveRequired = performPostSaveSync(currentServer, cloudItem, networks, metricsResult)
 
 				//check for restart usage records
-				if(postSaveResults.saveRequired) {
+				if(saveRequired) {
 					if (!usageLists.stopUsageIds.contains(currentServer.id) && !usageLists.startUsageIds.contains(currentServer.id)) {
 						usageLists.restartUsageIds << currentServer.id
 					}
