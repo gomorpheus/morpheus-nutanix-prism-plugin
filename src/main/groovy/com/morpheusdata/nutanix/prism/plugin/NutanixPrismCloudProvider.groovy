@@ -203,6 +203,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		linuxDockerType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		linuxDockerType.agentType = ComputeServerType.AgentType.host
 		linuxDockerType.clusterType = ComputeServerType.ClusterType.docker
+		linuxDockerType.containerEngine = ComputeServerType.ContainerEngine.docker
 		linuxDockerType.computeTypeCode = 'docker-host'
 
 		ComputeServerType kubeMasterType = new ComputeServerType()
