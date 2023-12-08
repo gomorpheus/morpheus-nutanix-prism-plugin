@@ -135,7 +135,7 @@ resource "compute-type-set" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-set" {
 	nodeCount = 1
 	nameSuffix = "-master"
 	nodeType = "master"
-	installContainerRuntime = true
+	installContainerRuntime = false
 	installStorageRuntime = true
 	//userData?
 }
@@ -152,7 +152,7 @@ resource "compute-type-set" "kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism
 	nameSuffix = "-worker"
 	nodeType = "worker"
 	canAddNodes = true
-	installContainerRuntime = true
+	installContainerRuntime = false
 	installStorageRuntime = true
 }
 
@@ -256,7 +256,7 @@ resource "compute-type-set" "kubernetes-1_27_7-ubuntu-20_04-nutanix-prism-set" {
 	nodeCount = 1
 	nameSuffix = "-master"
 	nodeType = "master"
-	installContainerRuntime = true
+	installContainerRuntime = false
 	installStorageRuntime = true
 	//userData?
 }
@@ -273,7 +273,7 @@ resource "compute-type-set" "kubernetes-1_27_7-ubuntu-20_04-worker-nutanix-prism
 	nameSuffix = "-worker"
 	nodeType = "worker"
 	canAddNodes = true
-	installContainerRuntime = true
+	installContainerRuntime = false
 	installStorageRuntime = true
 }
 
@@ -380,7 +380,7 @@ resource "compute-type-set" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-set" {
 	nodeCount = 1
 	nameSuffix = "-master"
 	nodeType = "master"
-	installContainerRuntime = true
+	installContainerRuntime = false
 	installStorageRuntime = true
 	//userData?
 }
@@ -397,7 +397,7 @@ resource "compute-type-set" "kubernetes-1_28_3-ubuntu-20_04-worker-nutanix-prism
 	nameSuffix = "-worker"
 	nodeType = "worker"
 	canAddNodes = true
-	installContainerRuntime = true
+	installContainerRuntime = false
 	installStorageRuntime = true
 }
 
