@@ -62,7 +62,8 @@ class NetworksSync {
 					itemsToAdd?.each { cloudItem ->
 						def cluster = clusters?.find { it.externalId == cloudItem.status?.cluster_reference?.uuid}
 						def clusterId = cluster?.id
-						def vpcId = vpcs?.find { it.externalId == cloudItem.spec?.resources?.vpc_reference?.uuid}?.id
+						def vpc = vpcs?.find { it.externalId == cloudItem.spec?.resources?.vpc_reference?.uuid}
+						def cloudPoolId = vpc?.id ?: clusterId
 						def networkTypeString = cloudItem.status.resources.subnet_type
 						def networkType = networkTypes?.find { it.externalType == networkTypeString }
 						def networkConfig = [
@@ -78,9 +79,10 @@ class NetworksSync {
 								type        : networkType,
 								refType     : 'ComputeZone',
 								refId       : cloud.id,
-								zonePoolId  : vpcId ?: clusterId,
+								cloudPool   : new CloudPool(id: cloudPoolId),
 								active      : true
 						]
+						println "\u001B[33mAC Log - NetworksSync:execute- ${networkConfig}\u001B[0m"
 						if(networkTypeString == 'OVERLAY') {
 							networkConfig.config = [vpc: cloudItem.spec.resources.vpc_reference.uuid]
 						}
@@ -105,8 +107,8 @@ class NetworksSync {
 						def clusterId = cluster?.id
 						def save = false
 						if (existingItem) {
-							if (existingItem.zonePoolId != clusterId) {
-								existingItem.zonePoolId = clusterId
+							if (existingItem.cloudPool?.id != clusterId) {
+								existingItem.cloudPool = new CloudPool(id: clusterId)
 								save = true
 							}
 							def name = masterItem.status.name
