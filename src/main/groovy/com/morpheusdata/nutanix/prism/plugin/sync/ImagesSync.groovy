@@ -45,9 +45,9 @@ class ImagesSync {
 				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(cloud.id, null)
 				SyncTask<VirtualImageLocationIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterImages)
 				syncTask.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
-					def uuid = cloudItem?.metadata?.uuid
-					def name = cloudItem?.spec?.name
-					domainObject.externalId == uuid || domainObject.imageName == name
+					domainObject.externalId == cloudItem?.metadata?.uuid
+				}.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
+					cloudItem?.spec?.name ==  domainObject.imageName
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 					morpheusContext.async.virtualImage.location.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImageLocation virtualImageLocation ->
@@ -141,7 +141,9 @@ class ImagesSync {
 				externalId  : uuid,
 				imageName   : virtualImage.name,
 				imageRegion : cloud.regionCode,
-				isPublic    : false
+				isPublic    : false,
+				refType     : 'ComputeZone',
+				refId       : cloud.id
 			]
 			VirtualImageLocation location = new VirtualImageLocation(locationConfig)
 			locationAdds << location
@@ -154,97 +156,73 @@ class ImagesSync {
 	}
 
 	private updateMatchedVirtualImageLocations(List<SyncTask.UpdateItem<VirtualImageLocation, Map>> updateList) {
-		log.debug "updateMatchedVirtualImageLocations: ${updateList?.size()}"
+		log.debug "updateMatchedVirtualImages: ${cloud} ${updateList.size()}"
+		def saveLocationList = []
+		def saveImageList = []
+		def virtualImagesById = morpheusContext.async.virtualImage.listById(updateList.collect { it.existingItem.virtualImage.id }).toMap {it.id}.blockingGet()
 
-		List<VirtualImageLocation> existingLocations = updateList?.collect { it.existingItem }
-
-		def imageIds = updateList?.findAll{ it.existingItem.virtualImage?.id }?.collect{ it.existingItem.virtualImage.id }
-		def externalIds = updateList?.findAll{ it.existingItem.externalId }?.collect{ it.existingItem.externalId }
-		List<VirtualImage> existingItems = []
-		if(imageIds && externalIds) {
-			def tmpImgProjs = morpheusContext.async.virtualImage.listIdentityProjections(cloud.id).filter { img ->
-				img.id in imageIds || (!img.systemImage && img.externalId != null && img.externalId in externalIds)
-			}.toList().blockingGet()
-			if(tmpImgProjs) {
-				existingItems = morpheusContext.async.virtualImage.listById(tmpImgProjs.collect { it.id }).filter { img ->
-					img.id in imageIds || img.imageLocations.size() == 0
-				}.toList().blockingGet()
-			}
-		} else if(imageIds) {
-			existingItems = morpheusContext.async.virtualImage.listById(imageIds).toList().blockingGet()
-		}
-
-		List<VirtualImageLocation> locationsToCreate = []
-		List<VirtualImageLocation> locationsToUpdate = []
-		List<VirtualImage> imagesToUpdate = []
-
-		//updates
-		updateList?.each { update ->
-			def cloudItem = update.masterItem
+		for(def updateItem in updateList) {
+			def existingItem = updateItem.existingItem
+			def virtualImage = virtualImagesById[existingItem.virtualImage.id]
+			def cloudItem = updateItem.masterItem
 			def virtualImageConfig = buildVirtualImageConfig(cloudItem)
-			VirtualImageLocation imageLocation = existingLocations?.find { it.id == update.existingItem.id }
-			if(imageLocation) {
-				def save = false
-				def saveImage = false
-				def image = existingItems.find {it.id == imageLocation.virtualImage.id}
-				if(image) {
-					if (imageLocation.imageName != virtualImageConfig.name) {
-						imageLocation.imageName = virtualImageConfig.name
-						if (image && (image.refId == imageLocation.refId.toString())) {
-							image.name = virtualImageConfig.name
-							imagesToUpdate << image
-							saveImage = true
-						}
-						save = true
-					}
-					if (imageLocation.imageRegion != virtualImageConfig.imageRegion) {
-						imageLocation.imageRegion = virtualImageConfig.imageRegion
-						save = true
-					}
-					if (image.remotePath != virtualImageConfig.remotePath) {
-						image.remotePath = virtualImageConfig.remotePath
-						saveImage = true
-					}
-					if (image.imageRegion != virtualImageConfig.imageRegion) {
-						image.imageRegion = virtualImageConfig.imageRegion
-						saveImage = true
-					}
-					if (image.minDisk != virtualImageConfig.minDisk) {
-						image.minDisk = virtualImageConfig.minDisk
-						saveImage = true
-					}
-					if (image.bucketId != virtualImageConfig.bucketId) {
-						image.bucketId = virtualImageConfig.bucketId
-						saveImage = true
-					}
-					if (save) {
-						locationsToUpdate << imageLocation
-					}
-					if (saveImage) {
-						imagesToUpdate << image
-					}
+			def save = false
+			def saveImage = false
+			def state = 'Active'
+			
+			def imageName = virtualImageConfig.name
+			if(existingItem.imageName != imageName) {
+				existingItem.imageName = imageName
+
+				if(virtualImage.imageLocations?.size() < 2) {
+					virtualImage.name = imageName
+					saveImage = true
 				}
-			} else {
-				VirtualImage image = existingItems?.find { it.externalId == virtualImageConfig.externalId || it.name == virtualImageConfig.name }
-				if(image) {
-					//if we matched by virtual image and not a location record we need to create that location record
-					def addLocation = new VirtualImageLocation(buildLocationConfig(image))
-					locationsToCreate << addLocation
-					image.deleted = false
-					image.setPublic(false)
-					imagesToUpdate << image
-				}
+				save = true
+			}
+			if(existingItem.externalId != cloudItem.imageId) {
+				existingItem.externalId = cloudItem.imageId
+				save = true
+			}
+			if(virtualImage.status != state) {
+				virtualImage.status = state
+				saveImageList << virtualImage
+			}
+			if (existingItem.imageRegion != cloud.regionCode) {
+				existingItem.imageRegion = cloud.regionCode
+				save = true
+			}
+			if (virtualImage.remotePath != virtualImageConfig.remotePath) {
+				virtualImage.remotePath = virtualImageConfig.remotePath
+				saveImage = true
+			}
+			if (virtualImage.imageRegion != virtualImageConfig.imageRegion) {
+				virtualImage.imageRegion = virtualImageConfig.imageRegion
+				saveImage = true
+			}
+			if (virtualImage.minDisk != virtualImageConfig.minDisk) {
+				virtualImage.minDisk = virtualImageConfig.minDisk as Long
+				saveImage = true
+			}
+			if (virtualImage.bucketId != virtualImageConfig.bucketId) {
+				virtualImage.bucketId = virtualImageConfig.bucketId
+				saveImage = true
 			}
 
+			if(save) {
+				saveLocationList << existingItem
+			}
+
+			if(saveImage) {
+				saveImageList << virtualImage
+			}
 		}
-		if(locationsToCreate.size() > 0 ) {
-			morpheusContext.async.virtualImage.location.create(locationsToCreate, cloud).blockingGet()
+
+		if(saveLocationList) {
+			morpheusContext.async.virtualImage.location.save(saveLocationList, cloud).blockingGet()
 		}
-		if(locationsToUpdate.size() > 0 ) {
-			morpheusContext.async.virtualImage.location.save(locationsToUpdate, cloud).blockingGet()
-		}
-		if(imagesToUpdate.size() > 0 ) {
-			morpheusContext.async.virtualImage.save(imagesToUpdate, cloud).blockingGet()
+		if(saveImageList) {
+			morpheusContext.async.virtualImage.save(saveImageList.unique(), cloud).blockingGet()
 		}
 	}
 
@@ -285,7 +263,9 @@ class ImagesSync {
 				externalId  : image.externalId,
 				imageName   : image.name,
 				imageRegion : cloud.regionCode,
-				isPublic    : false
+				isPublic    : false,
+				refType     : 'ComputeZone',
+			    refId       : cloud.id
 		]
 	}
 

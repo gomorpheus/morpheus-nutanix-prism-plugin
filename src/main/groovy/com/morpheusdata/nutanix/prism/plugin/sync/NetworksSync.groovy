@@ -82,7 +82,6 @@ class NetworksSync {
 								cloudPool   : new CloudPool(id: cloudPoolId),
 								active      : true
 						]
-						println "\u001B[33mAC Log - NetworksSync:execute- ${networkConfig}\u001B[0m"
 						if(networkTypeString == 'OVERLAY') {
 							networkConfig.config = [vpc: cloudItem.spec.resources.vpc_reference.uuid]
 						}
