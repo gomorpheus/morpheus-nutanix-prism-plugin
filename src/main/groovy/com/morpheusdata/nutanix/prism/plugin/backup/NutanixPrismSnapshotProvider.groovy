@@ -244,14 +244,15 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			def snapshotId = backupResult.externalId ?: backupResult.getConfigProperty("snapshotId")
 			def cloudId = backupResult.zoneId ?: backupResult.backup?.zoneId
 			def computeServerId = backupResult.serverId ?: backupResult.backup?.computeServerId
-			log.info("deleteBackupResult zoneId: ${cloudId}, snapshotId: ${snapshotId}")
+			log.info("deleteBackupResult cloudId: ${cloudId}, snapshotId: ${snapshotId}")
 			if(snapshotId && cloudId && computeServerId) {
 				Cloud cloud = plugin.morpheus.async.cloud.get(cloudId).blockingGet()
 				HttpApiClient client = new HttpApiClient()
 				Map authConfig = plugin.getAuthConfig(cloud)
 				if(cloud && computeServerId) {
 					def computeServer = getPlugin().morpheus.async.computeServer.get(computeServerId).blockingGet()
-					def resp = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, computeServer?.resourcePool?.externalId, snapshotId)
+					def clusterId = computeServer?.resourcePool?.externalId ?: backupResult.getConfigProperty('instanceConfig')?.config?.clusterName ?: backupResult.getConfigProperty('instanceConfig')?.vmwareResourcePoolId
+					def resp = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, clusterId, snapshotId)
 					log.debug("Delete snapshot resp: ${resp}")
 					if(resp.success) { //ignore snapshots already removed
 						log.debug("Delete successful")
