@@ -251,7 +251,8 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 				Map authConfig = plugin.getAuthConfig(cloud)
 				if(cloud && computeServerId) {
 					def computeServer = getPlugin().morpheus.async.computeServer.get(computeServerId).blockingGet()
-					def resp = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, computeServer?.resourcePool?.externalId, snapshotId)
+					def clusterId = computeServer?.resourcePool?.externalId ?: backupResult.getConfigProperty('instanceConfig')?.config?.clusterName ?: backupResult.getConfigProperty('instanceConfig')?.vmwareResourcePoolId
+					def resp = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, clusterId, snapshotId)
 					log.debug("Delete snapshot resp: ${resp}")
 					if(resp.success) { //ignore snapshots already removed
 						log.debug("Delete successful")
