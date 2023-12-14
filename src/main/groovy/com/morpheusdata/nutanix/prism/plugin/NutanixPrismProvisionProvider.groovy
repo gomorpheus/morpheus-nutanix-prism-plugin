@@ -1451,6 +1451,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						imageRegion : cloud.regionCode,
 						code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
 						internalId  : imageExternalId,
+						refId		: cloud.id,
+						refType		: 'ComputeZone'
 					])
 					morpheusContext.async.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
 					if (letNutanixDownloadImage == false) {
@@ -1467,6 +1469,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						imageRegion : cloud.regionCode,
 						code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
 						internalId  : imageExternalId,
+						refId		: cloud.id,
+						refType		: 'ComputeZone'
 					])
 					morpheusContext.async.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
 					throw new Exception("Error in creating the image: ${imageResults.msg}")

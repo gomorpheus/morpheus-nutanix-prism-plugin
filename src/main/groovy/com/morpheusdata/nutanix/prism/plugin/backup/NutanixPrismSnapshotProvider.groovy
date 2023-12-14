@@ -244,7 +244,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			def snapshotId = backupResult.externalId ?: backupResult.getConfigProperty("snapshotId")
 			def cloudId = backupResult.zoneId ?: backupResult.backup?.zoneId
 			def computeServerId = backupResult.serverId ?: backupResult.backup?.computeServerId
-			log.info("deleteBackupResult zoneId: ${cloudId}, snapshotId: ${snapshotId}")
+			log.info("deleteBackupResult cloudId: ${cloudId}, snapshotId: ${snapshotId}")
 			if(snapshotId && cloudId && computeServerId) {
 				Cloud cloud = plugin.morpheus.async.cloud.get(cloudId).blockingGet()
 				HttpApiClient client = new HttpApiClient()
