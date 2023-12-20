@@ -580,10 +580,8 @@ class NutanixPrismComputeUtility {
 			}
 
 		}
-		println "\u001B[33mAC Log - NutanixPrismComputeUtility:createVmFromTemplate- ${body}\u001B[0m"
 		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates/${templateUuid}/\$actions/deploy", authConfig.username, authConfig.password,
 			new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		println "\u001B[33mAC Log - NutanixPrismComputeUtility:createVmFromTemplate- ${results}\u001B[0m"
 		if(results?.success) {
 			return ServiceResponse.success(results?.data)
 		} else {
