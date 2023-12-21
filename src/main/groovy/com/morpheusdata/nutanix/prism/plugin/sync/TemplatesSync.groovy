@@ -40,7 +40,7 @@ class TemplatesSync {
 				def masterTemplates = listResults?.data?.data
 				Observable<VirtualImageLocationIdentityProjection> domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
 					new DataFilter("refType", "ComputeZone"),
-					new DataFilter("refId", 50L),
+					new DataFilter("refId", cloud.id),
 					new DataFilter("virtualImage.externalType", "template")
 				]).withJoins('virtualImage'))
 				SyncTask<VirtualImageLocationIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterTemplates)

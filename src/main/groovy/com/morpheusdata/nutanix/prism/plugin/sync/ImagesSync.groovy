@@ -44,7 +44,7 @@ class ImagesSync {
 				def masterImages = listResults?.data?.findAll { it.status.resources.image_type != 'ISO_IMAGE' }
 				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
 					new DataFilter("refType", "ComputeZone"),
-					new DataFilter("refId", 50L),
+					new DataFilter("refId", cloud.id),
 					new DataOrFilter(
 						new DataFilter("virtualImage.externalType","!=", "template"),
 						new DataFilter("virtualImage.externalType", "null")
