@@ -635,9 +635,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def runConfig = buildWorkloadRunConfig(workload, workloadRequest, imageExternalId, opts)
 			runConfig.imageExternalId = imageExternalId
 			runConfig.virtualImageId = server.sourceImage?.id
+			runConfig.isTemplate = virtualImage.externalType == "template"
 			runConfig.userConfig = workloadRequest.usersConfiguration
 			if(imageExternalId) {
-
 				provisionResponse.createUsers = runConfig.userConfig.createUsers
 				runVirtualMachine(cloud, runConfig, provisionResponse,  workloadRequest, null)
 
@@ -1425,15 +1425,23 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					log.info "Error in findVirtualImageLocation.. could be not found ${e}", e
 				}
 				if (imageExternalId) {
-					ServiceResponse response = NutanixPrismComputeUtility.getImage(client, authConfig, imageExternalId)
+					ServiceResponse response
+					if(virtualImage.externalType == "template") {
+						response = NutanixPrismComputeUtility.getTemplate(client, authConfig, imageExternalId)
+					} else {
+						response = NutanixPrismComputeUtility.getImage(client, authConfig, imageExternalId)
+					}
 					if (!response.success) {
 						imageExternalId = null
 					}
 				}
 			}
-
-			if (!imageExternalId) { //If its userUploaded and still needs uploaded
-				// Create the image
+			 if (!imageExternalId) { //If its userUploaded and still needs uploaded
+				 //is it a template?
+				if(virtualImage.externalType == "template") {
+					throw new Exception("Error finding location for template: ${virtualImage.name}")
+				}
+				 // Create the image
 				def cloudFiles = morpheusContext.async.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
 				def imageFile = cloudFiles?.find { cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2") }
 				def contentLength = imageFile?.getContentLength()
@@ -1890,13 +1898,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				}
 				createResults = NutanixPrismComputeUtility.cloneVm(client, authConfig, runConfig, vmUuid)
 				log.debug("clone server results: ${createResults}")
+			} else if(runConfig.isTemplate) {
+				createResults = NutanixPrismComputeUtility.createVmFromTemplate(client, authConfig, runConfig)
+				log.debug("create server results: ${createResults}")
 			} else if(virtualImage) {
 				createResults = NutanixPrismComputeUtility.createVm(client, authConfig, runConfig)
 				log.debug("create server results: ${createResults}")
 			}
 
 			//check success
-			if(createResults.success == true && (createResults.data?.metadata?.uuid || createResults.data?.task_uuid)) {
+			if(createResults.success == true && (createResults.data?.metadata?.uuid || createResults.data?.task_uuid || createResults.data?.data?.extId)) {
 
 				server = morpheusContext.async.computeServer.get(server.id).blockingGet()
 				if(virtualImage) {
@@ -1917,7 +1928,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 				morpheusContext.async.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
-				def taskId = createResults.data?.status?.execution_context?.task_uuid ?: createResults.data?.task_uuid
+				def taskId = createResults.data?.status?.execution_context?.task_uuid ?: createResults.data?.task_uuid ?: (createResults.data.data.extId.toString().split(":")[1])
 				def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 				if(taskResults.success) {
 					if(createResults.data?.task_uuid) {
@@ -1925,6 +1936,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						if(sourceServer && server?.serverOs?.platform != 'windows') {
 							getPlugin().morpheus.executeCommandOnServer(sourceServer, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
 						}
+					}
+					if(!server.externalId) {
 						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}.uuid
 						provisionResponse.externalId = server.externalId
 						server.internalId = server.externalId
@@ -1976,30 +1989,37 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								//update disks
 								def disks = serverDetail.diskList
 
-								//some ugly matching
-								def volumeCount = 0
-								def volumes = server.volumes.sort { it.displayOrder }
-								def volumesToSave = []
-								for (int i = 0; i < volumes.size(); i++) {
-									def volume = morpheusContext.async.storageVolume.get(volumes[i]?.id).blockingGet()
-									def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeCount }
-									volume.externalId = newDisk?.uuid
+								if(virtualImage.externalType == "template") {
+									//have to sync disk from template
+									NutanixPrismSyncUtils.syncVolumes(server, disks?.findAll { it.device_properties.device_type == 'DISK' }, cloud, morpheusContext)
+								} else {
 
-									def deviceName = ''
-									if(newDisk.device_properties.disk_address.adapter_type == 'SCSI' || newDisk.device_properties.disk_address.adapter_type == 'SATA') {
-										deviceName += 'sd'
-									} else {
-										deviceName += 'hd'
+									//some ugly matching
+									def volumeCount = 0
+									def volumes = server.volumes.sort { it.displayOrder }
+
+									def volumesToSave = []
+									for (int i = 0; i < volumes.size(); i++) {
+										def volume = morpheusContext.async.storageVolume.get(volumes[i]?.id).blockingGet()
+										def newDisk = disks.find { disk -> disk.device_properties.disk_address.adapter_type == volume.type.name.toUpperCase() && disk.device_properties.disk_address.device_index == volumeCount}
+										volume.externalId = newDisk?.uuid
+
+										def deviceName = ''
+										if(newDisk.device_properties.disk_address.adapter_type == 'SCSI' || newDisk.device_properties.disk_address.adapter_type == 'SATA') {
+											deviceName += 'sd'
+										} else {
+											deviceName += 'hd'
+										}
+										def letterIndex = ['a' ,'b' ,'c' ,'d' ,'e' ,'f' ,'g' ,'h' ,'i' ,'j' ,'k' ,'l']
+										def indexPos = newDisk.device_properties?.disk_address?.device_index ?: 0
+										deviceName += letterIndex[indexPos]
+										volume.deviceName = '/dev/' + deviceName
+										volume.deviceDisplayName = deviceName
+										volumeCount++
+										volumesToSave << volume
 									}
-									def letterIndex = ['a','b','c','d','e','f','g','h','i','j','k','l']
-									def indexPos = newDisk.device_properties?.disk_address?.device_index ?: 0
-									deviceName += letterIndex[indexPos]
-									volume.deviceName = '/dev/' + deviceName
-									volume.deviceDisplayName = deviceName
-									volumeCount++
-									volumesToSave << volume
+									morpheusContext.async.storageVolume.bulkSave(volumesToSave).blockingGet()
 								}
-								morpheusContext.async.storageVolume.bulkSave(volumesToSave).blockingGet()
 								server = saveAndGet(server)
 								provisionResponse.success = true
 							} else {

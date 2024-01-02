@@ -1,6 +1,7 @@
 package com.morpheusdata.nutanix.prism.plugin.utils
 
 import com.morpheusdata.core.MorpheusContext
+import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.response.ServiceResponse
 import groovy.json.JsonOutput
@@ -514,6 +515,80 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse listTemplates(HttpApiClient client, Map authConfig) {
+		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error listing templates", null, results.data)
+		}
+	}
+
+	static ServiceResponse getTemplate(HttpApiClient client, Map authConfig, String templateUuid) {
+		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates/${templateUuid}", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error getting template ${templateUuid}", null, results.data)
+		}
+	}
+
+	static ServiceResponse createVmFromTemplate(HttpApiClient client, Map authConfig, Map runConfig) {
+		def templateUuid = runConfig.imageExternalId
+		def headers = [
+			'Content-Type':'application/json',
+			'NTNX-Request-Id': UUID.randomUUID().toString()
+		]
+		def body = [
+			"numberOfVms": 1,
+			"clusterReference": runConfig.clusterReference.uuid,
+			"overrideVmConfigMap": [
+				"0": [
+					name: runConfig.name,
+					numSockets: runConfig.numSockets,
+					memorySizeBytes: runConfig.maxMemory * ComputeUtility.ONE_MEGABYTE,
+					numCoresPerSocket: runConfig.coresPerSocket,
+					nics: convertNicListTov4(runConfig.nicList)
+				]
+			]
+		]
+		if(runConfig.cloudInitUserData) {
+			if(runConfig.isSysprep) {
+				body["overrideVmConfigMap"]["0"]['guestCustomization'] = [
+					"config": [
+						"\$objectType": "vmm.v4.ahv.config.Sysprep",
+						"sysprepScript": [
+							"\$objectType":"vmm.v4.ahv.config.Unattendxml",
+							value: runConfig.cloudInitUserData
+						]
+					],
+
+
+				]
+			} else {
+				body['overrideVmConfigMap']["0"]['guestCustomization'] = [
+					"config": [
+						"\$objectType": "vmm.v4.ahv.config.CloudInit",
+						"cloudInitScript": [
+							"\$objectType":"vmm.v4.ahv.config.Userdata",
+							value: runConfig.cloudInitUserData
+						]
+					],
+				]
+			}
+
+		}
+		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates/${templateUuid}/\$actions/deploy", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error creating vm from template ${results}", null, results.data)
+		}
+	}
+
 
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
 		log.debug("listNetworks")
@@ -977,5 +1052,26 @@ class NutanixPrismComputeUtility {
 				rtn = true
 		}
 		return rtn
+	}
+
+	private static convertNicListTov4(List nicList) {
+		def newNicList = nicList.collect { nic ->
+			def nicMap = [
+				backingInfo: [
+			    	isConnected: nic.is_connected,
+				],
+				networkInfo: [
+				    subnet: [
+				        extId: nic.subnet_reference.uuid
+				    ],
+				]
+			]
+			if(nic["ip_endpoint_list"]) {
+				nicMap["ipv4Config"] = [
+					ipAddress: nic["ip_endpoint_list"][0].ip
+				]
+			}
+			return nicMap
+		}
 	}
 }

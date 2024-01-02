@@ -182,6 +182,13 @@ resource "compute-type-layout" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-sin
 		{code = "kubernetes.master.podCidr"},
 		{code = "kubernetes.master.serviceCidr"}
 	]
+	packages = [
+		{code = "kubernetes-calico-3-26-0-package"},
+		{code = "kubernetes-rook-1-12-package"},
+		{code = "kubernetes-fluentbit-1-8-9-1-modified-package"},
+		{code = "kubernetes-prometheus-0-9-modified-package"},
+		{code = "kubernetes-nginx-ingress-operator-1-9-4-package"}
+	]
 
 }
 
@@ -235,7 +242,7 @@ resource "workload-type" "kubernetes-1_27_7-ubuntu-20_04-worker-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-18_04-20230131
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20230131
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
@@ -303,6 +310,13 @@ resource "compute-type-layout" "kubernetes-1_27_7-ubuntu-20_04-nutanix-prism-sin
 		{code = "kubernetes.master.podCidr"},
 		{code = "kubernetes.master.serviceCidr"}
 	]
+	packages = [
+    		{code = "kubernetes-calico-3-26-0-package"},
+    		{code = "kubernetes-rook-1-12-package"},
+    		{code = "kubernetes-fluentbit-1-8-9-1-modified-package"},
+    		{code = "kubernetes-prometheus-0-9-modified-package"},
+    		{code = "kubernetes-nginx-ingress-operator-1-9-4-package"}
+    	]
 
 }
 
@@ -427,6 +441,13 @@ resource "compute-type-layout" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-sin
 		{code = "kubernetes.master.podCidr"},
 		{code = "kubernetes.master.serviceCidr"}
 	]
+	packages = [
+    		{code = "kubernetes-calico-3-26-0-package"},
+    		{code = "kubernetes-rook-1-12-package"},
+    		{code = "kubernetes-fluentbit-1-8-9-1-modified-package"},
+    		{code = "kubernetes-prometheus-0-9-modified-package"},
+    		{code = "kubernetes-nginx-ingress-operator-1-9-4-package"}
+    	]
 
 }
 
