@@ -235,7 +235,7 @@ resource "workload-type" "kubernetes-1_27_7-ubuntu-20_04-worker-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-18_04-20230131
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20230131
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
