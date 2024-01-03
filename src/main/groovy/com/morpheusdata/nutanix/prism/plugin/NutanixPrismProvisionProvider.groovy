@@ -2042,7 +2042,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					server.internalId = createResults.results.server.instanceUuid
 					server = saveAndGet(server)
 				}
-				provisionResponse.setError('Failed to create server')
+				def failureReason = createResults?.data?.message_list?.first()?.message
+				if(failureReason) {
+					provisionResponse.setError("Failed to create server - ${failureReason}")
+				} else {
+					provisionResponse.setError("Failed to create server")
+
+				}
 			}
 
 		} catch (e) {
