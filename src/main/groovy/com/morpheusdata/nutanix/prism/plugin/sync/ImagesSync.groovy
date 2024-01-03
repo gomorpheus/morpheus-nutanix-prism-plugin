@@ -53,8 +53,6 @@ class ImagesSync {
 				SyncTask<VirtualImageLocationIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterImages)
 				syncTask.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.metadata?.uuid
-				}.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
-					cloudItem?.spec?.name == domainObject.imageName
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 					morpheusContext.async.virtualImage.location.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImageLocation virtualImageLocation ->
