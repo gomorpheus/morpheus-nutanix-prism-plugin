@@ -584,7 +584,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		ServiceResponse<PrepareWorkloadResponse> resp = new ServiceResponse<>()
 		resp.data = new PrepareWorkloadResponse(workload: workload, options: [sendIp:false], disableCloudInit: false)
 		try {
-			Long virtualImageId = workload.getConfigProperty('imageId')?.toLong() ?: workload?.workloadType?.virtualImage?.id
+			Long virtualImageId = workload.getConfigProperty('imageId')?.toLong() ?: workload?.workloadType?.virtualImage?.id ?: opts?.config?.imageId
 			if(!virtualImageId) {
 				resp.msg = "No virtual image selected"
 			} else {
