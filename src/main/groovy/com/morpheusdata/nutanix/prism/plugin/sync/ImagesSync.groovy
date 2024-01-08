@@ -95,7 +95,9 @@ class ImagesSync {
 		]))
 		SyncTask<VirtualImageIdentityProjection, Map, VirtualImage> syncTask = new SyncTask<>(domainRecords, objList)
 		syncTask.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
-			domainObject.name == cloudItem.status.name
+			domainObject.externalId && (domainObject.externalId == cloudItem.metadata?.uuid)
+		}.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
+			!domainObject.externalId && (domainObject.name == cloudItem.status.name)
 		}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItems ->
 			Map<Long, SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 			morpheusContext.async.virtualImage.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImage virtualImage ->
@@ -107,6 +109,8 @@ class ImagesSync {
 		}.onUpdate { List<SyncTask.UpdateItem<VirtualImage, Map>> updateItems ->
 			// Found the VirtualImage for this location.. just need to create the location
 			addMissingVirtualImageLocationsForImages(updateItems)
+		}.onDelete {
+			//do nothing
 		}.start()
 	}
 
