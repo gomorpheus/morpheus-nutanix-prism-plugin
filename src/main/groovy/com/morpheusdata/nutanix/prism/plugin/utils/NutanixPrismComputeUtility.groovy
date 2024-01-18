@@ -1,11 +1,8 @@
 package com.morpheusdata.nutanix.prism.plugin.utils
 
 import com.morpheusdata.core.MorpheusContext
-import com.morpheusdata.core.data.DataFilter
-import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
-import com.morpheusdata.model.Cloud
 import com.morpheusdata.response.ServiceResponse
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
@@ -592,92 +589,6 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse listTags(HttpApiClient client, Map authConfig) {
-		log.debug("listTags")
-		def results = client.callJsonApi(authConfig.apiUrl, "api/nutanix/v1/tags", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error listing tags ${results}", null, results.data)
-		}
-	}
-
-	static ServiceResponse listVmForTags(HttpApiClient client, Map authConfig, List tagIds) {
-		log.debug("listVmForTags")
-		def body = [
-		    entity_type: "vm",
-			tagIds: tagIds
-		]
-		def results = client.callJsonApi(authConfig.apiUrl, "api/nutanix/v1/tags/get_entities", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body:body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error listing vms for tags ${tagIds}", null, results.data)
-		}
-	}
-
-	static ServiceResponse createTag(HttpApiClient client, Map authConfig, String name, String description) {
-		log.debug("listTags")
-		def body = [
-			"entityType": "vm",
-			"name": name,
-			"description": description
-		]
-		def results = client.callJsonApi(authConfig.apiUrl, "api/nutanix/v1/tags", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error creating tag ${results}", null, results.data)
-		}
-	}
-
-	static ServiceResponse attachTagToVirtualMachine(HttpApiClient client, Map authConfig, String vmUuid, String tagUuid) {
-		log.debug("listTags")
-		def body = [
-			[
-				"genericDTO":[
-					"tagUuid":tagUuid,
-					"entity":[
-						"entityUuid":vmUuid,
-						"entityType":"vm"
-					]
-				]
-			]
-		]
-		def results = client.callJsonApi(authConfig.apiUrl, "api/nutanix/v1/tags/add_entities/fanout", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error adding tag to vm ${results}", null, results.data)
-		}
-	}
-
-	static ServiceResponse detachTagFromVirtualMachine(HttpApiClient client, Map authConfig, String vmUuid, String tagUuid) {
-		log.debug("listTags")
-		def body = [
-			[
-				"genericDTO":[
-					"tagUuid":tagUuid,
-					"entity":[
-						"entityUuid":vmUuid,
-						"entityType":"vm"
-					]
-				]
-			]
-		]
-		def results = client.callJsonApi(authConfig.apiUrl, "api/nutanix/v1/tags/remove_entities/fanout", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error removing tag from vm ${results}", null, results.data)
-		}
-	}
-
 
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
 		log.debug("listNetworks")
@@ -1046,27 +957,6 @@ class NutanixPrismComputeUtility {
 		[value].flatten()
 	}
 
-
-	static Map getVmTags(MorpheusContext morpheusContext, Cloud cloud, HttpApiClient apiClient, Map authConfig) {
-		def tagRecords = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
-			new DataFilter("refType", "ComputeZone"),
-			new DataFilter("refId", cloud.id),
-		])).toMap({it.externalId}).blockingGet()
-		def tagUuids = tagRecords.keySet().toList()
-
-		def vmTagList = NutanixPrismComputeUtility.listVmForTags(apiClient, authConfig, tagUuids)
-		def tagMapping = [:]
-		if(vmTagList.success && vmTagList.data?.entities?.size() > 0) {
-			vmTagList.data?.entities?.each { it ->
-				def vmUuid = it.entityInfo.entityUuid
-				def tagList = it.tagList.collect {[uuid: it, tag: tagRecords[it]]}
-				if(vmUuid) {
-					tagMapping[vmUuid] = tagList
-				}
-			}
-		}
-		tagMapping
-	}
 	static waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
 		def rtn = [success:false]
 		try {

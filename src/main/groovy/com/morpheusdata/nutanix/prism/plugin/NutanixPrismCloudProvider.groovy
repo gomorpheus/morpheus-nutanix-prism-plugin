@@ -27,7 +27,6 @@ import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.ImagesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
 import com.morpheusdata.nutanix.prism.plugin.sync.SnapshotsSync
-import com.morpheusdata.nutanix.prism.plugin.sync.TagsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.TemplatesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.VirtualMachinesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.VirtualPrivateCloudSync
@@ -550,7 +549,6 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					ensureRegionCode(cloud)
 
 					(new CategoriesSync(this.plugin, cloud, client)).execute()
-					(new TagsSync(this.plugin, cloud, client)).execute()
 					(new VirtualPrivateCloudSync(this.plugin, cloud, client)).execute()
 					(new ClustersSync(this.plugin, cloud, client)).execute()
 					(new DatastoresSync(this.plugin, cloud, client)).execute()

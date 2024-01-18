@@ -28,7 +28,6 @@ import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.HostType
 import com.morpheusdata.model.Icon
 import com.morpheusdata.model.Instance
-import com.morpheusdata.model.MetadataTag
 import com.morpheusdata.model.Network
 import com.morpheusdata.model.NetworkProxy
 import com.morpheusdata.model.OptionType
@@ -990,42 +989,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		} else {
 			return ServiceResponse.error("Could not find server uuid")
 		}
-	}
-
-	@Override
-	ServiceResponse updateMetadataTags(ComputeServer server, Map opts) {
-		log.info("Updating Metadata")
-		Cloud cloud = server.cloud
-		HttpApiClient client = new HttpApiClient()
-		client.networkProxy = cloud.apiProxy
-		def authConfig = plugin.getAuthConfig(cloud)
-		def tagMapping = NutanixPrismComputeUtility.getVmTags(morpheusContext, cloud, client, authConfig)
-		def existingTags = tagMapping[server.externalId]
-		def tagsToRemove = existingTags.findAll { at ->
-			if(!server.metadata.find{it.externalId == at.uuid}) {
-				return true
-			}
-		}
-		tagsToRemove?.each {tagMap ->
-			NutanixPrismComputeUtility.detachTagFromVirtualMachine(client, authConfig, server.externalId, tagMap.uuid)
-		}
-		server.metadata?.each { MetadataTag tag ->
-			if(!tag.externalId) {
-				log.info("Creating Tag")
-				def tagResult = NutanixPrismComputeUtility.createTag(client, authConfig, tag.name, tag.value)
-				if(tagResult.success) {
-					tag.externalId = tagResult.data.uuid
-					tag.refType = 'ComputeZone'
-					tag.refId = cloud.id
-					morpheusContext.async.metadataTag.save(tag).blockingGet()
-				}
-			}
-			if(tag.externalId) {
-				NutanixPrismComputeUtility.attachTagToVirtualMachine(client, authConfig, server.externalId, tag.externalId)
-			}
-		}
-		return ServiceResponse.success()
-
 	}
 
 	@Override
