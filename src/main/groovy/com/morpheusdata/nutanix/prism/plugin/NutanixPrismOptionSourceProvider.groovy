@@ -152,7 +152,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def cloudId = getCloudId(args)
 		if(cloudId) {
 			Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
-			def options = morpheusContext.async.cloud.pool.listIdentityProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}", null).map {[name: it.name, value: it.externalId]}.toSortedList {it.name}.blockingGet()
+			def options = morpheusContext.async.cloud.pool.listIdentityProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}", null).map {[name: it.name, value: it.externalId]}.toList().blockingGet().sort({ it.name })
 			return options
 		} else {
 			return []
