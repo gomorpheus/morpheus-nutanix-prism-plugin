@@ -1,0 +1,17 @@
+resource "account-resource-type" "terraform.nutanix-prism-cloud.nutanix_virtual_machine" {
+	code = "terraform.nutanix-prism-cloud.nutanix_virtual_machine"
+	name = "Instance"
+	apiCategory = "nutanix"
+	category = "terraform"
+	apiType = "nutanix_virtual_machine"
+	resourceIcon = "nutanix-prism-cloud"
+	type = "instance"
+	rootType = true
+	resourceType = "instance"
+	morpheusType = "instance"
+	displayOrder = 10
+	resourceVersion = "1.0"
+	iacProviderType = "nutanix-prism-cloud"
+	iacType = "nutanix_virtual_machine"
+	description = ""
+}

@@ -606,7 +606,7 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse listDatastores(HttpApiClient client, Map authConfig) {
-		log.debug("listVMs")
+		log.debug("listDatastores")
 		def groupMemberAttributes = ['container_name','serial','storage.user_capacity_bytes','cluster','storage.user_free_bytes','state','message','reason']
 		return callGroupApi(client, 'storage_container', 'serial', groupMemberAttributes, authConfig)
 	}
