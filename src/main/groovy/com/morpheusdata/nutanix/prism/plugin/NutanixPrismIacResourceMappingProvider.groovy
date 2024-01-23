@@ -74,7 +74,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 			if (server) {
 				server.externalId = externalId
 				server.maxMemory = resourceResult?.values?.memory_size_mib * ComputeUtility.ONE_MEGABYTE
-				server.maxCores = resourceResult?.values?.num_sockets?.toLong() ?: 0
+				server.maxCores = (resourceResult?.values?.num_vcpus_per_socket?.toLong() ?: 0) * (resourceResult?.values?.num_sockets?.toLong() ?: 0)
 				server.coresPerSocket = resourceResult?.values?.num_vcpus_per_socket?.toLong()
 				server.resourcePool = cluster
 				if (serverName && server.name != serverName)
