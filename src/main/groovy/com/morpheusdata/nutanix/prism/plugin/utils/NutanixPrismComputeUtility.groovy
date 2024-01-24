@@ -1,8 +1,11 @@
 package com.morpheusdata.nutanix.prism.plugin.utils
 
 import com.morpheusdata.core.MorpheusContext
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
+import com.morpheusdata.model.Cloud
 import com.morpheusdata.response.ServiceResponse
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
@@ -535,6 +538,28 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse createCategoryKey(HttpApiClient client, Map authConfig, String keyName) {
+		def body = [name: keyName]
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/categories/${keyName}", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'PUT')
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error creating category key ${keyName}", null, results.data)
+		}
+	}
+
+	static ServiceResponse createCategoryValue(HttpApiClient client, Map authConfig, String keyName, String valueName) {
+		def body = [value: valueName]
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/categories/${keyName}/${valueName}", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'PUT')
+		if(results?.success) {
+			return ServiceResponse.success(results?.data)
+		} else {
+			return ServiceResponse.error("Error creating category value ${valueName} in key, ${keyName}", null, results.data)
+		}
+	}
+
 	static ServiceResponse createVmFromTemplate(HttpApiClient client, Map authConfig, Map runConfig) {
 		def templateUuid = runConfig.imageExternalId
 		def headers = [
@@ -588,6 +613,7 @@ class NutanixPrismComputeUtility {
 			return ServiceResponse.error("Error creating vm from template ${results}", null, results.data)
 		}
 	}
+
 
 
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
@@ -956,6 +982,7 @@ class NutanixPrismComputeUtility {
 	static toList(value) {
 		[value].flatten()
 	}
+
 
 	static waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
 		def rtn = [success:false]

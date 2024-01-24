@@ -24,9 +24,10 @@ class NutanixPrismPlugin extends Plugin {
 		def nutanixPrismCloud = new NutanixPrismCloudProvider(this, this.morpheus)
 		def backupProvider = new NutanixPrismBackupProvider(this, morpheus)
 		def nutanixPrismOptionSourceProvider = new NutanixPrismOptionSourceProvider(this, morpheus)
+		def iacResourceMappingProvider = new NutanixPrismIacResourceMappingProvider(this, morpheus)
 
 		registerProviders(
-			nutanixPrismCloud, nutanixProvision, nutanixPrismOptionSourceProvider, backupProvider
+			nutanixPrismCloud, nutanixProvision, nutanixPrismOptionSourceProvider, backupProvider, iacResourceMappingProvider
 		)
 
 		cloudProviderCode = nutanixPrismCloud.code

@@ -8,8 +8,6 @@ import com.morpheusdata.core.data.DataFilter
 import com.morpheusdata.core.data.DataOrFilter
 import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.model.*
-import com.morpheusdata.model.projection.VirtualImageIdentityProjection
-import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -141,7 +139,10 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def cloudId = getCloudId(args)
 		if(cloudId) {
 			Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
-			def options = morpheusContext.async.referenceData.listByCategory(CategoriesSync.getCategory(tmpCloud)).map { [name: it.externalId, value: it.externalId] }.toList().blockingGet().sort({ it.name })
+			def options = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+				new DataFilter("refType", "ComputeZone"),
+				new DataFilter("refId", tmpCloud.id),
+			])).map { [name: it.externalId, value: it.externalId] }.toList().blockingGet().sort({ it.name })
 			return options
 		} else {
 			return []

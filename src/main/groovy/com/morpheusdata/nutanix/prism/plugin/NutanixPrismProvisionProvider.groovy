@@ -5,6 +5,8 @@ import com.morpheusdata.PrepareHostResponse
 import com.morpheusdata.core.AbstractProvisionProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.providers.ComputeProvisionProvider
 import com.morpheusdata.core.providers.HostProvisionProvider
 import com.morpheusdata.core.providers.ProvisionProvider
@@ -28,6 +30,7 @@ import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.HostType
 import com.morpheusdata.model.Icon
 import com.morpheusdata.model.Instance
+import com.morpheusdata.model.MetadataTag
 import com.morpheusdata.model.Network
 import com.morpheusdata.model.NetworkProxy
 import com.morpheusdata.model.OptionType
@@ -992,6 +995,47 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
+	ServiceResponse updateMetadataTags(ComputeServer server, Map opts) {
+		log.info("Updating Metadata")
+		Cloud cloud = server.cloud
+		HttpApiClient client = new HttpApiClient()
+		client.networkProxy = cloud.apiProxy
+		def authConfig = plugin.getAuthConfig(cloud)
+		def tags = getAllTags(cloud)
+		def cloudItem = NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)?.data
+
+		def currentTags = []
+
+		server.metadata?.each { MetadataTag tag ->
+			if(!tag.externalId) {
+				log.info("Creating Category")
+				//check if key exists
+				def keyExists = tags.find {it.key.split(":")[0] == tag.name}
+				if(!keyExists) {
+					def x= NutanixPrismComputeUtility.createCategoryKey(client, authConfig, tag.name)
+				}
+				def categoryResults = NutanixPrismComputeUtility.createCategoryValue(client, authConfig, tag.name, tag.value)
+				if(categoryResults.success) {
+					tag.externalId = "${tag.name}:${tag.value}"
+					tag.refType = 'ComputeZone'
+					tag.refId = cloud.id
+					morpheusContext.async.metadataTag.save(tag).blockingGet()
+					currentTags += tag
+				}
+			}
+			if(tag.externalId) {
+				currentTags += tag
+			}
+		}
+		cloudItem.metadata.categories = currentTags.collectEntries {[it.name, it.value]}
+		cloudItem.metadata.categories_mapping = currentTags.collectEntries {[it.name, [it.value]]}
+		NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, cloudItem)
+
+		return ServiceResponse.success()
+
+	}
+
+	@Override
 	ServiceResponse resizeWorkload(Instance instance, Workload workload, ResizeRequest resizeRequest, Map opts) {
 		def server = morpheusContext.async.computeServer.get(workload.server.id).blockingGet()
 		if(server) {
@@ -1922,9 +1966,25 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					server = saveAndGet(server)
 				}
 
+				if(createResults?.data?.metadata?.categories_mapping) {
+					def tags = getAllTags(cloud)
+					def vmTags = createResults?.data?.metadata?.categories_mapping?.collect { "${it.key}:${it.value[0]}" }
+					def existingTags = server.metadata
+					def matchFunction = { existingTag, masterTag ->
+						{
+							masterTag == existingTag.externalId
+						}
+					}
+					def tagSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingTags, vmTags, matchFunction)
+					tagSyncLists.addList?.each {
+						server.metadata += tags[it]
+					}
+					tagSyncLists.removeList?.each {
+						server.metadata.remove(it)
+					}
+					server = saveAndGet(server)
+				}
 
-				//TODO tagging? No direct mapping
-				//applyTags(workload, client)
 
 				morpheusContext.async.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
@@ -2092,6 +2152,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		def resourcePoolProjectionIds = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).map{it.id}.toList().blockingGet()
 		def resourcePoolsMap = morpheusContext.async.cloud.pool.listById(resourcePoolProjectionIds).toMap { it.externalId}.blockingGet()
 		resourcePoolsMap
+	}
+
+	private Map getAllTags(Cloud cloud) {
+		log.debug "getAllTags: ${cloud}"
+		def tags = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+			new DataFilter("refType", "ComputeZone"),
+			new DataFilter("refId", cloud.id),
+		])).toMap {it.externalId}.blockingGet()
+		tags
 	}
 
 	private ComputeServerType findVmNodeServerType(Long cloudId, String platform, String provisionTypeCode) {

@@ -2,6 +2,7 @@ package com.morpheusdata.nutanix.prism.plugin.sync
 
 import com.morpheusdata.core.BulkSaveResult
 import com.morpheusdata.core.MorpheusContext
+import com.morpheusdata.core.data.DataFilter
 import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
@@ -55,6 +56,7 @@ class VirtualMachinesSync {
 				Map networks = getAllNetworks()
 				Map osTypes = getAllOsTypes()
 				List plans = getAllServicePlans()
+				Map tags = getAllTags()
 
 				def usageLists = [restartUsageIds: [], stopUsageIds: [], startUsageIds: [], updatedSnapshotIds: []]
 
@@ -69,10 +71,10 @@ class VirtualMachinesSync {
 					}
 				}.onAdd { itemsToAdd ->
 					if (createNew) {
-						addMissingVirtualMachines(cloud, plans, hosts, resourcePools, networks, osTypes, itemsToAdd, defaultServerType, blackListedNames, usageLists)
+						addMissingVirtualMachines(cloud, plans, hosts, resourcePools, networks, osTypes, itemsToAdd as List, defaultServerType, blackListedNames, usageLists, tags)
 					}
 				}.onUpdate { List<SyncTask.UpdateItem<ComputeServer, Map>> updateItems ->
-					updateMatchedVirtualMachines(cloud, plans, hosts, resourcePools, networks, osTypes, updateItems, usageLists)
+					updateMatchedVirtualMachines(cloud, plans, hosts, resourcePools, networks, osTypes, updateItems, usageLists, tags)
 				}.onDelete { removeItems ->
 					removeMissingVirtualMachines(cloud, removeItems, blackListedNames)
 				}.observe().blockingSubscribe { completed ->
@@ -92,7 +94,7 @@ class VirtualMachinesSync {
 		log.debug "END: execute VirtualMachinesSync: ${cloud.id} ${createNew} in ${endTime - startTime} ms"
 	}
 
-	def addMissingVirtualMachines(Cloud cloud, List plans, Map hosts, Map resourcePools, Map networks, Map osTypes, List addList, ComputeServerType defaultServerType, List blackListedNames, Map usageLists) {
+	def addMissingVirtualMachines(Cloud cloud, List plans, Map hosts, Map resourcePools, Map networks, Map osTypes, List addList, ComputeServerType defaultServerType, List blackListedNames, Map usageLists, Map tags) {
 		log.debug "addMissingVirtualMachines ${cloud} ${plans?.size()} ${addList?.size()} ${defaultServerType} ${blackListedNames}"
 
 		if (!createNew)
@@ -113,7 +115,7 @@ class VirtualMachinesSync {
 					if (!savedServer) {
 						log.error "Error in creating server ${add}"
 					} else {
-						performPostSaveSync(savedServer, cloudItem, networks, metricsResult)
+						performPostSaveSync(savedServer, cloudItem, networks, metricsResult, tags)
 					}
 
 					if (vmConfig.powerState == ComputeServer.PowerState.on) {
@@ -129,7 +131,7 @@ class VirtualMachinesSync {
 		}
 	}
 
-	protected updateMatchedVirtualMachines(Cloud cloud, List plans, Map hosts, Map resourcePools, Map networks, Map osTypes, List<SyncTask.UpdateItem<ComputeServer, Instance>> updateList, Map usageLists) {
+	protected updateMatchedVirtualMachines(Cloud cloud, List plans, Map hosts, Map resourcePools, Map networks, Map osTypes, List<SyncTask.UpdateItem<ComputeServer, Instance>> updateList, Map usageLists, Map tags) {
 		log.debug "updateMatchedVirtualMachines: ${cloud} ${updateList?.size()}"
 
 		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
@@ -201,7 +203,7 @@ class VirtualMachinesSync {
 							currentServer = saveAndGet(currentServer)
 						}
 
-						def changes = performPostSaveSync(currentServer, cloudItem, networks, metricsResult)
+						def changes = performPostSaveSync(currentServer, cloudItem, networks, metricsResult, tags)
 						if(changes || save) {
 							currentServer = morpheusContext.async.computeServer.get(currentServer.id).blockingGet()
 							planInfoChanged = true
@@ -246,7 +248,7 @@ class VirtualMachinesSync {
 			for(ComputeServer currentServer : saveResult.persistedItems) {
 				Map cloudItem = updateList.find { it.existingItem.id == currentServer.id }.masterItem
 
-				def saveRequired = performPostSaveSync(currentServer, cloudItem, networks, metricsResult)
+				def saveRequired = performPostSaveSync(currentServer, cloudItem, networks, metricsResult, tags)
 
 				//check for restart usage records
 				if(saveRequired) {
@@ -315,6 +317,15 @@ class VirtualMachinesSync {
 		def servicePlanProjections = morpheusContext.async.servicePlan.listIdentityProjections(provisionType).toList().blockingGet()
 		def plans = morpheusContext.async.servicePlan.listById(servicePlanProjections.collect { it.id }).filter {it.active && it.deleted != true}.toList().blockingGet()
 		plans
+	}
+
+	private Map getAllTags() {
+		log.debug "getAllTags: ${cloud}"
+		def tags = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+			new DataFilter("refType", "ComputeZone"),
+			new DataFilter("refId", cloud.id),
+		])).toMap {it.externalId}.blockingGet()
+		tags
 	}
 
 	private updateServerContainersAndInstances(ComputeServer currentServer, ServicePlan plan) {
@@ -402,12 +413,12 @@ class VirtualMachinesSync {
 		vmConfig
 	}
 
-	private Boolean performPostSaveSync(ComputeServer server, Map cloudItem, Map networks, metricsResult) {
+	private Boolean performPostSaveSync(ComputeServer server, Map cloudItem, Map networks, metricsResult, Map tags) {
 		log.debug "performPostSaveSync: ${server?.id}"
 		def changes = false
 		// Disks and metrics
 		if(server.status != 'resizing') {
-			def syncResults = NutanixPrismSyncUtils.syncVolumes(server, cloudItem.status.resources.disk_list?.findAll { it.device_properties.device_type == 'DISK' }, cloud, morpheusContext)
+			def syncResults = NutanixPrismSyncUtils.syncVolumes(server, cloudItem.status.resources.disk_list?.findAll { it.device_properties.device_type == 'DISK' } as ArrayList, cloud, morpheusContext)
 			if(!server.computeCapacityInfo) {
 				server.capacityInfo = new ComputeCapacityInfo(maxCores: server.maxCores, maxMemory: server.maxMemory, maxStorage: syncResults.maxStorage)
 				changes = true
@@ -420,6 +431,24 @@ class VirtualMachinesSync {
 			}
 
 		}
+
+		//tags
+
+		def vmTags = cloudItem.metadata?.categories?.collect {"${it.key}:${it.value}"}
+		def existingTags = server.metadata
+		def matchFunction = {existingTag, masterTag -> {
+			masterTag == existingTag.externalId
+		}}
+		def tagSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingTags, vmTags, matchFunction)
+		tagSyncLists.addList?.each {
+			server.metadata += tags[it]
+			changes = true
+		}
+		tagSyncLists.removeList?.each {
+			server.metadata.remove(it)
+			changes = true
+		}
+
 		// TODO : how to get used storage?
 		def metricChanges = NutanixPrismSyncUtils.updateMetrics(server, 'memory_usage_ppm', 'hypervisor_cpu_usage_ppm', metricsResult)
 		if(metricChanges || changes) {
@@ -428,7 +457,7 @@ class VirtualMachinesSync {
 
 		// Networks
 		if(server.status != 'resizing') {
-			def interfaceChanges = NutanixPrismSyncUtils.syncInterfaces(server, cloudItem.status.resources.nic_list, networks, netTypes, morpheusContext)
+			def interfaceChanges = NutanixPrismSyncUtils.syncInterfaces(server, cloudItem.status.resources.nic_list, networks, netTypes as List<ComputeServerInterfaceType>, morpheusContext)
 			if (interfaceChanges) {
 				changes = true
 			}
