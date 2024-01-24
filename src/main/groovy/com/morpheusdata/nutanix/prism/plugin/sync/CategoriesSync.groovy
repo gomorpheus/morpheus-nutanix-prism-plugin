@@ -1,10 +1,14 @@
 package com.morpheusdata.nutanix.prism.plugin.sync
 
 import com.morpheusdata.core.MorpheusContext
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Cloud
+import com.morpheusdata.model.MetadataTag
 import com.morpheusdata.model.ReferenceData
+import com.morpheusdata.model.projection.MetadataTagIdentityProjection
 import com.morpheusdata.model.projection.ReferenceDataSyncProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
@@ -27,31 +31,30 @@ class CategoriesSync {
 		this.apiClient = apiClient
 	}
 
-	public static getCategory(Cloud cloud) {
-		return "nutanix.prism.categories.${cloud.id}"
-	}
-
 	def execute() {
 		log.debug "BEGIN: execute Categories: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
 			def masterData = getCategoriesAndValues(authConfig)
 			if(masterData.success) {
-				Observable<ReferenceDataSyncProjection> domainRecords = morpheusContext.async.referenceData.listByCategory(getCategory(cloud))
-				SyncTask<ReferenceDataSyncProjection, Map, com.morpheusdata.model.ReferenceData> syncTask = new SyncTask<>(domainRecords, masterData.data)
-				syncTask.addMatchFunction { ReferenceDataSyncProjection domainObject, Map data ->
+				Observable<MetadataTagIdentityProjection> domainRecords = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+					new DataFilter("refType", "ComputeZone"),
+					new DataFilter("refId", cloud.id),
+				]))
+				SyncTask<MetadataTagIdentityProjection, Map, MetadataTag> syncTask = new SyncTask<>(domainRecords, masterData.data)
+				syncTask.addMatchFunction { MetadataTagIdentityProjection domainObject, Map data ->
 					domainObject.externalId == data.display
 				}.onDelete { removeItems ->
-					removeMissingCategories(removeItems)
+					removeMissingCategories(removeItems as List<MetadataTag>)
 				}.onUpdate { List<SyncTask.UpdateItem<ReferenceData, Map>> updateItems ->
 					// Nothing to do
 				}.onAdd { itemsToAdd ->
-					addMissingCategories(itemsToAdd)
+					addMissingCategories(itemsToAdd as List<Map>)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ReferenceDataSyncProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<ReferenceDataSyncProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
-					morpheusContext.async.referenceData.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {ReferenceData referenceData ->
-						SyncTask.UpdateItemDto<ReferenceData, Map> matchItem = updateItemMap[referenceData.id]
-						return new SyncTask.UpdateItem<ReferenceData,Map>(existingItem:referenceData, masterItem:matchItem.masterItem)
+					morpheusContext.async.metadataTag.listById(updateItems?.collect { it.existingItem.id }).map { MetadataTag tag ->
+						SyncTask.UpdateItemDto<MetadataTagIdentityProjection, Map> matchItem = updateItemMap[tag.id] as SyncTask.UpdateItemDto<MetadataTagIdentityProjection, Map>
+						return new SyncTask.UpdateItem<MetadataTag, Map>(existingItem: tag, masterItem: matchItem.masterItem)
 					}
 				}.start()
 			}
@@ -61,32 +64,34 @@ class CategoriesSync {
 		log.debug "END: execute Categories: ${cloud.id}"
 	}
 
-	def addMissingCategories(List addList) {
+	def addMissingCategories(List<Map> addList) {
 		log.debug "addMissingCategories ${cloud} ${addList.size()}"
 		def adds = []
 
 		for(Map data in addList) {
+
 			Map props = [
-					code      : "nutanix.prism.categories.${cloud.id}.${data.display}",
-					category  : getCategory(cloud),
-					name      : data.name,
-					keyValue  : data.value,
-					externalId: data.display,
-					value     : data.value
+				refType: 'ComputeZone',
+				refId: cloud.id,
+				externalId: data.display,
+				name: data.name,
+				value: data.value
 			]
 
-			def add = new ReferenceData(props)
+			def add = new MetadataTag(props)
 			adds << add
 		}
 
+
+
 		if(adds) {
-			morpheusContext.async.referenceData.create(adds).blockingGet()
+			morpheusContext.async.metadataTag.bulkCreate(adds).blockingGet()
 		}
 	}
 
-	private removeMissingCategories(List<ReferenceData> removeList) {
-		log.debug "removeMissingCategories: ${removeList?.size}"
-		morpheusContext.async.referenceData.remove(removeList).blockingGet()
+	private removeMissingCategories(List<MetadataTag> removeList) {
+		log.debug "removeMissingCategories: ${removeList?.size()}"
+		morpheusContext.async.metadataTag.remove(removeList).blockingGet()
 	}
 	
 	private getCategoriesAndValues(authConfig) {
