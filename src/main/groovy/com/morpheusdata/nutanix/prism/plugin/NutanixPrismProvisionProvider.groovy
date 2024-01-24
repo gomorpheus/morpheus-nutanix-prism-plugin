@@ -1976,7 +1976,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						}
 					}
 					def tagSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingTags, vmTags, matchFunction)
-					println "\u001B[33mAC Log - NutanixPrismProvisionProvider:insertVm- ${tagSyncLists}\u001B[0m"
 					tagSyncLists.addList?.each {
 						server.metadata += tags[it]
 					}

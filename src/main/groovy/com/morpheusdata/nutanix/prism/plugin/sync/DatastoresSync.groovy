@@ -12,6 +12,7 @@ import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.model.projection.DatastoreIdentity
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import groovy.util.logging.Slf4j
 import io.reactivex.Observable
 
@@ -40,6 +41,12 @@ class DatastoresSync {
 			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
 			}.toList().blockingGet()
+
+			//fetch our known vpcs
+			def vpcs = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
+				return projection.type == 'VPC' && projection.internalId != null
+			}.toList().blockingGet()
+			def vpcArray = vpcs.collect {new CloudPool(id: it.id)}
 
 			def listResults = NutanixPrismComputeUtility.listDatastores(apiClient, authConfig)
 			if(listResults.success == true) {
@@ -77,7 +84,9 @@ class DatastoresSync {
 							    refId       : cloud.id
 						]
 						Datastore add = new Datastore(datastoreConfig)
-						add.assignedZonePools = [new ComputeZonePool(id: cluster?.id)]
+						add.assignedZonePools = [new CloudPool(id: cluster?.id)]
+						//also assign to VPCs
+						add.assignedZonePools += vpcArray
 						adds << add
 
 					}
@@ -120,9 +129,15 @@ class DatastoresSync {
 							existingItem.zonePool = null
 							save = true
 						}
-						if(cluster?.id && !existingItem.assignedZonePools?.find{it.id == cluster?.id}) {
-							existingItem.assignedZonePools += new CloudPool(id: cluster.id)
-							save=true
+						//also assign to VPCs
+						def zonePools = vpcArray
+						if(cluster?.id) {
+							zonePools += new CloudPool(id: cluster.id)
+						}
+						def zonePoolSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingItem.assignedZonePools, zonePools, {e, m ->  {e.id == m.id}})
+						if(zonePoolSyncLists.addList.size() > 0) {
+							existingItem.assignedZonePools += zonePoolSyncLists.addList
+							save = true
 						}
 						if(save) {
 							updatedItems << existingItem

@@ -82,8 +82,6 @@ class CategoriesSync {
 			adds << add
 		}
 
-
-
 		if(adds) {
 			morpheusContext.async.metadataTag.bulkCreate(adds).blockingGet()
 		}
