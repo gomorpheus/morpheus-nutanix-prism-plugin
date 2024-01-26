@@ -15,6 +15,7 @@ import com.morpheusdata.core.providers.VmProvisionProvider
 import com.morpheusdata.core.providers.WorkloadProvisionProvider
 import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
+import com.morpheusdata.model.AccountResource
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.ComputeCapacityInfo
@@ -66,7 +67,7 @@ import org.apache.http.client.utils.URIBuilder
 import java.util.concurrent.TimeUnit
 
 @Slf4j
-class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements VmProvisionProvider, WorkloadProvisionProvider.ResizeFacet, HostProvisionProvider.ResizeFacet, ProvisionProvider.SnapshotFacet, ProvisionProvider.HypervisorConsoleFacet, ResourceProvisionProvider {
+class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements VmProvisionProvider, WorkloadProvisionProvider.ResizeFacet, HostProvisionProvider.ResizeFacet, ProvisionProvider.SnapshotFacet, ProvisionProvider.HypervisorConsoleFacet, ProvisionProvider.IacResourceFacet, ResourceProvisionProvider {
 
 	NutanixPrismPlugin plugin
 	MorpheusContext morpheusContext
@@ -1277,6 +1278,23 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		return rtn
 	}
 
+	@Override
+	ServiceResponse finalizeResourceWorkload(Workload workload, AccountResource resource) {
+		ComputeServer server = workload.server
+		Cloud cloud = server.cloud
+
+		def authConfig = plugin.getAuthConfig(cloud)
+		def serverUuid = server.externalId
+		HttpApiClient client = new HttpApiClient()
+		client.networkProxy = cloud.apiProxy
+		Map serverDetails = NutanixPrismComputeUtility.checkServerReady(client, authConfig, serverUuid)
+		if(serverDetails.success && serverDetails.virtualMachine) {
+			return ServiceResponse.success()
+
+		} else {
+			return ServiceResponse.error("Server not ready/does not exist")
+		}
+	}
 
 	@Override
 	ServiceResponse createWorkloadResources(Workload workload, Map opts) {
