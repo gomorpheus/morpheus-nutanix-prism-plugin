@@ -4,6 +4,7 @@ import com.morpheusdata.core.backup.AbstractBackupProvider
 import com.morpheusdata.core.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.providers.IacResourceMappingProvider
 import com.morpheusdata.core.providers.ProvisionProvider
 import com.morpheusdata.core.backup.BackupProvider
 import com.morpheusdata.core.util.ConnectionUtils
@@ -593,5 +594,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	NutanixPrismProvisionProvider nutanixPrismProvisionProvider() {
 		this.plugin.getProviderByCode('nutanix-prism-provision-provider') as NutanixPrismProvisionProvider
+	}
+
+	IacResourceMappingProvider getIacResourceMappingProvider() {
+		this.plugin.getProviderByCode('nutanix-prism-iac-resource-mapping-provider') as NutanixPrismIacResourceMappingProvider
 	}
 }
