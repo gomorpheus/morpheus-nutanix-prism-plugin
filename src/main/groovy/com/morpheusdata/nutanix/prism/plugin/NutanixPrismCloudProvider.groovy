@@ -357,15 +357,15 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					password = accountCredential.data.password
 					username = accountCredential.data.username
 				} else if(validateCloudRequest.credentialType == 'username-password') {
-					password = validateCloudRequest.credentialPassword ?: cloudInfo.servicePassword ?: cloudInfo.configMap.password
-					username = validateCloudRequest.credentialUsername ?: cloudInfo.serviceUsername ?: cloudInfo.configMap.username
+					password = validateCloudRequest.credentialPassword ?: cloudInfo.configMap.password ?: cloudInfo.servicePassword
+					username = validateCloudRequest.credentialUsername ?: cloudInfo.configMap.username ?: cloudInfo.serviceUsername
 				} else if(validateCloudRequest.credentialType == 'local') {
 					if(validateCloudRequest.opts?.zone?.servicePassword && validateCloudRequest.opts?.zone?.servicePassword != '************') {
 						password = validateCloudRequest.opts?.zone?.servicePassword
 					} else {
-						password = cloudInfo.servicePassword ?: cloudInfo.configMap.password
+						password = cloudInfo.configMap.password ?: cloudInfo.servicePassword
 					}
-					username = validateCloudRequest.opts?.zone?.serviceUsername ?: cloudInfo.serviceUsername ?: cloudInfo.configMap.username
+					username = validateCloudRequest.opts?.zone?.serviceUsername ?: cloudInfo.configMap.username ?: cloudInfo.serviceUsername
 				}
 
 				if(username?.length() < 1) {
