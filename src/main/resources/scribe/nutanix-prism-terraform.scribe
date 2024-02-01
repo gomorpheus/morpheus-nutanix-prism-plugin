@@ -4,7 +4,7 @@ resource "account-resource-type" "terraform.nutanix-prism-cloud.nutanix_virtual_
 	apiCategory = "nutanix"
 	category = "terraform"
 	apiType = "nutanix_virtual_machine"
-	resourceIcon = "nutanix-prism-cloud"
+	resourceIcon = "/plugin/nutanix-prism-central/nutanix-prism.svg"
 	type = "instance"
 	rootType = true
 	resourceType = "instance"
@@ -14,4 +14,5 @@ resource "account-resource-type" "terraform.nutanix-prism-cloud.nutanix_virtual_
 	iacProviderType = "nutanix-prism-cloud"
 	iacType = "nutanix_virtual_machine"
 	description = ""
+	isPlugin = true
 }
