@@ -569,6 +569,8 @@ class NutanixPrismComputeUtility {
 		def body = [
 			"numberOfVms": 1,
 			"clusterReference": runConfig.clusterReference.uuid,
+			"startIndex": 0,
+			"vmName": runConfig.name,
 			"overrideVmConfigMap": [
 				"0": [
 					name: runConfig.name,
