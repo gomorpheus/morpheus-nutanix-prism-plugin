@@ -78,6 +78,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 				instance.name = serverName
 			}
 			if (server) {
+				response.serverId = server.id
 				server.externalId = externalId
 				server.maxMemory = resourceResult?.values?.memory_size_mib * ComputeUtility.ONE_MEGABYTE
 				server.maxCores = (resourceResult?.values?.num_vcpus_per_socket?.toLong() ?: 0) * (resourceResult?.values?.num_sockets?.toLong() ?: 0)
@@ -89,9 +90,11 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 				//set extra config
 				instance.instanceTypeCode = 'nutanix-prism-provision-provider'
 				instance.layout = new InstanceTypeLayout(code: 'nutanix-prism-1.0-single')
-				instance.containers?.each { row ->
-					row.workloadType = row.workloadType ?: new WorkloadType(code: 'nutanix-prism-provision-provider-1.0"')
+				def workloads = morpheusContext.async.workload.listById(instance.containers.collect {it.id}).toList().blockingGet()
+				workloads?.each { row ->
+					row.workloadType = new WorkloadType(code: 'nutanix-prism-provision-provider-1.0')
 				}
+				morpheusContext.async.workload.save(workloads).blockingGet()
 				//set user data
 				def resourceConfig = resource?.getConfigMap() ?: [:]
 				def userData = resourceConfig?.userData ?: [found: false]
@@ -118,10 +121,10 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 						def platform = virtualImage.platform
 						def csTypeCode = platform == 'windows' ? 'nutanix-prism-windows-vm' : 'nutanix-prism-vm'
 						server.computeServerType = new ComputeServerType(code: csTypeCode)
-						morpheusContext.async.computeServer.save(server).blockingGet()
 					}
 				}
-				morpheusContext.async.instance.save(instance).blockingGet()
+				morpheusContext.async.computeServer.save(server).blockingGet()
+				morpheusContext.async.instance.save([instance]).blockingGet()
 			}
 			return ServiceResponse.success(response)
 		} else {
@@ -152,7 +155,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 					server.name = serverName
 				server.computeServerType = new ComputeServerType(code: 'nutanix-prism-unmanaged')
 				//set extra config
-				workload.workloadType = workload.workloadType ?: new WorkloadType(code: 'nutanix-prism-provision-provider-1.0"')
+				workload.workloadType = new WorkloadType(code: 'nutanix-prism-provision-provider-1.0"')
 				//set user data
 				def resourceConfig = resource?.getConfigMap() ?: [:]
 				def userData = resourceConfig?.userData ?: [found: false]
@@ -179,9 +182,9 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 						def platform = virtualImage.platform
 						def csTypeCode = platform == 'windows' ? 'nutanix-prism-windows-vm' : 'nutanix-prism-vm'
 						server.computeServerType = new ComputeServerType(code: csTypeCode)
-						morpheusContext.async.computeServer.save(server).blockingGet()
 					}
 				}
+				morpheusContext.async.computeServer.save(server).blockingGet()
 				morpheusContext.async.workload.save(workload).blockingGet()
 			}
 			return ServiceResponse.success(response)
