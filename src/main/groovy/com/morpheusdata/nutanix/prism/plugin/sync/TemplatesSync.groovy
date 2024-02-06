@@ -195,6 +195,11 @@ class TemplatesSync {
 				saveImage = true
 			}
 
+			if(virtualImage.systemImage == null) {
+				virtualImage.systemImage = false
+				saveImage = true
+			}
+
 			if(save) {
 				saveLocationList << existingItem
 			}
@@ -235,7 +240,8 @@ class TemplatesSync {
 				externalType : 'template',
 				imageRegion  : regionCode,
 				internalId   : uuid,
-				uniqueId     : uuid
+				uniqueId     : uuid,
+			    systemImage  : false
 		]
 
 		return imageConfig
