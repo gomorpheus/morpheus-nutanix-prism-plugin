@@ -217,6 +217,10 @@ class ImagesSync {
 				virtualImage.bucketId = virtualImageConfig.bucketId
 				saveImage = true
 			}
+			if(virtualImage.systemImage == null) {
+				virtualImage.systemImage = false
+				saveImage = true
+			}
 
 			if(save) {
 				saveLocationList << existingItem
@@ -258,7 +262,8 @@ class ImagesSync {
 				imageRegion: regionCode,
 				internalId : cloudItem.metadata.uuid,
 				uniqueId   : cloudItem.metadata.uuid,
-				bucketId   : cloudItem.status.resources?.current_cluster_reference_list?.getAt(0)?.uuid
+				bucketId   : cloudItem.status.resources?.current_cluster_reference_list?.getAt(0)?.uuid,
+				systemImage: false
 		]
 
 		return imageConfig

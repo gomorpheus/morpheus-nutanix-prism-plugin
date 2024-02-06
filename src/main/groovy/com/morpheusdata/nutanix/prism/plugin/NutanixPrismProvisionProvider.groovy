@@ -679,7 +679,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			client.networkProxy = cloud.apiProxy
 			def serverDetails = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
 			//check if ip changed and update
-			def serverResource = serverDetails?.data?.spec?.resources
+			def serverResource = serverDetails?.data?.status?.resources
 			def ipAddress = null
 			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
 				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
@@ -797,7 +797,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			client.networkProxy = cloud.apiProxy
 			def serverDetails = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
 			//check if ip changed and update
-			def serverResource = serverDetails?.data?.spec?.resources
+			def serverResource = serverDetails?.data?.status?.resources
 			def ipAddress = null
 			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
 				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
@@ -1238,18 +1238,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						]
 					]
 				}
-				def newNicList = vmBody.spec?.resources?.nic_list
+				def newNicList = vmBody.status?.resources?.nic_list
 				def oldNicList = newNicList.collect {it.uuid}
 				newNicList << networkConfig
 
 
-				vmBody.spec.resources.nic_list = newNicList
+				vmBody.status.resources.nic_list = newNicList
 				def networkResults = NutanixPrismComputeUtility.updateVm(client, authConfig, vmId, vmBody)
 				if(networkResults.success) {
 					//wait for operation to complete
 					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
 					vmBody = serverDetails?.data
-					def newNic = vmBody.spec.resources.nic_list.find {!oldNicList.contains(it.uuid)}
+					def newNic = vmBody.status.resources.nic_list.find {!oldNicList.contains(it.uuid)}
 					def newInterface = new ComputeServerInterface([
 							externalId      : newNic.uuid,
 							type            : new ComputeServerInterfaceType(code: 'nutanix-prism-normal-nic'),
