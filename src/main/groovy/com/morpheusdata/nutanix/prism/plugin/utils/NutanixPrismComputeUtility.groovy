@@ -998,7 +998,7 @@ class NutanixPrismComputeUtility {
 				if(!serverDetail.success && serverDetail.data.code == 404 ) {
 					pending = false
 				}
-				def serverResource = serverDetail?.data?.spec?.resources
+				def serverResource = serverDetail?.data?.status?.resources
 				if(serverDetail.success == true && serverResource.power_state) {
 					rtn.success = true
 					rtn.data = serverDetail.data
@@ -1024,7 +1024,7 @@ class NutanixPrismComputeUtility {
 				sleep(1000l * 20l)
 				def serverDetail = getVm(client, authConfig, vmId)
 				log.debug("serverDetail: ${serverDetail}")
-				def serverResource = serverDetail?.data?.spec?.resources
+				def serverResource = serverDetail?.data?.status?.resources
 				if(serverDetail.success == true && serverResource.power_state == 'ON' && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)} ) {
 					rtn.success = true
 					rtn.virtualMachine = serverDetail.data
