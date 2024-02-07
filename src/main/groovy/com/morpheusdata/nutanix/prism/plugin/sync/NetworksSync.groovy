@@ -46,7 +46,6 @@ class NetworksSync {
 			def authConfig = plugin.getAuthConfig(cloud)
 			def listResults = NutanixPrismComputeUtility.listNetworks(apiClient, authConfig)
 			if (listResults.success) {
-
 				def domainRecords = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id)
 				SyncTask<NetworkIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, listResults.data)
 				syncTask.addMatchFunction { NetworkIdentityProjection domainObject, Map cloudItem ->
@@ -82,14 +81,15 @@ class NetworksSync {
 								cloudPool   : new CloudPool(id: cloudPoolId),
 								active      : true
 						]
-						if(networkTypeString == 'OVERLAY') {
-							networkConfig.config = [vpc: cloudItem.spec.resources.vpc_reference.uuid]
-						}
+
 						if(clusterId) {
 							networkConfig.displayName = "${cloudItem.status.name} ${cluster.name}"
 						}
 
 						Network networkAdd = new Network(networkConfig)
+						if(networkTypeString == 'OVERLAY') {
+							networkAdd.setConfigProperty("vpc", cloudItem.spec.resources.vpc_reference.uuid)
+						}
 						if(clusterId) {
 							networkConfig.assignedZonePools = [new CloudPool(id: clusterId)]
 						}
