@@ -162,20 +162,6 @@ class NutanixPrismComputeUtility {
 				]
 		]
 
-		if(runConfig.categories && runConfig.categories instanceof List) {
-			body.metadata.use_categories_mapping = true
-			body.metadata.categories_mapping = [:]
-			runConfig.categories.each { categoryString ->
-				def categoryData = categoryString.trim().split(':')
-				def key = categoryData[0]
-				def value = categoryData[1]
-				if(!body.metadata.categories_mapping[key]) {
-					body.metadata.categories_mapping[key] = []
-				}
-				body.metadata.categories_mapping[key] << value
-			}
-		}
-
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
 		if(results?.success) {

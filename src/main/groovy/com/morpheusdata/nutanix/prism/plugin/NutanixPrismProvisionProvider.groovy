@@ -1002,8 +1002,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		HttpApiClient client = new HttpApiClient()
 		client.networkProxy = cloud.apiProxy
 		def authConfig = plugin.getAuthConfig(cloud)
-		def tags = getAllTags(cloud)
-		def cloudItem = NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)?.data
+		def tags = opts.cloudTags ?: getAllTags(cloud)
+		def cloudItem = opts.cloudVm ?: NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)?.data
 
 		def currentTags = []
 
@@ -1984,26 +1984,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					server = saveAndGet(server)
 				}
 
-				if(createResults?.data?.metadata?.categories_mapping) {
-					def tags = getAllTags(cloud)
-					def vmTags = createResults?.data?.metadata?.categories_mapping?.collect { "${it.key}:${it.value[0]}" }
-					def existingTags = server.metadata
-					def matchFunction = { existingTag, masterTag ->
-						{
-							masterTag == existingTag.externalId
-						}
-					}
-					def tagSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingTags, vmTags, matchFunction)
-					tagSyncLists.addList?.each {
-						server.metadata += tags[it]
-					}
-					tagSyncLists.removeList?.each {
-						server.metadata.remove(it)
-					}
-					server = saveAndGet(server)
-				}
-
-
 				morpheusContext.async.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
 				def taskId = createResults.data?.status?.execution_context?.task_uuid ?: createResults.data?.task_uuid ?: (createResults.data.data.extId.toString().split(":")[1])
@@ -2066,6 +2046,19 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 								//update disks
 								def disks = serverDetail.diskList
+
+								if(runConfig.categories || server.metadata) {
+									def tags = getAllTags(cloud)
+									def newTags = []
+									if(runConfig.categories && runConfig.categories instanceof List) {
+										runConfig.categories.each { categoryString ->
+											newTags += tags[categoryString]
+										}
+									}
+									server.metadata += newTags
+									updateMetadataTags(server, [cloudTags: tags, cloudVm: serverDetail.virtualMachine])
+								}
+
 
 								if(virtualImage.externalType == "template") {
 									//have to sync disk from template
@@ -2174,7 +2167,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	private Map getAllTags(Cloud cloud) {
 		log.debug "getAllTags: ${cloud}"
-		def tags = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+		def tags = morpheusContext.async.metadataTag.list(new DataQuery().withFilters([
 			new DataFilter("refType", "ComputeZone"),
 			new DataFilter("refId", cloud.id),
 		])).toMap {it.externalId}.blockingGet()
