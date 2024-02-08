@@ -69,7 +69,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 					new DataFilter('owner.id', null),
 					new DataFilter('visibility', 'public')
 				)
-			]).withJoins('locations')
+			]).withJoins('locations', 'owner')
 			def additionalFilters = new DataOrFilter([
 				new DataFilter('category', "nutanix.prism.image.${cloudId}"),
 				new DataAndFilter(
@@ -89,11 +89,11 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 				])
 			}
 			query.withFilters(additionalFilters)
-			options = morpheusContext.async.virtualImage.list(query).map { [name: it.name, value: it.id] }.toList().blockingGet()
+			options = morpheusContext.async.virtualImage.list(query).map { [name: it.name, value: it.id, locations: it.imageLocations] }.toList().blockingGet()
 		}
 
 		if(options.size() > 0) {
-			options = options.sort { it.name }
+			options = options.findAll{ it.locations.size == 0 || (it.locations[0].refType == "ComputeZone" && it.locations[0].refId == cloudId)}.collect {[name: it.name, value: it.value]}.sort { it.name }
 		}
 
 		options
@@ -125,7 +125,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 						new DataFilter('userUploaded', true)
 					)
 				)
-			])).map {[name: it.name, value: it.id]}.toList().blockingGet()
+			]).withJoins('owner')).map {[name: it.name, value: it.id]}.toList().blockingGet()
 		}
 
 		if(options.size() > 0) {
