@@ -684,6 +684,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
 				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
 			}
+			NutanixPrismSyncUtils.updateServerContainersAndInstances(server, null, morpheusContext)
 			def privateIp = ipAddress
 			def publicIp = ipAddress
 			if(server.internalIp != privateIp) {
@@ -1289,6 +1290,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		client.networkProxy = cloud.apiProxy
 		Map serverDetails = NutanixPrismComputeUtility.checkServerReady(client, authConfig, serverUuid)
 		if(serverDetails.success && serverDetails.virtualMachine) {
+			NutanixPrismSyncUtils.updateServerContainersAndInstances(server, null, morpheusContext)
 			return ServiceResponse.success()
 
 		} else {

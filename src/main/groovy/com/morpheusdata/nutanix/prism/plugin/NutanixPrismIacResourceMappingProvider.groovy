@@ -63,6 +63,8 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 			def externalId = resourceResult?.values?.metadata?.uuid
 			response.privateIp = ip_address
 			response.publicIp = ip_address
+			response.noAgent = true
+			response.installAgent = false
 			def serverName = resourceResult?.values?.name
 			def clusterId = resourceResult?.values?.cluster_uuid
 			def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId)).blockingGet()
@@ -141,6 +143,8 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 			def externalId = resourceResult?.values?.metadata?.uuid
 			response.privateIp = ip_address
 			response.publicIp = ip_address
+			response.noAgent = true
+			response.installAgent = false
 			def serverName = resourceResult?.values?.name
 			def clusterId = resourceResult?.values?.cluster_uuid
 			def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId)).blockingGet()
