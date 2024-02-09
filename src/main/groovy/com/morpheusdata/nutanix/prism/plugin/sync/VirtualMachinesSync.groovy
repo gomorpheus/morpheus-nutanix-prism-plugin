@@ -210,7 +210,7 @@ class VirtualMachinesSync {
 						}
 
 						if(planInfoChanged && currentServer.computeServerType?.guestVm) {
-							updateServerContainersAndInstances(currentServer, null)
+							NutanixPrismSyncUtils.updateServerContainersAndInstances(currentServer, null, morpheusContext)
 						}
 
 						if(currentServer.powerState != vmConfig.powerState) {
@@ -326,60 +326,6 @@ class VirtualMachinesSync {
 			new DataFilter("refId", cloud.id),
 		])).toMap {it.externalId}.blockingGet()
 		tags
-	}
-
-	private updateServerContainersAndInstances(ComputeServer currentServer, ServicePlan plan) {
-		log.debug "updateServerContainersAndInstances: ${currentServer}"
-		try {
-			// Save the workloads
-			def instanceIds = []
-			def workloads = getWorkloadsForServer(currentServer)
-			for(Workload workload in workloads) {
-				workload.plan = plan
-				workload.maxCores = currentServer.maxCores
-				workload.maxMemory = currentServer.maxMemory
-				workload.coresPerSocket = currentServer.coresPerSocket
-				workload.maxStorage = currentServer.maxStorage
-				def instanceId = workload.instance?.id
-				morpheusContext.async.cloud.saveWorkload(workload).blockingGet()
-
-				if(instanceId) {
-					instanceIds << instanceId
-				}
-			}
-
-			if(instanceIds) {
-				def instancesToSave = []
-				def instances = morpheusContext.async.instance.listById(instanceIds).toList().blockingGet()
-				instances.each { Instance instance ->
-					if(plan) {
-						if (instance.containers.every { cnt -> (cnt.plan.id == currentServer.plan.id && cnt.maxMemory == currentServer.maxMemory && cnt.maxCores == currentServer.maxCores && cnt.coresPerSocket == currentServer.coresPerSocket) || cnt.server.id == currentServer.id }) {
-							log.debug("Changing Instance Plan To : ${plan.name} - memory: ${currentServer.maxMemory} for ${instance.name} - ${instance.id}")
-							instance.plan = plan
-							instance.maxCores = currentServer.maxCores
-							instance.maxMemory = currentServer.maxMemory
-							instance.maxStorage = currentServer.maxStorage
-							instance.coresPerSocket = currentServer.coresPerSocket
-							instancesToSave << instance
-						}
-					}
-				}
-				if(instancesToSave.size() > 0) {
-					morpheusContext.async.instance.bulkSave(instancesToSave).blockingGet()
-				}
-			}
-		} catch(e) {
-			log.error "Error in updateServerContainersAndInstances: ${e}", e
-		}
-	}
-
-	private getWorkloadsForServer(ComputeServer currentServer) {
-		def workloads = []
-		def projections = morpheusContext.async.cloud.listCloudWorkloadProjections(cloud.id).filter { it.serverId == currentServer.id }.toList().blockingGet()
-		for(proj in projections) {
-			workloads << morpheusContext.async.cloud.getWorkloadById(proj.id).blockingGet()
-		}
-		workloads
 	}
 
 	private buildVmConfig(Map cloudItem, Map resourcePools, Map hosts) {
