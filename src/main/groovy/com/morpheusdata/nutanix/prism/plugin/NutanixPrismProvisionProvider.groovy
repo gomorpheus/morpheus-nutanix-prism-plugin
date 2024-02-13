@@ -1345,14 +1345,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	Boolean canAddVolumes() {
-		true
+		return true
 	}
 
 	@Override
-	Boolean disableRootDatastore() { return true }
+	Boolean disableRootDatastore() {
+		return false
+	}
 
 	@Override
-	Boolean hasConfigurableSockets() { return true }
+	Boolean hasConfigurableSockets() {
+		return true
+	}
 
 	@Override
 	MorpheusContext getMorpheus() {
