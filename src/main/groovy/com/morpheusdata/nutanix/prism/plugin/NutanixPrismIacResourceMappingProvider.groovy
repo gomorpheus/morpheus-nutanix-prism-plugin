@@ -135,7 +135,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 	}
 
 	@Override
-	ServiceResponse<WorkloadResourceMappingResponse> resolveContainer(Workload workload, AccountResource resource, Map resourceResult, String iacProvider, String iacProviderType, String iacType) {
+	ServiceResponse<WorkloadResourceMappingResponse> resolveWorkload(Workload workload, AccountResource resource, Map resourceResult, String iacProvider, String iacProviderType, String iacType) {
 		//only supports terraform at the moment
 		if (iacProvider == 'terraform') {
 			WorkloadResourceMappingResponse response = new WorkloadResourceMappingResponse()
