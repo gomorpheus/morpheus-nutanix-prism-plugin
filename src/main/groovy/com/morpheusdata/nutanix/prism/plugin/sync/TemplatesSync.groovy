@@ -37,7 +37,7 @@ class TemplatesSync {
 			def authConfig = plugin.getAuthConfig(cloud)
 			def listResults = NutanixPrismComputeUtility.listTemplates(apiClient, authConfig)
 			if (listResults.success) {
-				def masterTemplates = listResults?.data?.data
+				def masterTemplates = listResults?.data?.data ?: []
 				Observable<VirtualImageLocationIdentityProjection> domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
 					new DataFilter("refType", "ComputeZone"),
 					new DataFilter("refId", cloud.id),
