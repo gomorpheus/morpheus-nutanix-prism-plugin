@@ -100,12 +100,21 @@ class HostsSync {
 
 		def volumeType = new StorageVolumeType(code: 'nutanix-prism-host-disk')
 		def serverType = new ComputeServerType(code: 'nutanix-prism-hypervisor')
-		def serverOs = new OsType(code: 'esxi.6')
+
 		
 		for(cloudItem in addList) {
 			try {
 				def clusterObj = clusters?.find { pool -> pool.externalId == cloudItem.cluster_uuid }
-
+				def cloudHypervisorType = cloudItem.hypervisor_type
+				def serverOs = new OsType(code: 'linux')
+				switch (cloudHypervisorType) {
+					case "kKvm":
+						serverOs = new OsType(code: 'ahv')
+						break
+					case "kVCenter":
+						serverOs = new OsType(code: 'esxi')
+						break
+				}
 				def serverConfig = [
 						account          : cloud.owner,
 						category         : "nutanix.prism.host.${cloud.id}",
@@ -120,7 +129,7 @@ class HostsSync {
 						serverType       : 'hypervisor',
 						computeServerType: serverType,
 						serverOs         : serverOs,
-						osType           : 'esxi',
+						osType           : 'linux',
 						hostname         : cloudItem.name,
 						externalIp       : cloudItem.hypervisor_address
 				]
@@ -175,6 +184,22 @@ class HostsSync {
 				def externalIp = matchedServer.hypervisor_address
 				if(currentServer.externalIp != externalIp) {
 					currentServer.externalIp = externalIp
+					save = true
+				}
+
+				def cloudHypervisorType = matchedServer.hypervisor_type
+				def serverOs = new OsType(code: 'linux')
+				switch (cloudHypervisorType) {
+					case "kKvm":
+						serverOs = new OsType(code: 'ahv')
+						break
+					case "kVCenter":
+						serverOs = new OsType(code: 'esxi')
+						break
+				}
+				if(currentServer.serverOs.code != serverOs.code) {
+					currentServer.serverOs = serverOs
+					currentServer.osType = 'linux'
 					save = true
 				}
 
