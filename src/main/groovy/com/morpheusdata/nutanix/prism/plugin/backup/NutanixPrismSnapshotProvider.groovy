@@ -115,7 +115,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 
 		def snapshotName = "${server.name}.${server.id}.${System.currentTimeMillis()}".toString()
 
-		if(server.serverOs?.platform != 'windows') {
+		if(server.serverOs?.platform != PlatformType.windows) {
 			def x = getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old; sudo rm -f /etc/machine-id; sudo touch /etc/machine-id ; sync ; sync ; sleep 5', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
 		}
 
@@ -165,7 +165,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 						if(taskResults?.data?.status == "SUCCEEDED"){
 							log.debug("snapshot complete ${taskId}")
 							if(taskResults.success && taskResults.data){
-								def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}.uuid
+								def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}?.uuid
 								def snapshotResp = NutanixPrismComputeUtility.getSnapshot(client, authConfig, computeServer?.resourcePool?.externalId, snapshotUuid)
 								def snapshot = snapshotResp.data
 								log.debug("Snapshot details: ${snapshot}")
@@ -223,7 +223,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			rtn.success = true
 
 			if([BackupStatusUtility.FAILED, BackupStatusUtility.CANCELLED, BackupStatusUtility.SUCCEEDED].contains(rtn.data.backupResult.status)) {
-				if(computeServer && computeServer.sourceImage && computeServer.sourceImage.isCloudInit && computeServer.serverOs?.platform != 'windows') {
+				if(computeServer && computeServer.sourceImage && computeServer.sourceImage.isCloudInit && computeServer.serverOs?.platform != PlatformType.windows) {
 					getPlugin().morpheus.executeCommandOnServer(computeServer, "sleep 5; sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, computeServer.sshUsername, computeServer.sshPassword, null, null, null, null, true, true).blockingGet()
 				}
 			}

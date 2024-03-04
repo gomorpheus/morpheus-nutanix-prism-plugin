@@ -332,14 +332,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			Map authConfig = plugin.getAuthConfig(server.cloud)
 			log.debug("Executing Nutanix Prism Central clone to template for ${workload?.instance?.name}")
 			def serverId = server?.externalId
-			if(server.sourceImage && server.sourceImage.isCloudInit && server.serverOs?.platform != 'windows') {
+			if(server.sourceImage && server.sourceImage.isCloudInit && server.serverOs?.platform != PlatformType.windows) {
 				getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old ; sync', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
 			}
 
 			def vmDetails = NutanixPrismComputeUtility.getVm(client, authConfig, serverId)
 			def diskToClone = vmDetails?.data?.spec?.resources?.disk_list?[0]
 			if(diskToClone && diskToClone.uuid) {
-				def cloneResults = NutanixPrismComputeUtility.createImage(client, authConfig, opts.templateName, "DISK_IMAGE", null, diskToClone.uuid)
+				def cloneResults = NutanixPrismComputeUtility.createImage(client, authConfig, opts.templateName as String, "DISK_IMAGE", null, diskToClone.uuid)
 				log.debug("cloneResults: ${cloneResults}")
 				if(cloneResults.success == true) {
 					def cloneTaskId = cloneResults?.data?.status?.execution_context?.task_uuid
@@ -349,7 +349,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						log.debug("cloneTaskResults: ${cloneTaskResults}")
 						if (cloneTaskResults.success == true && cloneTaskResults.error != true) {
 							//get the image id - create the image
-							def imageId = cloneTaskResults?.data?.entity_reference_list?.find { it.kind == 'image' }.uuid
+							def imageId = cloneTaskResults?.data?.entity_reference_list?.find { it.kind == 'image' }?.uuid
 							def imageResults = NutanixPrismComputeUtility.getImage(client, authConfig, imageId)
 							log.debug("imageResults: ${imageResults}")
 							if (imageResults.success == true) {
@@ -364,8 +364,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 										code: "nutanix.prism.image.${workload.server.cloud.id}.${imageId}",
 										status: 'Active',
 										imageType: 'qcow2',
-										remotePath: vmImage?.status.resources?.retrieval_uri_list?.getAt(0) ?: cloudItem.status.resources?.source_uri,
-										bucketId: vmImage?.status.resources?.current_cluster_reference_list?.getAt(0)?.uuid,
+										remotePath: vmImage?.status?.resources?.retrieval_uri_list?.getAt(0) ?: cloudItem.status.resources?.source_uri,
+										bucketId: vmImage?.status?.resources?.current_cluster_reference_list?.getAt(0)?.uuid,
 										uniqueId: imageId,
 										externalId: imageId,
 										refType: 'ComputeZone',
@@ -414,10 +414,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				//clone failed
 				rtn.msg = 'clone failed'
 			}
-			if(server.sourceImage && server.sourceImage.isCloudInit && server.serverOs?.platform != 'windows') {
+			if(server.sourceImage && server.sourceImage.isCloudInit && server.serverOs?.platform != PlatformType.windows) {
 				getPlugin().morpheus.executeCommandOnServer(server, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
-				return new ServiceResponse(rtn.success, rtn.msg, null, null)
 			}
+			return new ServiceResponse(rtn.success, rtn.msg, null, null)
 		} catch(e) {
 			log.error("cloneToTemplate error: ${e}", e)
 			return ServiceResponse.error("cloneToTemplate error")
@@ -458,7 +458,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 		log.debug("Snapshot results: ${taskResults}")
 		if(taskResults.success) {
-			def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}.uuid
+			def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}?.uuid
 			if(snapshotUuid) {
 				def rawSnapshot = NutanixPrismComputeUtility.getSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshotUuid)
 				Date createdDate = null
@@ -1148,7 +1148,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				}
 				def storageVolumeType = storageVolumeTypes[volumeAdd.storageType.toLong()]
 				def datastore = datastores[volumeAdd.datastoreId.toLong()]
-				def targetIndex = vmBody.spec?.resources?.disk_list.size()
+				def targetIndex = vmBody.spec?.resources?.disk_list?.size()
 				if(targetIndex != null) {
 					//account for ide.0
 					targetIndex--
@@ -1961,7 +1961,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				sourceWorkload = morpheusContext.async.workload.get(runConfig.cloneContainerId).blockingGet()
 				def sourceServer = sourceWorkload?.server
 				def vmUuid = sourceServer?.externalId
-				if(server.serverOs?.platform != 'windows') {
+				if(server.serverOs?.platform != PlatformType.windows) {
 					getPlugin().morpheus.executeCommandOnServer(sourceServer, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old ; sync', false, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
 				}
 				createResults = NutanixPrismComputeUtility.cloneVm(client, authConfig, runConfig, vmUuid)
@@ -1997,12 +1997,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				if(taskResults.success) {
 					if(createResults.data?.task_uuid) {
 						def sourceServer = sourceWorkload?.server
-						if(sourceServer && server?.serverOs?.platform != 'windows') {
+						if(sourceServer && server?.serverOs?.platform != PlatformType.windows) {
 							getPlugin().morpheus.executeCommandOnServer(sourceServer, "sudo bash -c \"echo 'manual_cache_clean: True' >> /etc/cloud/cloud.cfg.d/99-manual-cache.cfg\"; sudo cat /tmp/machine-id-old > /etc/machine-id ; sudo rm /tmp/machine-id-old ; sync", true, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
 						}
 					}
 					if(!server.externalId) {
-						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}.uuid
+						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}?.uuid
 						provisionResponse.externalId = server.externalId
 						server.internalId = server.externalId
 						server = saveAndGet(server)
@@ -2032,7 +2032,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
 					log.debug("start: ${startResults.success}")
 					if (startResults.success) {
-						if (startResults.error == true) {
+						if (startResults.error) {
 							server.statusMessage = 'Failed to start server'
 							server = saveAndGet(server)
 						} else {

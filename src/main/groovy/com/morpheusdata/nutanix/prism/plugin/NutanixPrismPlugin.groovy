@@ -80,17 +80,17 @@ class NutanixPrismPlugin extends Plugin {
 		return rtn
 	}
 
-	def NutanixPrismCloudProvider getCloudProvider() {
-		this.getProviderByCode(cloudProviderCode)
+	NutanixPrismCloudProvider getCloudProvider() {
+		return this.getProviderByCode(cloudProviderCode) as NutanixPrismCloudProvider
 	}
 
 	static getApiUrl(String apiUrl) {
 		if(apiUrl) {
 			def rtn = apiUrl
-			if(rtn.startsWith('http') == false)
+			if(!rtn.startsWith('http'))
 				rtn = 'https://' + rtn
 
-			if(rtn.endsWith('/') == false)
+			if(!rtn.endsWith('/'))
 				rtn = rtn + '/'
 
 			return rtn

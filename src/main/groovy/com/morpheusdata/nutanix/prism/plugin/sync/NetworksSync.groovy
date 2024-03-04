@@ -49,7 +49,7 @@ class NetworksSync {
 				def domainRecords = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id)
 				SyncTask<NetworkIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, listResults.data)
 				syncTask.addMatchFunction { NetworkIdentityProjection domainObject, Map cloudItem ->
-					domainObject.externalId == cloudItem?.metadata.uuid
+					domainObject.externalId == cloudItem?.metadata?.uuid
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<NetworkIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<NetworkIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 					morpheusContext.async.cloud.network.listById(updateItems?.collect { it.existingItem.id }).map { Network network ->
