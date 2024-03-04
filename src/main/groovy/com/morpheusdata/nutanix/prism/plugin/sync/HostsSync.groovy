@@ -348,7 +348,6 @@ class HostsSync {
 				updates = true
 			}
 
-			// How to determine powerstate?!.. right now just using the cpu
 			def powerState = capacityInfo.maxCpu > 0 ? ComputeServer.PowerState.on : ComputeServer.PowerState.off
 			if(server.powerState != powerState) {
 				server.powerState = powerState

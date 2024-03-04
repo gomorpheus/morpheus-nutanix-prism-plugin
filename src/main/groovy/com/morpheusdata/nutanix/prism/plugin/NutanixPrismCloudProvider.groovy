@@ -352,7 +352,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				def username
 				def password
 				def url = (cloudInfo.serviceUrl ?: cloudInfo.configMap.apiUrl) as String
-				if(validateCloudRequest.credentialType?.toString().isNumber()) {
+				if(validateCloudRequest.credentialType?.toString()?.isNumber()) {
 					AccountCredential accountCredential = morpheus.async.accountCredential.get(validateCloudRequest.credentialType.toLong()).blockingGet()
 					password = accountCredential.data.password
 					username = accountCredential.data.username

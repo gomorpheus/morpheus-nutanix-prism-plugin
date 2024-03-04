@@ -137,7 +137,7 @@ class VirtualMachinesSync {
 		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
 		List<ComputeServer> servers = updateList.collect { it.existingItem }
 
-		// Gather up all the Workloads that may pertain to the servers we are sync'ing
+		// Gather up all the Workloads that may pertain to the servers we are syncing
 		def managedServerIds = servers?.findAll{it.computeServerType?.managed }?.collect{it.id}
 		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.async.workload.list(new DataQuery().withFilter('server.id', managedServerIds)).toMap {it.serverId}.blockingGet()
 		List<ComputeServer> serversToSave = []
