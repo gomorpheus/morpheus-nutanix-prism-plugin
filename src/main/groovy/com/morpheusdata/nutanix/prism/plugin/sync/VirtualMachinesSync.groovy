@@ -379,7 +379,6 @@ class VirtualMachinesSync {
 		}
 
 		//tags
-
 		def vmTags = cloudItem.metadata?.categories?.collect {"${it.key}:${it.value}"}
 		def existingTags = server.metadata
 		def matchFunction = {existingTag, masterTag -> {
@@ -387,8 +386,10 @@ class VirtualMachinesSync {
 		}}
 		def tagSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingTags, vmTags, matchFunction)
 		tagSyncLists.addList?.each {
-			server.metadata += tags[it]
-			changes = true
+			if (tags[it]) {
+				server.metadata += tags[it]
+				changes = true
+			}
 		}
 		tagSyncLists.removeList?.each {
 			server.metadata.remove(it)
