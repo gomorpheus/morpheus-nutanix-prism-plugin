@@ -2049,6 +2049,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								server.internalIp = privateIp
 								server.externalIp = publicIp
 								server.resourcePool = new ComputeZonePool(id: resourcePool.id)
+								//sync interfaces
+								def networks = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id).toMap {it.externalId }.blockingGet()
+								NutanixPrismSyncUtils.syncInterfaces(server, serverDetail.nicList, networks, getComputeServerInterfaceTypes(), morpheusContext)
 
 								//update disks
 								def disks = serverDetail.diskList
