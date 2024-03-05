@@ -93,7 +93,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		}
 
 		if(options.size() > 0) {
-			options = options.findAll{ it.locations.size == 0 || (it.locations[0].refType == "ComputeZone" && it.locations[0].refId == cloudId)}.collect {[name: it.name, value: it.value]}.sort { it.name }
+			options = options.findAll{it.locations.size == 0 || (it.locations.find {loc -> loc.refType == "ComputeZone" && loc.refId == cloudId})}.collect {[name: it.name, value: it.value]}.sort { it.name }
 		}
 
 		options
