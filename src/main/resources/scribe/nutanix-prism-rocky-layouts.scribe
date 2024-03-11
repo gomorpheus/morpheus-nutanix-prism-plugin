@@ -1,11 +1,11 @@
 //8
 resource "virtual-image" "nutanix-prism-image-morpheus-rocky-8" {
-	code = "nutanix.prism.image.morpheus.rocky.8.20230822"
+	code = "nutanix.prism.image.morpheus.rocky.8.20240304"
 	category = "nutanix.prism.image.morpheus.rocky.8"
-	name = "Morpheus Rocky 8 20230822"
+	name = "Morpheus Rocky 8 20240304"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/rocky-8/morpheus-rocky-8-x86_64-20230822.qcow2"
-	imagePath = "qemu/20230822/rocky-8"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240304/rocky-8/morpheus-rocky-8-x86_64-20240304.qcow2"
+	imagePath = "qemu/20240304/rocky-8"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -86,12 +86,12 @@ resource "scale-action" "nutanix-prism-rocky-8-single" {
 
 //9
 resource "virtual-image" "nutanix-prism-image-morpheus-rocky-9" {
-	code = "nutanix.prism.image.morpheus.rocky.9.20230822"
+	code = "nutanix.prism.image.morpheus.rocky.9.20240304"
 	category = "nutanix.prism.image.morpheus.rocky.9"
-	name = "Morpheus Rocky 9 20230822"
+	name = "Morpheus Rocky 9 20240304"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230822/rocky-9/morpheus-rocky-9-x86_64-20230822.qcow2"
-	imagePath = "qemu/20230822/rocky-9"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240304/rocky-9/morpheus-rocky-9-x86_64-20240304.qcow2"
+	imagePath = "qemu/20240304/rocky-9"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
