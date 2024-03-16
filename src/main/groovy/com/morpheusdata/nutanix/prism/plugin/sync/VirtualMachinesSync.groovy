@@ -139,7 +139,7 @@ class VirtualMachinesSync {
 
 		// Gather up all the Workloads that may pertain to the servers we are syncing
 		def managedServerIds = servers?.findAll{it.computeServerType?.managed }?.collect{it.id}
-		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.async.workload.list(new DataQuery().withFilter('server.id', managedServerIds)).toMap {it.serverId}.blockingGet()
+		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.async.workload.list(new DataQuery().withFilter('server.id', 'in', managedServerIds)).toMap {it.serverId}.blockingGet()
 		List<ComputeServer> serversToSave = []
 		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, updateList?.collect{ it.masterItem.metadata.uuid } )
 		for(update in updateList) {
