@@ -85,6 +85,7 @@ class ImagesSync {
 		Observable domainRecords = morpheusContext.async.virtualImage.listIdentityProjections(new DataQuery().withFilters([
 			new DataFilter<String>("imageType", "in", allowedImageTypes),
 			new DataFilter<Collection<String>>("name", "in", names),
+			new DataFilter("code", "=~", "nutanix.prism.image"),
 			new DataOrFilter(
 				new DataFilter<Boolean>("systemImage", true),
 				new DataOrFilter(
