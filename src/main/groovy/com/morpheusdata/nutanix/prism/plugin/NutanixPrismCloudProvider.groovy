@@ -4,6 +4,9 @@ import com.morpheusdata.core.backup.AbstractBackupProvider
 import com.morpheusdata.core.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataOrFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.providers.IacResourceMappingProvider
 import com.morpheusdata.core.providers.ProvisionProvider
 import com.morpheusdata.core.backup.BackupProvider
@@ -21,6 +24,8 @@ import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.PlatformType
 import com.morpheusdata.model.StorageControllerType
 import com.morpheusdata.model.StorageVolumeType
+import com.morpheusdata.model.projection.VirtualImageIdentityProjection
+import com.morpheusdata.model.projection.VirtualImageLocationIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
 import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
@@ -407,7 +412,25 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
-	ServiceResponse deleteCloud(Cloud cloudInfo) {
+	ServiceResponse deleteCloud(Cloud cloud) {
+
+		//clean up images and templates
+		List<VirtualImageLocationIdentityProjection> virtualImageLocations = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
+			new DataFilter("refType", "ComputeZone"),
+			new DataFilter("refId", cloud.id),
+			new DataOrFilter(
+				new DataFilter("virtualImage.externalType", "template"),
+				new DataFilter("virtualImage.externalType", "null")
+			)
+		]).withJoins('virtualImage')).toList().blockingGet()
+
+		List<VirtualImageIdentityProjection> imagesToRemove = virtualImageLocations.collect { it.virtualImage }.findAll {!it.systemImage}.unique()
+		//remove the locations
+		morpheusContext.async.virtualImage.location.bulkRemove(virtualImageLocations).blockingGet()
+		//remove the images
+		morpheusContext.async.virtualImage.bulkRemove(imagesToRemove).blockingGet()
+
+
 		return new ServiceResponse(success: true)
 	}
 
