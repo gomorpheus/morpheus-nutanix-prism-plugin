@@ -7,7 +7,9 @@ import com.morpheusdata.core.data.DataAndFilter
 import com.morpheusdata.core.data.DataFilter
 import com.morpheusdata.core.data.DataOrFilter
 import com.morpheusdata.core.data.DataQuery
+import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.*
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -43,7 +45,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage'])
+		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage', 'nutanixPrismProjects'])
 	}
 
 	def nutanixPrismProvisionImage(args) {
@@ -160,20 +162,85 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		}
 	}
 
+	def nutanixPrismProjects(args) {
+		Cloud cloud = loadCloud(args)
+		def rtn = []
+		def authConfig = plugin.getAuthConfig(cloud)
+		NetworkProxy proxySettings = cloud.apiProxy
+		HttpApiClient client
+		client = new HttpApiClient()
+		client.networkProxy = proxySettings
+		if(NutanixPrismComputeUtility.testConnection(client, authConfig).success) {
+			def projectResult = NutanixPrismComputeUtility.listProjects(client, authConfig)
+			if(projectResult.success && projectResult.data) {
+				projectResult.data.each {
+					rtn << [name:it.status?.name, value:it.status?.uuid, isDefault: cloud.configMap.project == it.status?.uuid]
+				}
+			}
+		}
+		rtn ?: [[name: 'No projects found: verify credentials above.', value: '-1', isDefault: true]]
+
+	}
+
 	private static getCloudId(args) {
 		def cloudId = null
 		if(args?.size() > 0) {
 			def firstArg =  args.getAt(0)
 			if(firstArg?.zoneId) {
-				cloudId = firstArg.zoneId.toLong()
-				return cloudId
-			}
-			if(firstArg?.domain?.zone?.id) {
-				cloudId = firstArg.domain.zone.id.toLong()
-				return cloudId
+				cloudId = firstArg.zoneId
+			} else if(firstArg?.domain?.zone?.id) {
+				cloudId = firstArg.domain.zone.id
 			}
 		}
-		return cloudId
+		if(!cloudId) {
+			cloudId = args.cloudId ?: args.zoneId
+		}
+		cloudId ? cloudId.toLong() : null
+	}
 
+	private Cloud loadCloud(args) {
+		args = args instanceof Object[] ? args.getAt(0) : args
+		Long cloudId = getCloudId(args)
+		Cloud rtn = cloudId ? morpheusContext.async.cloud.getCloudById(cloudId).blockingGet() : null
+		if(!rtn) {
+			rtn = new Cloud()
+		}
+
+		// load existing credentials when not passed in
+		if(args.credential == null && !(args.username ?: args.config?.username)) {
+			// check for passed in credentials
+			if(!rtn.accountCredentialLoaded) {
+				AccountCredential credentials = morpheusContext.services.accountCredential.loadCredentials(rtn)
+				rtn.accountCredentialData = credentials?.data
+			}
+		} else {
+			def url = args.apiUrl ?: args.config?.apiUrl
+			url = decodeUrl(url)
+			def config = [
+				username: args.username ?: args.config?.username,
+				password: args.password ?: args.config?.password,
+				apiUrl: url
+			]
+			if (config.password == '*' * 12) {
+				config.remove('secretKey')
+			}
+			rtn.setConfigMap(rtn.getConfigMap() + config)
+			rtn.accountCredentialData = morpheusContext.services.accountCredential.loadCredentialConfig(args.credential, config).data
+		}
+		rtn.accountCredentialLoaded = true
+
+		def proxy = args.apiProxy ? morpheusContext.async.network.networkProxy.getById(args.long('apiProxy')).blockingGet() : null
+		rtn.apiProxy = proxy
+
+		return rtn
+	}
+
+	private static decodeUrl(url) {
+		if(url) {
+			try {
+				url = URLDecoder.decode(url, "UTF-8");
+			} catch (UnsupportedEncodingException e) {}
+		}
+		return url
 	}
 }
