@@ -1,6 +1,5 @@
 package com.morpheusdata.nutanix.prism.plugin
 
-import com.morpheusdata.core.backup.AbstractBackupProvider
 import com.morpheusdata.core.CloudProvider
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
@@ -24,6 +23,8 @@ import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.PlatformType
 import com.morpheusdata.model.StorageControllerType
 import com.morpheusdata.model.StorageVolumeType
+import com.morpheusdata.model.projection.ComputeServerIdentityProjection
+import com.morpheusdata.model.projection.MetadataTagIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageLocationIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
@@ -430,6 +431,17 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		//remove the images
 		morpheusContext.async.virtualImage.bulkRemove(imagesToRemove).blockingGet()
 
+		//clean up tags
+		List<MetadataTagIdentityProjection> tags = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+			new DataFilter("refType", "ComputeZone"),
+			new DataFilter("refId", cloud.id),
+		])).toList().blockingGet()
+
+		morpheusContext.async.metadataTag.remove(tags).blockingGet()
+
+		List<ComputeServerIdentityProjection> servers = morpheusContext.async.computeServer.listIdentityProjections(cloud.id, null).toList().blockingGet()
+
+		morpheusContext.async.computeServer.remove(servers).blockingGet()
 
 		return new ServiceResponse(success: true)
 	}
