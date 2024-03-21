@@ -11,6 +11,7 @@ import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.model.projection.NetworkIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
 import io.reactivex.Observable
 
@@ -21,12 +22,14 @@ class NetworksSync {
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
+	private Map project
 
-	public NetworksSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
+	public NetworksSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map project) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
+		this.project = project
 	}
 
 	def execute() {
@@ -44,7 +47,7 @@ class NetworksSync {
 			}.toList().blockingGet()
 
 			def authConfig = plugin.getAuthConfig(cloud)
-			def listResults = NutanixPrismComputeUtility.listNetworks(apiClient, authConfig)
+			def listResults = getNetworks(authConfig, project?.subnet_reference_list)
 			if (listResults.success) {
 				def domainRecords = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id)
 				SyncTask<NetworkIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, listResults.data)
@@ -152,5 +155,27 @@ class NetworksSync {
 			log.error "Error in execute of NetworksSync: ${e}", e
 		}
 		log.debug "END: execute NetworksSync: ${cloud.id}"
+	}
+
+	private getNetworks(authConfig, networkList) {
+		log.debug "getNetworks"
+		def rtn = [success: true, data: []]
+		try {
+			ServiceResponse listResult = NutanixPrismComputeUtility.listNetworks(apiClient, authConfig)
+			if (listResult.success) {
+				def networks = listResult.data
+				if(networkList?.size() > 0) {
+					def allowedNetworkUuids = networkList.collect { it.uuid }
+					networks = networks.findAll{allowedNetworkUuids.contains(it.metadata?.uuid)}
+				}
+				rtn.data = networks
+			} else {
+				log.warn "Error getting list of networks: ${listResult.msg}"
+			}
+		} catch(e) {
+			rtn.success = false
+			log.error "Error in getting networks: ${e}", e
+		}
+		rtn
 	}
 }

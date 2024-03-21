@@ -102,6 +102,19 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				localCredential: true
 		)
 
+		OptionType project = new OptionType(
+			name: 'Project',
+			code: 'nutanix-prism-project',
+			fieldName: 'project',
+			displayOrder: 30,
+			fieldLabel: 'Project',
+			required: false,
+			inputType: OptionType.InputType.SELECT,
+			fieldContext: 'config',
+			optionSource: 'nutanixPrismProjects',
+			dependsOnCode: 'config.apiUrl, apiUrl, config.username, username, config.password, password, credential.type, credential.username, credential.password'
+		)
+
 		OptionType inventoryInstances = new OptionType(
 				name: 'Inventory Existing Instances',
 				code: 'nutanix-prism-import-existing',
@@ -124,7 +137,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'config'
 		)
 
-		return [apiUrl, credentials, username, password, inventoryInstances, enableVnc]
+		return [apiUrl, credentials, username, password, project, inventoryInstances, enableVnc]
 	}
 
 	@Override
@@ -571,16 +584,24 @@ class NutanixPrismCloudProvider implements CloudProvider {
 						createNew = true
 					}
 					ensureRegionCode(cloud)
+					Map project = null
+					if(cloud.configMap.project) {
+						def projectResponse =  NutanixPrismComputeUtility.getProject(client, authConfig, cloud.configMap.project as String)
+						if(projectResponse.success) {
+							project = projectResponse.data as Map
+							project.uuid = cloud.configMap.project
+						}
+					}
 
 					(new CategoriesSync(this.plugin, cloud, client)).execute()
-					(new VirtualPrivateCloudSync(this.plugin, cloud, client)).execute()
-					(new ClustersSync(this.plugin, cloud, client)).execute()
+					(new VirtualPrivateCloudSync(this.plugin, cloud, client, project)).execute()
+					(new ClustersSync(this.plugin, cloud, client, project)).execute()
 					(new DatastoresSync(this.plugin, cloud, client)).execute()
-					(new NetworksSync(this.plugin, cloud, client)).execute()
+					(new NetworksSync(this.plugin, cloud, client, project)).execute()
 					(new ImagesSync(this.plugin, cloud, client)).execute()
 					(new TemplatesSync(this.plugin, cloud, client)).execute()
-					(new HostsSync(this.plugin, cloud, client)).execute()
-					(new VirtualMachinesSync(this.plugin, cloud, client, createNew)).execute()
+					(new HostsSync(this.plugin, cloud, client, project)).execute()
+					(new VirtualMachinesSync(this.plugin, cloud, client, createNew, project)).execute()
 					(new SnapshotsSync(this.plugin, cloud, client)).execute()
 
 					rtn = ServiceResponse.success()

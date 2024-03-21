@@ -16,6 +16,7 @@ import com.morpheusdata.model.projection.ComputeServerIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
+import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -26,12 +27,14 @@ class HostsSync {
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
 	private Map authConfig
+	private Map project
 
-	public HostsSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
+	public HostsSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map project) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
+		this.project = project
 	}
 
 	def execute() {
@@ -51,7 +54,7 @@ class HostsSync {
 
 			def cloudItems = []
 			def listResultSuccess = false
-			def listResults = NutanixPrismComputeUtility.listHostsV2(apiClient, authConfig) // Need this one for the stats
+			def listResults = getHosts(authConfig, project?.cluster_reference_list)
 			if (listResults.success) {
 				listResultSuccess = true
 				cloudItems = listResults?.data
@@ -361,5 +364,27 @@ class HostsSync {
 		} catch(e) {
 			log.warn("error updating host stats: ${e}", e)
 		}
+	}
+
+	private getHosts(authConfig, clusterList) {
+		log.debug "getHosts"
+		def rtn = [success: true, data: []]
+		try {
+			ServiceResponse listResult = NutanixPrismComputeUtility.listHostsV2(apiClient, authConfig)  // Need this one for the stats
+			if (listResult.success) {
+				def hosts = listResult.data
+				if(clusterList?.size() > 0) {
+					def allowedClusterUuids = clusterList.collect { it.uuid }
+					hosts = hosts.findAll{allowedClusterUuids.contains(it.cluster_uuid)}
+				}
+				rtn.data = hosts
+			} else {
+				log.warn "Error getting list of hosts: ${listResult.msg}"
+			}
+		} catch(e) {
+			rtn.success = false
+			log.error "Error in getting hosts: ${e}", e
+		}
+		rtn
 	}
 }

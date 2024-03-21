@@ -8,6 +8,7 @@ import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
 import io.reactivex.Observable
 
@@ -18,19 +19,21 @@ class ClustersSync {
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
+	private Map project
 
-	public ClustersSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
+	public ClustersSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map project) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
+		this.project = project
 	}
 
 	def execute() {
 		log.debug "BEGIN: execute ClustersSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def listResults = NutanixPrismComputeUtility.listClusters(apiClient, authConfig)
+			def listResults = getClusters(authConfig, project?.cluster_reference_list)
 			if(listResults.success) {
 				def masterHosts = listResults?.data?.findAll { cloudItem ->
 					cloudItem.status?.resources?.config?.service_list?.contains('AOS')
@@ -114,5 +117,27 @@ class ClustersSync {
 	private removeMissingResourcePools(List<CloudPoolIdentity> removeList) {
 		log.debug "removeMissingResourcePools: ${removeList?.size()}"
 		morpheusContext.async.cloud.pool.bulkRemove(removeList).blockingGet()
+	}
+
+	private getClusters(authConfig, clusterList) {
+		log.debug "getClusters"
+		def rtn = [success: true, data: []]
+		try {
+			ServiceResponse listResult = NutanixPrismComputeUtility.listClusters(apiClient, authConfig)
+			if (listResult.success) {
+				def clusters = listResult.data
+				if(clusterList?.size() > 0) {
+					def allowedClusterUuids = clusterList.collect { it.uuid }
+					clusters = clusters.findAll{allowedClusterUuids.contains(it.metadata?.uuid)}
+				}
+				rtn.data = clusters
+			} else {
+				log.warn "Error getting list of clusters: ${listResult.msg}"
+			}
+		} catch(e) {
+			rtn.success = false
+			log.error "Error in getting clusters: ${e}", e
+		}
+		rtn
 	}
 }

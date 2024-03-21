@@ -602,7 +602,16 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-
+	static ServiceResponse getProject(HttpApiClient client, Map authConfig, String uuid) {
+		log.debug("getVm")
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/projects/${uuid}", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		if(results?.success) {
+			return ServiceResponse.success(results.data.status.resources)
+		} else {
+			return ServiceResponse.error("Error getting project ${uuid}", null, results.data)
+		}
+	}
 
 	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
 		log.debug("listNetworks")
@@ -643,6 +652,11 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse listVPCs(HttpApiClient client, Map authConfig) {
 		log.debug("listVPCs")
 		return callListApi(client, 'vpc', 'vpcs/list', authConfig)
+	}
+
+	static ServiceResponse listProjects(HttpApiClient client, Map authConfig) {
+		log.debug("listProjects")
+		return callListApi(client, 'project', 'projects/list', authConfig)
 	}
 
 	static ServiceResponse listHostsV2(HttpApiClient client, Map authConfig) {

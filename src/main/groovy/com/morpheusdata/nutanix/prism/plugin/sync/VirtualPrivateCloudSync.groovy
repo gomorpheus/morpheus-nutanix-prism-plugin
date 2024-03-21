@@ -19,12 +19,14 @@ class VirtualPrivateCloudSync {
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
+	private Map project
 
-	public VirtualPrivateCloudSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
+	public VirtualPrivateCloudSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map project) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
+		this.project = project
 	}
 
 	public static getVPC(Cloud cloud) {
@@ -35,7 +37,7 @@ class VirtualPrivateCloudSync {
 		log.debug "BEGIN: execute VirtualPrivateCloudSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def masterData = getVPCs(authConfig)
+			def masterData = getVPCs(authConfig, project?.vpc_reference_list)
 			if(masterData.success) {
 
 				Observable<CloudPoolIdentity> domainRecords = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, getVPC(cloud), null)
@@ -117,13 +119,18 @@ class VirtualPrivateCloudSync {
 	}
 
 
-	private getVPCs(authConfig) {
+	private getVPCs(authConfig, vpcList) {
 		log.debug "getVPCs"
 		def rtn = [success: true, data: []]
 		try {
 			ServiceResponse listResult = NutanixPrismComputeUtility.listVPCs(apiClient, authConfig)
 			if (listResult.success) {
-				rtn.data = listResult.data?.collect { [name: it.spec?.name, externalId: it.metadata?.uuid]}
+				def vpcs =  listResult.data?.collect { [name: it.spec?.name, externalId: it.metadata?.uuid]}
+				if(vpcList?.size() > 0) {
+					def allowedVpcUuids = vpcList.collect { it.uuid}
+					vpcs = vpcs.findAll{allowedVpcUuids.contains(it.externalId)}
+				}
+				rtn.data = vpcs
 			} else {
 				log.warn "Error getting list of vpcs: ${listResult.msg}"
 			}

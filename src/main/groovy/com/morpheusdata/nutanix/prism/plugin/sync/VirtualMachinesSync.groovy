@@ -14,6 +14,7 @@ import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.core.util.SyncUtils
+import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -26,14 +27,16 @@ class VirtualMachinesSync {
 	private Boolean createNew
 	private Map authConfig
 	private Collection<ComputeServerInterfaceType> netTypes
+	private Map project
 
-	public VirtualMachinesSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Boolean createNew) {
+	public VirtualMachinesSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Boolean createNew, Map project) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
 		this.createNew = createNew
 		this.netTypes = nutanixPrismPlugin.getCloudProvider().nutanixPrismProvisionProvider().getComputeServerInterfaceTypes()
+		this.project = project
 	}
 
 	def execute() {
@@ -42,7 +45,7 @@ class VirtualMachinesSync {
 		try {
 			this.authConfig = plugin.getAuthConfig(cloud)
 
-			def listResults = NutanixPrismComputeUtility.listVMs(apiClient, authConfig)
+			def listResults = getVms(authConfig, project?.uuid)
 			if(listResults.success) {
 				def domainRecords = morpheusContext.async.computeServer.listIdentityProjections(cloud.id, null).filter { ComputeServerIdentityProjection projection ->
 					projection.computeServerTypeCode != 'nutanix-prism-hypervisor'
@@ -418,5 +421,26 @@ class VirtualMachinesSync {
 			log.warn("Error saving server: ${server?.id}" )
 		}
 		return morpheusContext.async.computeServer.get(server.id).blockingGet()
+	}
+
+	private getVms(authConfig, projectUuid) {
+		log.debug "getVms"
+		def rtn = [success: true, data: []]
+		try {
+			ServiceResponse listResult = NutanixPrismComputeUtility.listVMs(apiClient, authConfig)
+			if (listResult.success) {
+				def vms = listResult.data
+				if(projectUuid) {
+					vms = vms.findAll{it.metadata?.project_reference?.uuid == projectUuid}
+				}
+				rtn.data = vms
+			} else {
+				log.warn "Error getting list of vms: ${listResult.msg}"
+			}
+		} catch(e) {
+			rtn.success = false
+			log.error "Error in getting vms: ${e}", e
+		}
+		rtn
 	}
 }
