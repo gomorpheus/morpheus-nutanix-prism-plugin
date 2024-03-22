@@ -427,9 +427,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 		List<VirtualImageIdentityProjection> imagesToRemove = virtualImageLocations.collect { it.virtualImage }.findAll {!it.systemImage}.unique()
 		//remove the locations
-		morpheusContext.async.virtualImage.location.bulkRemove(virtualImageLocations).blockingGet()
+		morpheusContext.async.virtualImage.location.remove(virtualImageLocations).blockingGet()
 		//remove the images
-		morpheusContext.async.virtualImage.bulkRemove(imagesToRemove).blockingGet()
+		morpheusContext.async.virtualImage.remove(imagesToRemove).blockingGet()
 
 		//clean up tags
 		List<MetadataTagIdentityProjection> tags = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
