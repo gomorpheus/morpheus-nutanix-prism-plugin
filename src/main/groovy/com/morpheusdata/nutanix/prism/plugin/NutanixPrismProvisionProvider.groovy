@@ -264,7 +264,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 		servicePlans << new ServicePlan([code:'nutanix-prism-internal-custom', editable:false, name:'Nutanix Custom', description:'Nutanix Custom', sortOrder:0,
 				customMaxStorage:true, customMaxDataStorage:true, addVolumes:true, customCpu: true, customCores: true, customMaxMemory: true, deletable: false, provisionable: false,
-				maxStorage:0l, maxMemory: 0l,  maxCpu:0])
+				maxStorage:0l, maxMemory: 0l,  maxCpu:0, maxCores:1, coresPerSocket: 1])
 		servicePlans
 	}
 
