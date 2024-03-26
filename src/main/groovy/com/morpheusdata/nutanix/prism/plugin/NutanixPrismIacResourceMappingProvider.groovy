@@ -97,14 +97,6 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 					row.workloadType = new WorkloadType(code: 'nutanix-prism-provision-provider-1.0')
 				}
 				morpheusContext.async.workload.save(workloads).blockingGet()
-				//set user data
-				def resourceConfig = resource?.getConfigMap() ?: [:]
-				def userData = resourceConfig?.userData ?: [found: false]
-				//configure for agent install
-				if (userData?.found == true) {
-					response.installAgent = true
-					response.noAgent = false
-				}
 				//find the zone in case different than selected?
 				//find a matching image and configure agent etc...
 				def disk = resourceResult.values?.disk_list?.find { it?.data_source_reference?.kind == "image" }
@@ -160,14 +152,6 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 				server.computeServerType = new ComputeServerType(code: 'nutanix-prism-unmanaged')
 				//set extra config
 				workload.workloadType = new WorkloadType(code: 'nutanix-prism-provision-provider-1.0"')
-				//set user data
-				def resourceConfig = resource?.getConfigMap() ?: [:]
-				def userData = resourceConfig?.userData ?: [found: false]
-				//configure for agent install
-				if (userData?.found == true) {
-					response.installAgent = true
-					response.noAgent = false
-				}
 				//find the zone in case different than selected?
 				//find a matching image and configure agent etc...
 				def disk = resourceResult.values?.disk_list?.find { it?.data_source_reference?.kind == "image" }
