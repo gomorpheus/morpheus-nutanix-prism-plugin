@@ -111,7 +111,6 @@ class VirtualMachinesSync {
 				new DataFilter("morpheusResourceId", "in", plans.collect{pl -> pl.id})
 			))
 		}
-		println "\u001B[33mAC Log - VirtualMachinesSync:addMissingVirtualMachines- ${availablePlanPermissions}\u001B[0m"
 
 		for(cloudItem in addList) {
 			try {
