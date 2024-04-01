@@ -45,7 +45,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage', 'nutanixPrismProjects'])
+		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage', 'nutanixPrismProjects', 'nutanixPrismVPC'])
 	}
 
 	def nutanixPrismProvisionImage(args) {
@@ -155,7 +155,42 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def cloudId = getCloudId(args)
 		if(cloudId) {
 			Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
-			def options = morpheusContext.async.cloud.pool.listIdentityProjections(tmpCloud.id, "nutanix.prism.cluster.${tmpCloud.id}", null).map {[name: it.name, value: it.externalId]}.toList().blockingGet().sort({ it.name })
+			def options = morpheusContext.async.cloud.pool.list(new DataQuery().withFilters([
+				new DataFilter("refType", "ComputeZone"),
+				new DataFilter("refId", tmpCloud.id),
+				new DataFilter("category", "nutanix.prism.cluster.${tmpCloud.id}")
+			])).toList().blockingGet()
+			def projectId = getProjectId(args)
+			println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismCluster- ${projectId}\u001B[0m"
+			if(projectId) {
+				options = options.findAll {
+					it.getConfigProperty('associatedProjectIds').collect { it.toLong() }.contains(projectId)
+				}
+			}
+			options = options.collect {[name: it.name, value: it.externalId]}.sort({ it.name })
+			println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismVPC- ${options}\u001B[0m"
+			return options
+		} else {
+			return []
+		}
+	}
+
+	def nutanixPrismVPC(args){
+		def cloudId = getCloudId(args)
+		if(cloudId) {
+			Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
+			def options = morpheusContext.async.cloud.pool.list(new DataQuery().withFilters([
+				new DataFilter("refType", "ComputeZone"),
+				new DataFilter("refId", tmpCloud.id),
+				new DataFilter("category", "nutanix.prism.vpc.${tmpCloud.id}")
+			])).toList().blockingGet()
+			def projectId = getProjectId(args)
+			if(projectId) {
+				options = options.findAll {
+					it.getConfigProperty('associatedProjectIds').collect { it.toLong() }.contains(projectId)
+				}
+			}
+			options = options.collect {[name: it.name, value: it.externalId]}.sort({ it.name })
 			return options
 		} else {
 			return []
@@ -196,6 +231,29 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			cloudId = args.cloudId ?: args.zoneId
 		}
 		cloudId ? cloudId.toLong() : null
+	}
+
+	private static getProjectId(args) {
+		def projectId = null
+		if(args?.size() > 0) {
+			def firstArg =  args.getAt(0)
+			if(firstArg?.poolId) {
+				projectId = firstArg.poolId
+			} else if(firstArg?.resourcePoolId) {
+				projectId = firstArg?.resourcePoolId
+			}
+		}
+		if(!projectId) {
+			projectId = args.poolId ?: args.resourcePoolId
+		}
+		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:getProjectId- ${projectId}\u001B[0m"
+		if(projectId instanceof String && projectId.startsWith('pool-') ) {
+			projectId = projectId.substring(5)
+		}
+		if(projectId && (projectId instanceof String || projectId instanceof Long)) {
+			projectId =  projectId.toLong()
+		}
+		return projectId
 	}
 
 	private Cloud loadCloud(args) {

@@ -27,14 +27,16 @@ class HostsSync {
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
 	private Map authConfig
-	private Map project
+	private Map selectedProject
+	private ArrayList allProjects
 
-	public HostsSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map project) {
+	public HostsSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map projects) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
-		this.project = project
+		this.selectedProject = projects.selected as Map
+		this.allProjects = projects.all as ArrayList
 	}
 
 	def execute() {
@@ -54,7 +56,7 @@ class HostsSync {
 
 			def cloudItems = []
 			def listResultSuccess = false
-			def listResults = getHosts(authConfig, project?.cluster_reference_list)
+			def listResults = getHosts(authConfig, selectedProject??.cluster_reference_list)
 			if (listResults.success) {
 				listResultSuccess = true
 				cloudItems = listResults?.data

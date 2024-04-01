@@ -19,21 +19,47 @@ class ClustersSync {
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
-	private Map project
+	private Map selectedProject
+	private ArrayList allProjects
 
-	public ClustersSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map project) {
+
+	public ClustersSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map projects) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
-		this.project = project
+		this.selectedProject = projects.selected as Map
+		this.allProjects = projects.all as ArrayList
+
 	}
 
 	def execute() {
 		log.debug "BEGIN: execute ClustersSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def listResults = getClusters(authConfig, project?.cluster_reference_list)
+			def listResults = getClusters(authConfig, selectedProject?.cluster_reference_list)
+
+			def projects = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
+				return projection.type == 'Project' && projection.internalId != null
+			}.toList().blockingGet()
+
+			def clusterProjectsMapping = [:]
+			if(allProjects) {
+				allProjects.each { project ->
+					def clusterList = project.status?.resources?.cluster_reference_list
+					if(clusterList) {
+						clusterList.each { cluster ->
+							def projectMatch = projects.find{it.externalId == project.metadata?.uuid}
+							if(projectMatch) {
+								if (clusterProjectsMapping[cluster.uuid])
+									clusterProjectsMapping[cluster.uuid] += projectMatch.id
+								else
+									clusterProjectsMapping[cluster.uuid] = [projectMatch.id]
+							}
+						}
+					}
+				}
+			}
 			if(listResults.success) {
 				def masterHosts = listResults?.data?.findAll { cloudItem ->
 					cloudItem.status?.resources?.config?.service_list?.contains('AOS')
@@ -45,9 +71,9 @@ class ClustersSync {
 				}.onDelete { removeItems ->
 					removeMissingResourcePools(removeItems)
 				}.onUpdate { List<SyncTask.UpdateItem<CloudPool, Map>> updateItems ->
-					updateMatchedResourcePools(updateItems)
+					updateMatchedResourcePools(updateItems, clusterProjectsMapping)
 				}.onAdd { itemsToAdd ->
-					addMissingResourcePools(itemsToAdd)
+					addMissingResourcePools(itemsToAdd, clusterProjectsMapping)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<CloudPoolIdentity, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<CloudPoolIdentity, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
 					morpheusContext.async.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {CloudPool cloudPool ->
@@ -62,7 +88,7 @@ class ClustersSync {
 		log.debug "END: execute ClustersSync: ${cloud.id}"
 	}
 
-	def addMissingResourcePools(List addList) {
+	def addMissingResourcePools(List addList, Map clusterProjectsMapping) {
 		log.debug "addMissingResourcePools ${cloud} ${addList.size()}"
 		def adds = []
 
@@ -84,6 +110,10 @@ class ClustersSync {
 			]
 
 			def add = new CloudPool(poolConfig)
+			if(clusterProjectsMapping[cloudItem.metadata.uuid]){
+				add.setConfigProperty('associatedProjectIds', clusterProjectsMapping[cloudItem.metadata.uuid])
+			}
+			add.setConfigProperty()
 			adds << add
 		}
 
@@ -92,7 +122,7 @@ class ClustersSync {
 		}
 	}
 
-	private updateMatchedResourcePools(List updateList) {
+	private updateMatchedResourcePools(List updateList, Map clusterProjectsMapping) {
 		log.debug "updateMatchedResourcePools: ${cloud} ${updateList.size()}"
 		def updates = []
 		
@@ -103,6 +133,10 @@ class ClustersSync {
 
 			if(existing.name != matchItem.status.name) {
 				existing.name = matchItem.status.name
+				save = true
+			}
+			if(clusterProjectsMapping[matchItem.metadata.uuid] && existing.getConfigProperty('associatedProjectIds') != clusterProjectsMapping[matchItem.metadata.uuid]){
+				existing.setConfigProperty('associatedProjectIds', clusterProjectsMapping[matchItem.metadata.uuid])
 				save = true
 			}
 			if(save) {

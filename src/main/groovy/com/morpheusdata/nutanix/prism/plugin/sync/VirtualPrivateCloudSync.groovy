@@ -19,17 +19,19 @@ class VirtualPrivateCloudSync {
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
-	private Map project
+	private Map selectedProject
+	private ArrayList allProjects
 
-	public VirtualPrivateCloudSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map project) {
+	public VirtualPrivateCloudSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map projects) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
-		this.project = project
+		this.selectedProject = projects.selected as Map
+		this.allProjects = projects.all as ArrayList
 	}
 
-	public static getVPC(Cloud cloud) {
+	public static getVPCCategory(Cloud cloud) {
 		return "nutanix.prism.vpc.${cloud.id}"
 	}
 
@@ -37,19 +39,39 @@ class VirtualPrivateCloudSync {
 		log.debug "BEGIN: execute VirtualPrivateCloudSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def masterData = getVPCs(authConfig, project?.vpc_reference_list)
-			if(masterData.success) {
+			def masterData = getVPCs(authConfig, selectedProject?.vpc_reference_list)
+			def projects = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
+				return projection.type == 'Project' && projection.internalId != null
+			}.toList().blockingGet()
 
-				Observable<CloudPoolIdentity> domainRecords = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, getVPC(cloud), null)
+			def vpcProjectsMapping = [:]
+			if(allProjects) {
+				allProjects.each { project ->
+					def vpcList = project.status?.resources?.vpc_reference_list
+					if(vpcList) {
+						vpcList.each { vpc ->
+							def projectMatch = projects.find{it.externalId == project.metadata?.uuid}
+							if(projectMatch) {
+								if (vpcProjectsMapping[vpc.uuid])
+									vpcProjectsMapping[vpc.uuid] += projectMatch.id
+								else
+									vpcProjectsMapping[vpc.uuid] = [projectMatch.id]
+							}
+						}
+					}
+				}
+			}
+			if(masterData.success) {
+				Observable<CloudPoolIdentity> domainRecords = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, getVPCCategory(cloud), null)
 				SyncTask<CloudPoolIdentity, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterData.data)
 				syncTask.addMatchFunction { CloudPoolIdentity domainObject, Map apiItem ->
 					domainObject.externalId == apiItem.externalId
 				}.onDelete { removeItems ->
 					removeMissingVPCs(removeItems)
 				}.onUpdate { List<SyncTask.UpdateItem<CloudPool, Map>> updateItems ->
-					updateMatchedVPCs(updateItems)
+					updateMatchedVPCs(updateItems, vpcProjectsMapping)
 				}.onAdd { itemsToAdd ->
-					addMissingVPCs(itemsToAdd)
+					addMissingVPCs(itemsToAdd, vpcProjectsMapping)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<CloudPoolIdentity, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<CloudPoolIdentity, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
 					morpheusContext.async.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {CloudPool cloudPool ->
@@ -64,7 +86,7 @@ class VirtualPrivateCloudSync {
 		log.debug "END: execute VirtualPrivateCloudSync: ${cloud.id}"
 	}
 
-	def addMissingVPCs(Collection<Map> addList) {
+	def addMissingVPCs(Collection<Map> addList, Map vpcProjectsMapping) {
 		log.debug "addMissingVPCs ${cloud} ${addList.size()}"
 		def adds = []
 
@@ -79,10 +101,14 @@ class VirtualPrivateCloudSync {
 					refType   : 'ComputeZone',
 					refId     : cloud.id,
 					cloud     : cloud,
-					category  : getVPC(cloud),
-					code      : "${getVPC(cloud)}.${cloudItem.externalId}"
+					category  : getVPCCategory(cloud),
+					code      : "${getVPCCategory(cloud)}.${cloudItem.externalId}",
+				    readOnly  : true
 			]
 			def add = new CloudPool(poolConfig)
+			if(vpcProjectsMapping[cloudItem.metadata.uuid]){
+				add.setConfigProperty('associatedProjectIds', vpcProjectsMapping[cloudItem.metadata.uuid])
+			}
 			adds << add
 		}
 
@@ -91,7 +117,7 @@ class VirtualPrivateCloudSync {
 		}
 	}
 
-	private updateMatchedVPCs(List updateList) {
+	private updateMatchedVPCs(List updateList, Map vpcProjectsMapping) {
 		log.debug "updateMatchedVPCs: ${cloud} ${updateList.size()}"
 		def updates = []
 
@@ -102,6 +128,14 @@ class VirtualPrivateCloudSync {
 
 			if(existing.name != matchItem.name) {
 				existing.name = matchItem.name
+				save = true
+			}
+			if(!existing.readOnly) {
+				existing.readOnly = true
+				save = true
+			}
+			if(vpcProjectsMapping[matchItem.externalId] && existing.getConfigProperty('associatedProjectIds') != vpcProjectsMapping[matchItem.externalId]){
+				existing.setConfigProperty('associatedProjectIds', vpcProjectsMapping[matchItem.externalId])
 				save = true
 			}
 			if(save) {

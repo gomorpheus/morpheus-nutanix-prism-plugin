@@ -33,6 +33,7 @@ import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
 import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.ImagesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
+import com.morpheusdata.nutanix.prism.plugin.sync.ProjectsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.SnapshotsSync
 import com.morpheusdata.nutanix.prism.plugin.sync.TemplatesSync
 import com.morpheusdata.nutanix.prism.plugin.sync.VirtualMachinesSync
@@ -41,6 +42,7 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
+import org.apache.tools.ant.Project
 
 import java.security.MessageDigest
 
@@ -596,24 +598,30 @@ class NutanixPrismCloudProvider implements CloudProvider {
 						createNew = true
 					}
 					ensureRegionCode(cloud)
-					Map project = null
+					Map projects = [:]
+					def allProjects = NutanixPrismComputeUtility.listProjects(client, authConfig)
+					if(allProjects.success) {
+						projects.all = allProjects.data as Map
+					}
 					if(cloud.configMap.project) {
 						def projectResponse =  NutanixPrismComputeUtility.getProject(client, authConfig, cloud.configMap.project as String)
 						if(projectResponse.success) {
-							project = projectResponse.data as Map
-							project.uuid = cloud.configMap.project
+							projects.selected = projectResponse.data as Map
+							projects.selected.uuid = cloud.configMap.project
 						}
+
 					}
 
 					(new CategoriesSync(this.plugin, cloud, client)).execute()
-					(new VirtualPrivateCloudSync(this.plugin, cloud, client, project)).execute()
-					(new ClustersSync(this.plugin, cloud, client, project)).execute()
-					(new DatastoresSync(this.plugin, cloud, client)).execute()
-					(new NetworksSync(this.plugin, cloud, client, project)).execute()
+					(new ProjectsSync(this.plugin, cloud, client, projects)).execute()
+					(new VirtualPrivateCloudSync(this.plugin, cloud, client, projects)).execute()
+					(new ClustersSync(this.plugin, cloud, client, projects)).execute()
+					(new DatastoresSync(this.plugin, cloud, client, projects)).execute()
+					(new NetworksSync(this.plugin, cloud, client, projects)).execute()
 					(new ImagesSync(this.plugin, cloud, client)).execute()
 					(new TemplatesSync(this.plugin, cloud, client)).execute()
-					(new HostsSync(this.plugin, cloud, client, project)).execute()
-					(new VirtualMachinesSync(this.plugin, cloud, client, createNew, project)).execute()
+					(new HostsSync(this.plugin, cloud, client, projects)).execute()
+					(new VirtualMachinesSync(this.plugin, cloud, client, createNew, projects)).execute()
 					(new SnapshotsSync(this.plugin, cloud, client)).execute()
 
 					rtn = ServiceResponse.success()

@@ -27,16 +27,18 @@ class VirtualMachinesSync {
 	private Boolean createNew
 	private Map authConfig
 	private Collection<ComputeServerInterfaceType> netTypes
-	private Map project
+	private Map selectedProject
+	private ArrayList allProjects
 
-	public VirtualMachinesSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Boolean createNew, Map project) {
+	public VirtualMachinesSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Boolean createNew, Map projects) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
 		this.createNew = createNew
 		this.netTypes = nutanixPrismPlugin.getCloudProvider().nutanixPrismProvisionProvider().getComputeServerInterfaceTypes()
-		this.project = project
+		this.selectedProject = projects.selected as Map
+		this.allProjects = projects.all as ArrayList
 	}
 
 	def execute() {
@@ -45,7 +47,7 @@ class VirtualMachinesSync {
 		try {
 			this.authConfig = plugin.getAuthConfig(cloud)
 
-			def listResults = getVms(authConfig, project?.uuid)
+			def listResults = getVms(authConfig, selectedProject??.uuid)
 			if(listResults.success) {
 				def domainRecords = morpheusContext.async.computeServer.listIdentityProjections(cloud.id, null).filter { ComputeServerIdentityProjection projection ->
 					projection.computeServerTypeCode != 'nutanix-prism-hypervisor'

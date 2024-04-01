@@ -23,12 +23,14 @@ class DatastoresSync {
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
+	private ArrayList allProjects
 
-	public DatastoresSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
+	public DatastoresSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient, Map projects) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
 		this.apiClient = apiClient
+		this.allProjects = projects.all as ArrayList
 	}
 
 	def execute() {
@@ -47,6 +49,28 @@ class DatastoresSync {
 				return projection.type == 'VPC' && projection.internalId != null
 			}.toList().blockingGet()
 			def vpcArray = vpcs.collect {new CloudPool(id: it.id)}
+
+			def projects = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
+				return projection.type == 'Project' && projection.internalId != null
+			}.toList().blockingGet()
+
+			def clusterProjectsMapping = [:]
+			if(allProjects) {
+				allProjects.each { project ->
+					def clusterList = project.status?.resources?.cluster_reference_list
+					if(clusterList) {
+						clusterList.each { cluster ->
+							def projectMatch = projects.find{it.externalId == project.metadata?.uuid}
+							if(projectMatch) {
+								if (clusterProjectsMapping[cluster.uuid])
+									clusterProjectsMapping[cluster.uuid] += projectMatch
+								else
+									clusterProjectsMapping[cluster.uuid] = [projectMatch]
+							}
+						}
+					}
+				}
+			}
 
 			def listResults = NutanixPrismComputeUtility.listDatastores(apiClient, authConfig)
 			if(listResults.success == true) {
@@ -69,6 +93,7 @@ class DatastoresSync {
 						def cluster = clusters.find {
 							it.externalId == clusterId
 						}
+
 						def datastoreConfig = [
 								owner       : new Account(id: cloud.owner.id),
 								name        : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'container_name'),
@@ -87,6 +112,9 @@ class DatastoresSync {
 						add.assignedZonePools = [new CloudPool(id: cluster?.id)]
 						//also assign to VPCs
 						add.assignedZonePools += vpcArray
+						if(clusterProjectsMapping[clusterId]) {
+							add.assignedZonePools += clusterProjectsMapping[clusterId]
+						}
 						adds << add
 
 					}
@@ -131,6 +159,9 @@ class DatastoresSync {
 						}
 						//also assign to VPCs
 						def zonePools = vpcArray
+						if(clusterProjectsMapping[clusterId]) {
+							zonePools += clusterProjectsMapping[clusterId]
+						}
 						if(cluster?.id) {
 							zonePools += new CloudPool(id: cluster.id)
 						}
