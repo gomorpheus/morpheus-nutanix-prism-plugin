@@ -109,6 +109,20 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		)
 
 		options << new OptionType([
+			name : 'vpc',
+			code : 'nutanix-prism-provision-vpc',
+			fieldName : 'vpcId',
+			fieldContext : 'config',
+			fieldLabel : 'VPC',
+			required : false,
+			inputType : OptionType.InputType.SELECT,
+			displayOrder : 100,
+			optionSource: 'nutanixPrismVPC',
+			dependsOn: 'config.resourcePoolId'
+
+		])
+
+		options << new OptionType([
 			name : 'cluster',
 			code : 'nutanix-prism-provision-cluster',
 			fieldName : 'clusterName',
@@ -117,8 +131,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			required : true,
 			inputType : OptionType.InputType.SELECT,
 			displayOrder : 101,
-			optionSource: 'nutanixPrismCluster'
-
+			optionSource: 'nutanixPrismCluster',
+			dependsOn: 'config.resourcePoolId,nutanix-prism-provision-vpc'
 		])
 
 		options << new OptionType([
