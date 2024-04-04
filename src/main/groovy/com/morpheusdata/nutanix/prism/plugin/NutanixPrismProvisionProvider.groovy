@@ -1617,23 +1617,24 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 		def runConfig = [:] + opts + buildRunConfig(server, imageExternalId, workloadRequest.networkConfiguration, config)
 		runConfig += [
-			workloadId        : workload.id,
-			accountId         : workload.account.id,
-			maxMemory         : maxMemory,
-			maxStorage        : maxStorage,
-			cpuCount          : maxCores,
-			maxCores          : maxCores,
-			coresPerSocket    : coresPerSocket,
-			numSockets		  : numSockets,
-			networkType       : workload.getConfigProperty('networkType'),
-			containerId       : workload.id,
-			workloadConfig    : workload.getConfigMap(),
-			timezone          : (workload.getConfigProperty('timezone') ?: cloud.timezone),
-			proxySettings     : workloadRequest.proxyConfiguration,
-			uefi              : uefi,
-			secureBoot        : workload.getConfigProperty('secureBoot'),
-			noAgent           : (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
-			installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
+			workloadId        	: workload.id,
+			accountId         	: workload.account.id,
+			maxMemory         	: maxMemory,
+			maxStorage        	: maxStorage,
+			cpuCount          	: maxCores,
+			maxCores          	: maxCores,
+			coresPerSocket    	: coresPerSocket,
+			numSockets		: numSockets,
+			networkType       	: workload.getConfigProperty('networkType'),
+			containerId       	: workload.id,
+			workloadConfig    	: workload.getConfigMap(),
+			timezone          	: (workload.getConfigProperty('timezone') ?: cloud.timezone),
+			proxySettings    	: workloadRequest.proxyConfiguration,
+			uefi             	: uefi,
+			secureBoot        	: workload.getConfigProperty('secureBoot'),
+			hardwareVirtualization  : workload.getConfigProperty('hardwareVirtualization'),
+			noAgent           	: (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
+			installAgent      	: (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 
 		]
 		return runConfig
