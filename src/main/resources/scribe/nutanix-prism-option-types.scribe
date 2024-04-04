@@ -33,10 +33,10 @@ resource "option-type" "nutanix-prism-provision-secure-boot" {
 	fieldGroup = "Nutanix Prism Boot Options"
 }
 
-resource "option-type" "nutanix-prism-provision-hardware-virtualization" {
+resource "option-type" "nutanix-prism-provision-credential-guard" {
 	name = "windows defender credential guard"
-	code = "nutanix-prism-provision-hardware-virtualization"
-	fieldName = "hardwareVirtualization"
+	code = "nutanix-prism-provision-credential-guard"
+	fieldName = "windowsCredentialGuard"
 	fieldContext = "config"
 	fieldLabel = "Windows Defender Credential Guard"
 	type = "checkbox"
