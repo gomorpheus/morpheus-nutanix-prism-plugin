@@ -33,3 +33,14 @@ resource "option-type" "nutanix-prism-provision-secure-boot" {
 	fieldGroup = "Nutanix Prism Boot Options"
 }
 
+resource "option-type" "nutanix-prism-provision-hardware-virtualization" {
+	name = "hardware virtualization security"
+	code = "nutanix-prism-provision-hardware-virtualization"
+	fieldName = "hardwareVirtualization"
+	fieldContext = "config"
+	fieldLabel = "Windows Defender Credential Guard"
+	type = "checkbox"
+	displayOrder = 105
+	visibleOnCode = "nutanix-prism-provision-secure-boot:on"
+	fieldGroup = "Nutanix Prism Boot Options"
+}
