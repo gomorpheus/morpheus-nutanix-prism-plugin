@@ -128,7 +128,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			fieldContext : 'config',
 			fieldLabel : 'Categories',
 			inputType : OptionType.InputType.MULTI_SELECT,
-			displayOrder : 105,
+			displayOrder : 106,
 			optionSource: 'nutanixPrismCategories'
 
 		])
