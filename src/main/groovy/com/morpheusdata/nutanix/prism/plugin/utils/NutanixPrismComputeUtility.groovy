@@ -127,6 +127,9 @@ class NutanixPrismComputeUtility {
 			if(runConfig.secureBoot) {
 				resources['machine_type'] = "Q35"
 				resources['boot_config']['boot_type'] = "SECURE_BOOT"
+				if(runConfig.hardwareVirtualization) {
+					resources['hardware_virtualization_enabled'] = true
+				}
 			}
 		}
 
