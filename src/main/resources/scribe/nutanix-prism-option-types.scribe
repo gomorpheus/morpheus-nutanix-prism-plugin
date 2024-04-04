@@ -34,7 +34,7 @@ resource "option-type" "nutanix-prism-provision-secure-boot" {
 }
 
 resource "option-type" "nutanix-prism-provision-hardware-virtualization" {
-	name = "hardware virtualization security"
+	name = "windows defender credential guard"
 	code = "nutanix-prism-provision-hardware-virtualization"
 	fieldName = "hardwareVirtualization"
 	fieldContext = "config"
