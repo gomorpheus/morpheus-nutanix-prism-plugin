@@ -1632,7 +1632,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			proxySettings    	: workloadRequest.proxyConfiguration,
 			uefi             	: uefi,
 			secureBoot        	: workload.getConfigProperty('secureBoot'),
-			hardwareVirtualization  : workload.getConfigProperty('hardwareVirtualization'),
+			windowsCredentialGuard  : workload.getConfigProperty('windowsCredentialGuard'),
 			noAgent           	: (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
 			installAgent      	: (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 
