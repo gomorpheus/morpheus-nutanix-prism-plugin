@@ -103,12 +103,21 @@ class VirtualMachinesSync {
 		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, addList?.collect{ it.metadata.uuid } )
 		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
 
+		Collection<ResourcePermission> availablePlanPermissions = []
+
+		if(plans) {
+			availablePlanPermissions = morpheusContext.services.resourcePermission.list(new DataQuery().withFilters(
+				new DataFilter("morpheusResourceType", "ServicePlan"),
+				new DataFilter("morpheusResourceId", "in", plans.collect{pl -> pl.id})
+			))
+		}
+
 		for(cloudItem in addList) {
 			try {
 				def doCreate = !blackListedNames?.contains(cloudItem.status.name)
 				if(doCreate) {
 					def vmConfig = buildVmConfig(cloudItem, resourcePools, hosts)
-					vmConfig.plan = SyncUtils.findServicePlanBySizing(plans, vmConfig.maxMemory, vmConfig.maxCores, null, fallbackPlan, null, cloud.account)
+					vmConfig.plan = SyncUtils.findServicePlanBySizing(plans, vmConfig.maxMemory, vmConfig.maxCores, null, fallbackPlan, null, cloud.account, availablePlanPermissions)
 					ComputeServer add = new ComputeServer(vmConfig)
 					add.computeServerType = defaultServerType
 					ComputeServer savedServer = morpheusContext.async.computeServer.create(add).blockingGet()
@@ -135,6 +144,13 @@ class VirtualMachinesSync {
 		log.debug "updateMatchedVirtualMachines: ${cloud} ${updateList?.size()}"
 
 		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
+		Collection<ResourcePermission> availablePlanPermissions = []
+		if(plans) {
+			availablePlanPermissions = morpheusContext.services.resourcePermission.list(new DataQuery().withFilters(
+				new DataFilter("morpheusResourceType", "ServicePlan"),
+				new DataFilter("morpheusResourceId", "in", plans.collect{pl -> pl.id})
+			))
+		}
 		List<ComputeServer> servers = updateList.collect { it.existingItem }
 
 		// Gather up all the Workloads that may pertain to the servers we are syncing
@@ -192,7 +208,7 @@ class VirtualMachinesSync {
 							save = true
 						}
 
-						ServicePlan plan = SyncUtils.findServicePlanBySizing(plans, currentServer.maxMemory, currentServer.maxCores, null, fallbackPlan, currentServer.plan, currentServer.account)
+						ServicePlan plan = SyncUtils.findServicePlanBySizing(plans, currentServer.maxMemory, currentServer.maxCores, null, fallbackPlan, currentServer.plan, currentServer.account, availablePlanPermissions)
 						if(currentServer.plan?.code != plan?.code) {
 							currentServer.plan = plan
 							planInfoChanged = true

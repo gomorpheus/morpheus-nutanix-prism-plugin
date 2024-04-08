@@ -136,7 +136,7 @@ class DatastoresSync {
 						}
 						def zonePoolSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingItem.assignedZonePools, zonePools, {e, m ->  {e.id == m.id}})
 						if(zonePoolSyncLists.addList.size() > 0) {
-							existingItem.assignedZonePools += zonePoolSyncLists.addList
+							existingItem.assignedZonePools += zonePoolSyncLists.addList.collect { new CloudPool(id: it.id)}
 							save = true
 						}
 						if(save) {
