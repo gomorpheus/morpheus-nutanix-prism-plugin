@@ -106,8 +106,8 @@ class VirtualPrivateCloudSync {
 				    readOnly  : true
 			]
 			def add = new CloudPool(poolConfig)
-			if(vpcProjectsMapping[cloudItem.metadata.uuid]){
-				add.setConfigProperty('associatedProjectIds', vpcProjectsMapping[cloudItem.metadata.uuid])
+			if(vpcProjectsMapping[cloudItem.externalId]){
+				add.setConfigProperty('associatedProjectIds', vpcProjectsMapping[cloudItem.externalId])
 			}
 			adds << add
 		}

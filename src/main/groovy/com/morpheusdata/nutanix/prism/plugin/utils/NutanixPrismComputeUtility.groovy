@@ -160,6 +160,10 @@ class NutanixPrismComputeUtility {
 				]
 		]
 
+		if(runConfig.projectReference) {
+			body.metadata.project_reference = runConfig.projectReference
+		}
+
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms", authConfig.username, authConfig.password,
 				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
 		if(results?.success) {
