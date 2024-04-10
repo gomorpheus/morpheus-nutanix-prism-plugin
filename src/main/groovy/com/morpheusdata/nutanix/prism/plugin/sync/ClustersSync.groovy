@@ -113,7 +113,6 @@ class ClustersSync {
 			if(clusterProjectsMapping[cloudItem.metadata.uuid]){
 				add.setConfigProperty('associatedProjectIds', clusterProjectsMapping[cloudItem.metadata.uuid])
 			}
-			add.setConfigProperty()
 			adds << add
 		}
 
