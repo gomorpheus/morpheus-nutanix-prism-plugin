@@ -668,7 +668,6 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Collection<Datastore> filterDatastores(Cloud cloud, Collection<Datastore> datastores, Collection<CloudPool> resourcePools) {
-		println "\u001B[33mAC Log - NutanixPrismCloudProvider:filterDatastores- ${resourcePools.collect {"${it.name} ${it.externalId}"}} ${datastores.collect {"${it.name} ${it.assignedZonePools.collect {it.externalId}}" }}\u001B[0m"
 		if(resourcePools.size() > 0 ) {
 			def allowedPoolIds = resourcePools.collect { it.externalId }
 			return datastores.findAll({ datastore -> datastore.assignedZonePools.find { it.externalId in allowedPoolIds } })

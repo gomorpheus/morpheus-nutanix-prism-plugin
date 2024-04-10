@@ -161,14 +161,12 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 				new DataFilter("category", "nutanix.prism.cluster.${tmpCloud.id}")
 			])).toList().blockingGet()
 			def projectId = getProjectId(args)
-			println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismCluster- ${projectId}\u001B[0m"
 			if(projectId) {
 				options = options.findAll {
 					it.getConfigProperty('associatedProjectIds').collect { it.toLong() }.contains(projectId)
 				}
 			}
 			options = options.collect {[name: it.name, value: it.externalId]}.sort({ it.name })
-			println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:nutanixPrismVPC- ${options}\u001B[0m"
 			return options
 		} else {
 			return []
@@ -244,9 +242,12 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			}
 		}
 		if(!projectId) {
-			projectId = args.poolId ?: args.resourcePoolId
+			if(args.poolId && args.poolId != [null]) {
+				projectId = args.poolId
+			} else if(args.resourcePoolId && args.resourcePoolId != [null]) {
+				projectId = args.resourcePoolId
+			}
 		}
-		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:getProjectId- ${projectId}\u001B[0m"
 		if(projectId instanceof String && projectId.startsWith('pool-') ) {
 			projectId = projectId.substring(5)
 		}
