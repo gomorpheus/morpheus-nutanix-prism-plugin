@@ -14,7 +14,8 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	optionTypes = [
 		option-type.nutanix-prism-provision-image,
 		option-type.nutanix-prism-provision-uefi,
-		option-type.nutanix-prism-provision-credential-guard
+		option-type.nutanix-prism-provision-credential-guard,
+		option-type.nutanix-prism-provision-vtpm
 	]
 	pluginIconPath = "nutanix-prism.svg"
 	pluginIconHidpiPath= "nutanix-prism.svg"
