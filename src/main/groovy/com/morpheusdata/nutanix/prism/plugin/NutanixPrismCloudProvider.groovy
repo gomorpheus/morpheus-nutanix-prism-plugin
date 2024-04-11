@@ -13,8 +13,10 @@ import com.morpheusdata.core.util.ConnectionUtils
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.AccountCredential
 import com.morpheusdata.model.Cloud
+import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.ComputeServer
 import com.morpheusdata.model.ComputeServerType
+import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.Icon
 import com.morpheusdata.model.NetworkProxy
 import com.morpheusdata.model.NetworkSubnetType
@@ -662,5 +664,15 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	IacResourceMappingProvider getIacResourceMappingProvider() {
 		this.plugin.getProviderByCode('nutanix-prism-iac-resource-mapping-provider') as NutanixPrismIacResourceMappingProvider
+	}
+
+	@Override
+	Collection<Datastore> filterDatastores(Cloud cloud, Collection<Datastore> datastores, Collection<CloudPool> resourcePools) {
+		println "\u001B[33mAC Log - NutanixPrismCloudProvider:filterDatastores- ${resourcePools.collect {"${it.name} ${it.externalId}"}} ${datastores.collect {"${it.name} ${it.assignedZonePools.collect {it.externalId}}" }}\u001B[0m"
+		if(resourcePools.size() > 0 ) {
+			def allowedPoolIds = resourcePools.collect { it.externalId }
+			return datastores.findAll({ datastore -> datastore.assignedZonePools.find { it.externalId in allowedPoolIds } })
+		}
+		return datastores
 	}
 }

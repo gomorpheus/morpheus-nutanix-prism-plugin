@@ -1846,6 +1846,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				kind: "cluster",
 				uuid: config.clusterName
 		]
+		def projectReference
+		if(server.resourcePool && server.resourcePool?.code?.startsWith("nutanix.prism.project") && server.resourcePool?.externalId) {
+			projectReference = [
+				"kind": "project",
+				"uuid": server.resourcePool.externalId
+			]
+		}
 
 		def runConfig = [:]
 		runConfig += [
@@ -1864,6 +1871,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				skipNetworkWait   : false,
 				clusterReference  : clusterReference,
 				categories        : categories,
+				projectReference  : projectReference
 
 		]
 		return runConfig
