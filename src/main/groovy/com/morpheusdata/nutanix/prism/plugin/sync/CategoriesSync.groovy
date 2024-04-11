@@ -14,7 +14,7 @@ import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
-import io.reactivex.rxjava3.core.Observable
+import io.reactivex.Observable
 
 @Slf4j
 class CategoriesSync {

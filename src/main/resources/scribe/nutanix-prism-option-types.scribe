@@ -29,6 +29,6 @@ resource "option-type" "nutanix-prism-provision-credential-guard" {
 	fieldLabel = "Windows Defender Credential Guard"
 	type = "checkbox"
 	displayOrder = 105
-	visibleOnCode = "matchAll::nutanix-prism-provision-uefi:(on),nutanix-prism-provision-secure-boot:(on)"
+	visibleOnCode = "matchAll::nutanix-prism-provision-uefi:(on)"
 	fieldGroup = "Nutanix Prism Boot Options"
 }

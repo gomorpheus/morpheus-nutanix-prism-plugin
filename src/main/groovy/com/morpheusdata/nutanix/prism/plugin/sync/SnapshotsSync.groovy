@@ -8,7 +8,7 @@ import com.morpheusdata.model.projection.SnapshotIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import groovy.util.logging.Slf4j
-import io.reactivex.rxjava3.core.Observable
+import io.reactivex.Observable
 import java.util.concurrent.TimeUnit
 
 
