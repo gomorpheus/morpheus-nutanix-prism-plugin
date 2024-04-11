@@ -8,7 +8,7 @@ import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import groovy.util.logging.Slf4j
-import io.reactivex.Observable
+import io.reactivex.rxjava3.core.Observable
 
 @Slf4j
 class ProjectsSync {

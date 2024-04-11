@@ -12,9 +12,7 @@ import com.morpheusdata.model.projection.VirtualImageLocationIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import groovy.util.logging.Slf4j
-import io.reactivex.Observable
-
-import java.awt.Image
+import io.reactivex.rxjava3.core.Observable
 
 @Slf4j
 class TemplatesSync {
