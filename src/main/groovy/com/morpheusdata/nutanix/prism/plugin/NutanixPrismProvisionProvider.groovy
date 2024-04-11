@@ -142,7 +142,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			fieldContext : 'config',
 			fieldLabel : 'Categories',
 			inputType : OptionType.InputType.MULTI_SELECT,
-			displayOrder : 106,
+			displayOrder : 110,
 			optionSource: 'nutanixPrismCategories'
 
 		])
@@ -1646,6 +1646,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			proxySettings     : workloadRequest.proxyConfiguration,
 			uefi              : uefi,
 			windowsCredentialGuard  : workload.getConfigProperty('windowsCredentialGuard'),
+			vtpm              : workload.getConfigProperty('vtpm'),
 			noAgent           : (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
 			installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 

@@ -128,6 +128,9 @@ class NutanixPrismComputeUtility {
 			if(runConfig.windowsCredentialGuard) {
 				resources['hardware_virtualization_enabled'] = true
 			}
+			if(runConfig.vtpm) {
+				resources['vtpm_config'] = ["vtpm_enabled": true]
+			}
 
 		}
 

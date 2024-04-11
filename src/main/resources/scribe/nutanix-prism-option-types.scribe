@@ -32,3 +32,15 @@ resource "option-type" "nutanix-prism-provision-credential-guard" {
 	visibleOnCode = "matchAll::nutanix-prism-provision-uefi:(on)"
 	fieldGroup = "Nutanix Prism Boot Options"
 }
+
+resource "option-type" "nutanix-prism-provision-vtpm" {
+	name = "vtpm"
+	code = "nutanix-prism-provision-vtpm"
+	fieldName = "vtpm"
+	fieldContext = "config"
+	fieldLabel = "Attach vTPM"
+	type = "checkbox"
+	displayOrder = 106
+	visibleOnCode = "matchAll::nutanix-prism-provision-uefi:(on)"
+	fieldGroup = "Nutanix Prism Boot Options"
+}
