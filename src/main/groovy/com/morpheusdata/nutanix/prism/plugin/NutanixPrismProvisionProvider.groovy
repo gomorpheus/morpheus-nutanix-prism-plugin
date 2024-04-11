@@ -142,7 +142,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			fieldContext : 'config',
 			fieldLabel : 'Categories',
 			inputType : OptionType.InputType.MULTI_SELECT,
-			displayOrder : 105,
+			displayOrder : 106,
 			optionSource: 'nutanixPrismCategories'
 
 		])
@@ -1645,6 +1645,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			timezone          : (workload.getConfigProperty('timezone') ?: cloud.timezone),
 			proxySettings     : workloadRequest.proxyConfiguration,
 			uefi              : uefi,
+			windowsCredentialGuard  : workload.getConfigProperty('windowsCredentialGuard'),
 			noAgent           : (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
 			installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 
