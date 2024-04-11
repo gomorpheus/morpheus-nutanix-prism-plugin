@@ -309,14 +309,14 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static String getNutanixSession(Map authConfig) {
+	static Map getNutanixSession(Map authConfig) {
 		URIBuilder uriBuilder = new URIBuilder(authConfig.apiUrl)
 		uriBuilder.setPath("api/nutanix/v3/users/info")
 
 		HttpRequestBase request
 		request = new HttpGet(uriBuilder.build())
 		def cookies = []
-		def sessionCookie
+		def sessionCookie = [:]
 
 		def outboundClient
 		def rtn = [success: false]
@@ -354,7 +354,11 @@ class NutanixPrismComputeUtility {
 					String cookie = it.value.split(';')[0]
 					cookies.add(cookie)
 					if(cookie.startsWith("NTNX_IGW_SESSION")) {
-						sessionCookie = cookie
+						sessionCookie.type = "NTNX_IGW_SESSION"
+						sessionCookie.cookieValue = cookie
+					} else if(cookie.startsWith("NTNX_IAM_SESSION")) {
+						sessionCookie.type = "NTNX_IAM_SESSION"
+						sessionCookie.cookieValue = cookie
 					}
 				}
 				if(sessionCookie) {
@@ -373,7 +377,20 @@ class NutanixPrismComputeUtility {
 
 	static ServiceResponse getVMConsoleUrl(Map authConfig, String vmUuid, String clusterUuid) {
 
-		String nutanixSessionCookie = getNutanixSession(authConfig) ?: ""
+
+		Map nutanixSession = getNutanixSession(authConfig)
+		def nutanixSessionCookie = ""
+		def socketURI = new URIBuilder(authConfig.apiUrl)
+		socketURI.setScheme("wss")
+		socketURI.setPath("/vnc/vm/${vmUuid}/proxy")
+		socketURI.setParameter("proxyClusterUuid", clusterUuid)
+		if(nutanixSession?.type == "NTNX_IGW_SESSION") {
+			nutanixSessionCookie = nutanixSession.cookieValue
+		} else if(nutanixSession?.type == "NTNX_IAM_SESSION") {
+			nutanixSessionCookie = nutanixSession.cookieValue
+			return ServiceResponse.success([url: socketURI.build().toString(), headers: ['Cookie':nutanixSessionCookie]])
+		}
+
 
 		URIBuilder uriBuilder = new URIBuilder(authConfig.apiUrl)
 		uriBuilder.setPath("PrismGateway/j_spring_security_check")
@@ -422,10 +439,6 @@ class NutanixPrismComputeUtility {
 					}
 				}
 				if(sessionCookie) {
-					def socketURI = new URIBuilder(authConfig.apiUrl)
-					socketURI.setScheme("wss")
-					socketURI.setPath("/vnc/vm/${vmUuid}/proxy")
-					socketURI.setParameter("proxyClusterUuid", clusterUuid)
 					return ServiceResponse.success([url: socketURI.build().toString(), headers: ['Cookie':sessionCookie + ";" + nutanixSessionCookie]])
 				}
 			} else {
