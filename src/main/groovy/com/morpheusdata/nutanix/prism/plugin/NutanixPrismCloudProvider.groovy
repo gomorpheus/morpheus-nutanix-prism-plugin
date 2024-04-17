@@ -44,7 +44,6 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
-import org.apache.tools.ant.Project
 
 import java.security.MessageDigest
 

@@ -101,8 +101,7 @@ class NutanixPrismSyncUtils {
 				log.debug "Updating ${updateMap}"
 				StorageVolume existingVolume = updateMap.existingItem
 				def volume = updateMap.masterItem
-
-				volume.maxStorage = volume.disk_size_bytes
+				volume.maxStorage = volume.disk_size_bytes ?: 0l
 				rtn.maxStorage += volume.maxStorage
 				def save = false
 				if(existingVolume.maxStorage != volume.maxStorage) {
@@ -199,7 +198,7 @@ class NutanixPrismSyncUtils {
 		StorageVolume storageVolume = new StorageVolume()
 		storageVolume.name = volume.name
 		storageVolume.account = account
-		storageVolume.maxStorage = size?.toLong() ?: volume.maxStorage?.toLong() ?: volume.size?.toLong()
+		storageVolume.maxStorage = size?.toLong() ?: volume.maxStorage?.toLong() ?: volume.size?.toLong() ?: 0l
 		if(volume.storageType) {
 			String storageTypeCode = "nutanix-prism-disk-" + volume.storageType.toLowerCase()
 			storageVolume.type = new StorageVolumeType(code: storageTypeCode)
