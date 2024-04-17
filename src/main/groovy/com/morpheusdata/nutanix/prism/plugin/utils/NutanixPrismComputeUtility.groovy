@@ -123,8 +123,11 @@ class NutanixPrismComputeUtility {
 
 		if(runConfig.uefi) {
 			resources['boot_config'] = resources['boot_config'] ?:[:]
-			resources['machine_type'] = "Q35"
-			resources['boot_config']['boot_type'] = "SECURE_BOOT"
+			resources['boot_config']['boot_type'] = "UEFI"
+			if(runConfig.secureBoot) {
+				resources['machine_type'] = "Q35"
+				resources['boot_config']['boot_type'] = "SECURE_BOOT"
+			}
 			if(runConfig.windowsCredentialGuard) {
 				resources['hardware_virtualization_enabled'] = true
 			}
