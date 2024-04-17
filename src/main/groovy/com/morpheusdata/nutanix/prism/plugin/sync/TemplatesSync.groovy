@@ -11,6 +11,8 @@ import com.morpheusdata.model.projection.VirtualImageIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageLocationIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
+import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
 import io.reactivex.rxjava3.core.Observable
 
@@ -112,13 +114,14 @@ class TemplatesSync {
 			VirtualImageLocation location = new VirtualImageLocation(locationConfig)
 			add.imageLocations = [location]
 			addExternalIds << add.externalId
-			adds << add
+			VirtualImage savedImage = morpheusContext.async.virtualImage.create(add, cloud).blockingGet()
+			def savedLocation = savedImage.imageLocations.find {it.externalId == locationConfig.externalId}
+			if (!savedLocation) {
+				log.error "Error in creating template ${add}"
+			} else {
+				performPostSaveSync(savedLocation, it)
+			}
 		}
-
-		// Create em all!
-		log.debug "About to create ${adds.size()} virtualImages"
-		morpheusContext.async.virtualImage.create(adds, cloud).blockingGet()
-
 	}
 
 	private addMissingVirtualImageLocationsForImages(List<SyncTask.UpdateItem<VirtualImage, Map>> addItems) {
@@ -141,11 +144,17 @@ class TemplatesSync {
 				refId       : cloud.id
 			]
 			VirtualImageLocation location = new VirtualImageLocation(locationConfig)
-			locationAdds << location
+			VirtualImageLocation savedLocation = morpheusContext.async.virtualImage.location.create(location, cloud).blockingGet()
+			if (!savedLocation) {
+				log.error "Error in creating template ${location}"
+			} else {
+				performPostSaveSync(savedLocation, add.masterItem)
+			}
 		}
 
 		if(locationAdds) {
 			log.debug "About to create ${locationAdds.size()} locations"
+
 			morpheusContext.async.virtualImage.location.create(locationAdds, cloud).blockingGet()
 		}
 	}
@@ -162,6 +171,19 @@ class TemplatesSync {
 			def virtualImage = virtualImagesById[existingItem.virtualImage.id]
 			def cloudItem = updateItem.masterItem
 			def virtualImageConfig = buildVirtualImageConfig(cloudItem)
+			def specString = cloudItem.templateVersionSpec.vmSpec
+			def diskList = []
+			try {
+				if(specString) {
+					def parsedSpec = new JsonSlurper().parseText(specString)
+					diskList = parsedSpec?.spec?.resources?.disk_list ?: []
+					diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
+				}
+
+			} catch (e) {
+				log.debug("Error saving template disks ${e}")
+
+			}
 			def save = false
 			def saveImage = false
 			def state = 'Active'
@@ -196,6 +218,11 @@ class TemplatesSync {
 			if(virtualImage.systemImage == null) {
 				virtualImage.systemImage = false
 				saveImage = true
+			}
+
+			def syncResults = NutanixPrismSyncUtils.syncVolumes(existingItem, diskList, cloud, morpheusContext)
+			if(syncResults.changed) {
+				save = true
 			}
 
 			if(save) {
@@ -268,6 +295,25 @@ class TemplatesSync {
 				imageName   : imageLocationProj.name,
 				imageRegion : cloud.regionCode
 		]
+	}
+
+	private performPostSaveSync(location, cloudItem) {
+		def specString = cloudItem.templateVersionSpec.vmSpec
+		def diskList = []
+		try {
+			if(specString) {
+				def parsedSpec = new JsonSlurper().parseText(specString)
+				diskList = parsedSpec?.spec?.resources?.disk_list ?: []
+				diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
+			}
+
+		} catch (e) {
+			log.debug("Error saving template disks ${e}")
+		}
+		def syncResults = NutanixPrismSyncUtils.syncVolumes(location, diskList, cloud, morpheusContext)
+		if(syncResults.changed) {
+			morpheusContext.async.virtualImage.location.save([location] as List<VirtualImageLocation>, cloud).blockingGet()
+		}
 	}
 
 }

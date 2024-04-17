@@ -530,7 +530,7 @@ class NutanixPrismComputeUtility {
 
 	static ServiceResponse listTemplates(HttpApiClient client, Map authConfig) {
 		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: ["\$expand":"vmSpec"], ignoreSSL: true), 'GET')
 		if(results?.success) {
 			return ServiceResponse.success(results?.data)
 		} else {

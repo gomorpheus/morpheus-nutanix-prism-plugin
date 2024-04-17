@@ -1297,6 +1297,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	ServiceResponse finalizeResourceWorkload(Workload workload, AccountResource resource) {
 		ComputeServer server = workload.server
 		Cloud cloud = server.cloud
+		log.debug "finalizeResourceWorkload: ${server?.id}"
 
 		def authConfig = plugin.getAuthConfig(cloud)
 		def serverUuid = server.externalId
