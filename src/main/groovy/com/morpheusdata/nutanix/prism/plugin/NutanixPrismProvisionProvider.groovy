@@ -1631,6 +1631,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			timezone          : (workload.getConfigProperty('timezone') ?: cloud.timezone),
 			proxySettings     : workloadRequest.proxyConfiguration,
 			uefi              : uefi,
+			secureBoot        : workload.getConfigProperty('secureBoot'),
 			noAgent           : (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
 			installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 

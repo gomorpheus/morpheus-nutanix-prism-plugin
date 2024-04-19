@@ -14,6 +14,7 @@ resource "instance-type" "nutanix-prism-provision-provider" {
 	optionTypes = [
 		option-type.nutanix-prism-provision-image,
 		option-type.nutanix-prism-provision-uefi,
+		option-type.nutanix-prism-provision-secure-boot
 	]
 	pluginIconPath = "nutanix-prism.svg"
 	pluginIconHidpiPath= "nutanix-prism.svg"
