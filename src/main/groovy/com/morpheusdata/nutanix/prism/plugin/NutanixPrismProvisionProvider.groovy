@@ -132,7 +132,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			inputType : OptionType.InputType.SELECT,
 			displayOrder : 101,
 			optionSource: 'nutanixPrismCluster',
-			dependsOn: 'config.resourcePoolId,nutanix-prism-provision-vpc'
+			dependsOn: 'config.resourcePoolId'
 		])
 
 		options << new OptionType([
