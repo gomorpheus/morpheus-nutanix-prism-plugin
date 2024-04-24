@@ -216,18 +216,23 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 	}
 
 	private static getCloudId(args) {
+		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:getCloudId- ${args} ${args.size()}\u001B[0m"
 		def cloudId = null
 		if(args?.size() > 0) {
 			def firstArg =  args.getAt(0)
+			println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:getCloudId- ${firstArg}\u001B[0m"
 			if(firstArg?.zoneId) {
 				cloudId = firstArg.zoneId
 			} else if(firstArg?.domain?.zone?.id) {
 				cloudId = firstArg.domain.zone.id
+			} else if (firstArg?.server?.zone?.id) {
+				cloudId = firstArg.server.zone.id
 			}
 		}
 		if(!cloudId) {
 			cloudId = args.cloudId ?: args.zoneId
 		}
+		println "\u001B[33mAC Log - NutanixPrismOptionSourceProvider:getCloudId- ${cloudId}\u001B[0m"
 		cloudId ? cloudId.toLong() : null
 	}
 
