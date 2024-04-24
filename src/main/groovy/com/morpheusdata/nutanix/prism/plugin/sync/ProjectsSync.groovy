@@ -37,6 +37,15 @@ class ProjectsSync {
 		log.debug "BEGIN: execute ProjectsSync: ${cloud.id}"
 		try {
 			def masterData = filterProjects(allProjects, selectedProject?.uuid)
+			if(!selectedProject?.uuid) {
+				masterData.data << [
+				    metadata: [
+				        uuid: "${cloud.id}.none",
+				        name: "None",
+						default: true
+				    ]
+				]
+			}
 			if(masterData.success) {
 				Observable<CloudPoolIdentity> domainRecords = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, getProjectCategory(cloud), null)
 				SyncTask<CloudPoolIdentity, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterData.data)
@@ -80,6 +89,9 @@ class ProjectsSync {
 					category  : getProjectCategory(cloud),
 					code      : "${getProjectCategory(cloud)}.${cloudItem.metadata.uuid}"
 			]
+			if(cloudItem.metadata.default) {
+				poolConfig.defaultPool = true
+			}
 			def add = new CloudPool(poolConfig)
 			adds << add
 		}

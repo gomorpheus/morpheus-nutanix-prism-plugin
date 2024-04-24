@@ -43,6 +43,10 @@ class ClustersSync {
 				return projection.type == 'Project' && projection.internalId != null
 			}.toList().blockingGet()
 
+			def projectPlaceholderId = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
+				return projection.type == 'Project' && projection.externalId == "${cloud.id}.none"
+			}.toList().blockingGet()[0]?.id
+
 			def clusterProjectsMapping = [:]
 			if(allProjects) {
 				allProjects.each { project ->
@@ -71,9 +75,9 @@ class ClustersSync {
 				}.onDelete { removeItems ->
 					removeMissingResourcePools(removeItems)
 				}.onUpdate { List<SyncTask.UpdateItem<CloudPool, Map>> updateItems ->
-					updateMatchedResourcePools(updateItems, clusterProjectsMapping)
+					updateMatchedResourcePools(updateItems, clusterProjectsMapping, projectPlaceholderId)
 				}.onAdd { itemsToAdd ->
-					addMissingResourcePools(itemsToAdd, clusterProjectsMapping)
+					addMissingResourcePools(itemsToAdd, clusterProjectsMapping, projectPlaceholderId)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<CloudPoolIdentity, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<CloudPoolIdentity, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
 					morpheusContext.async.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {CloudPool cloudPool ->
@@ -88,7 +92,7 @@ class ClustersSync {
 		log.debug "END: execute ClustersSync: ${cloud.id}"
 	}
 
-	def addMissingResourcePools(List addList, Map clusterProjectsMapping) {
+	def addMissingResourcePools(List addList, Map clusterProjectsMapping, Long projectPlaceholderId) {
 		log.debug "addMissingResourcePools ${cloud} ${addList.size()}"
 		def adds = []
 
@@ -110,8 +114,15 @@ class ClustersSync {
 			]
 
 			def add = new CloudPool(poolConfig)
+			def projectIds = []
+			if(projectPlaceholderId) {
+				projectIds << projectPlaceholderId
+			}
 			if(clusterProjectsMapping[cloudItem.metadata.uuid]){
-				add.setConfigProperty('associatedProjectIds', clusterProjectsMapping[cloudItem.metadata.uuid])
+				projectIds += clusterProjectsMapping[cloudItem.metadata.uuid]
+			}
+			if(projectIds) {
+				add.setConfigProperty('associatedProjectIds', projectIds)
 			}
 			adds << add
 		}
@@ -121,7 +132,7 @@ class ClustersSync {
 		}
 	}
 
-	private updateMatchedResourcePools(List updateList, Map clusterProjectsMapping) {
+	private updateMatchedResourcePools(List updateList, Map clusterProjectsMapping, Long projectPlaceholderId) {
 		log.debug "updateMatchedResourcePools: ${cloud} ${updateList.size()}"
 		def updates = []
 		
@@ -134,8 +145,15 @@ class ClustersSync {
 				existing.name = matchItem.status.name
 				save = true
 			}
-			if(clusterProjectsMapping[matchItem.metadata.uuid] && existing.getConfigProperty('associatedProjectIds') != clusterProjectsMapping[matchItem.metadata.uuid]){
-				existing.setConfigProperty('associatedProjectIds', clusterProjectsMapping[matchItem.metadata.uuid])
+			def projectIds = []
+			if(projectPlaceholderId) {
+				projectIds << projectPlaceholderId
+			}
+			if(clusterProjectsMapping[matchItem.metadata.uuid]){
+				projectIds += clusterProjectsMapping[matchItem.metadata.uuid]
+			}
+			if(projectIds && existing.getConfigProperty('associatedProjectIds') != projectIds){
+				existing.setConfigProperty('associatedProjectIds', projectIds)
 				save = true
 			}
 			if(save) {

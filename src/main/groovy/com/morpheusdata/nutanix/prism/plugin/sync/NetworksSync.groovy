@@ -49,6 +49,10 @@ class NetworksSync {
 				return projection.type == 'VPC' && projection.internalId != null
 			}.toList().blockingGet()
 
+			def projectPlaceholder = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
+				return projection.type == 'Project' && projection.externalId == "${cloud.id}.none"
+			}.toList().blockingGet()[0]
+
 			def projects = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
 				return projection.type == 'Project' && projection.internalId != null
 			}.toList().blockingGet()
@@ -122,6 +126,9 @@ class NetworksSync {
 						if(clusterId) {
 							networkConfig.assignedZonePools += new CloudPool(id: clusterId)
 						}
+						if(projectPlaceholder) {
+							networkConfig.assignedZonePools += new CloudPool(id: projectPlaceholder.id)
+						}
 						if(networkProjectsMapping[cloudItem.metadata.uuid]) {
 							networkConfig.assignedZonePools += networkProjectsMapping[cloudItem.metadata.uuid]
 						}
@@ -168,6 +175,9 @@ class NetworksSync {
 							}
 							if(clusterId) {
 								zonePools += new CloudPool(id: clusterId)
+							}
+							if(projectPlaceholder) {
+								zonePools += new CloudPool(id: projectPlaceholder.id)
 							}
 							def zonePoolSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingItem.assignedZonePools, zonePools, { e, m ->  {e.id == m.id}})
 							if(zonePoolSyncLists.addList.size() > 0) {

@@ -1404,6 +1404,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
+	Boolean computeZonePoolRequired() {
+		return true
+	}
+
+	@Override
 	Boolean hasStorageControllers() {
 		false
 	}
