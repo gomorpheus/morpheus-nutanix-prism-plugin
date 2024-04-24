@@ -604,7 +604,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					if(allProjects.success) {
 						projects.all = allProjects.data as Map
 					}
-					if(cloud.configMap.project) {
+					if(cloud.configMap.project && cloud.configMap.project?.toString() != '-1') {
 						def projectResponse =  NutanixPrismComputeUtility.getProject(client, authConfig, cloud.configMap.project as String)
 						if(projectResponse.success) {
 							projects.selected = projectResponse.data as Map

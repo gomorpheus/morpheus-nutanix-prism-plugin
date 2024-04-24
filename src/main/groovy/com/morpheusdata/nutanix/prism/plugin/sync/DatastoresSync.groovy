@@ -50,6 +50,14 @@ class DatastoresSync {
 			}.toList().blockingGet()
 			def vpcArray = vpcs.collect {new CloudPool(id: it.id)}
 
+			//fetch null placeholder
+			def projectPlaceholder = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
+				return projection.type == 'Project' && projection.externalId == "${cloud.id}.none"
+			}.toList().blockingGet()[0]
+			if(projectPlaceholder) {
+				vpcArray += new CloudPool(id: projectPlaceholder.id)
+			}
+
 			def projects = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
 				return projection.type == 'Project' && projection.internalId != null
 			}.toList().blockingGet()
