@@ -1856,7 +1856,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				uuid: config.clusterName
 		]
 		def projectReference
-		if(server.resourcePool && server.resourcePool?.code?.startsWith("nutanix.prism.project") && server.resourcePool?.externalId) {
+		if(server.resourcePool && server.resourcePool?.code?.startsWith("nutanix.prism.project") && server.resourcePool?.externalId && server.resourcePool?.externalId != "${cloud.id}.none") {
 			projectReference = [
 				"kind": "project",
 				"uuid": server.resourcePool.externalId
