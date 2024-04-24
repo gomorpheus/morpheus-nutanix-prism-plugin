@@ -49,6 +49,7 @@ resource "compute-type-layout" "docker-nutanix-prism-ubuntu-18_04-single" {
 	groupType = "docker-cluster"
 	computeServers = ["docker-nutanix-prism-ubuntu-18.04-set"]
 	optionTypes = [
+		{code = "nutanix-prism-provision-vpc"},
 		{code = "nutanix-prism-provision-cluster"},
 		{code = "nutanix-prism-provision-categories"},
 	]
@@ -177,6 +178,7 @@ resource "compute-type-layout" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-sin
 	groupType = "kubernetes-cluster"
 	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = [
+		{code = "nutanix-prism-provision-vpc"},
 		{code = "nutanix-prism-provision-cluster"},
 		{code = "nutanix-prism-provision-categories"},
 		{code = "kubernetes.master.podCidr"},
@@ -305,6 +307,7 @@ resource "compute-type-layout" "kubernetes-1_27_7-ubuntu-20_04-nutanix-prism-sin
 	groupType = "kubernetes-cluster"
 	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = [
+		{code = "nutanix-prism-provision-vpc"},
 		{code = "nutanix-prism-provision-cluster"},
 		{code = "nutanix-prism-provision-categories"},
 		{code = "kubernetes.master.podCidr"},
@@ -436,6 +439,7 @@ resource "compute-type-layout" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-sin
 	groupType = "kubernetes-cluster"
 	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = [
+		{code = "nutanix-prism-provision-vpc"},
 		{code = "nutanix-prism-provision-cluster"},
 		{code = "nutanix-prism-provision-categories"},
 		{code = "kubernetes.master.podCidr"},
