@@ -126,6 +126,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			name : 'cluster',
 			code : 'nutanix-prism-provision-cluster',
 			fieldName : 'clusterName',
+			noBlank: true,
 			fieldContext : 'config',
 			fieldLabel : 'Cluster',
 			required : true,
