@@ -1634,6 +1634,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		def config = new JsonSlurper().parseText(workload.configs)
 
 		def uefi = server.sourceImage?.uefi ?: workload.getConfigProperty('uefi')
+		def vtpm = server.sourceImage?.tpm ?: workload.getConfigProperty('vtpm')
 
 		def runConfig = [:] + opts + buildRunConfig(server, imageExternalId, workloadRequest.networkConfiguration, config)
 		runConfig += [
@@ -1653,7 +1654,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			uefi              : uefi,
 			secureBoot        : workload.getConfigProperty('secureBoot'),
 			windowsCredentialGuard  : workload.getConfigProperty('windowsCredentialGuard'),
-			vtpm              : workload.getConfigProperty('vtpm'),
+			vtpm              : vtpm,
 			noAgent           : (opts.config?.containsKey("noAgent") == true && opts.config.noAgent == true),
 			installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 
