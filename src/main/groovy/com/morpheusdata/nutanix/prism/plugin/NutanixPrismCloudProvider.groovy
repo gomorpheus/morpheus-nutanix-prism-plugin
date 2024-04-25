@@ -468,6 +468,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
+	Boolean provisionRequiresResourcePool() {
+		return true
+	}
+
+	@Override
 	Boolean hasNetworks() {
 		return true
 	}
