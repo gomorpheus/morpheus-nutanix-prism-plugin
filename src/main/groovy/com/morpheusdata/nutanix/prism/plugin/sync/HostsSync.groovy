@@ -202,7 +202,7 @@ class HostsSync {
 						serverOs = new OsType(code: 'esxi')
 						break
 				}
-				if(currentServer.serverOs.code != serverOs.code) {
+				if(currentServer?.serverOs?.code != serverOs.code) {
 					currentServer.serverOs = serverOs
 					currentServer.osType = 'linux'
 					save = true
