@@ -111,7 +111,7 @@ class NetworksSync {
 								refType     : 'ComputeZone',
 								refId       : cloud.id,
 								cloudPool   : new CloudPool(id: cloudPoolId),
-								active      : true
+								active      : cloud.defaultNetworkSyncActive
 						]
 
 						if(clusterId) {

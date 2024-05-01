@@ -107,7 +107,8 @@ class VirtualPrivateCloudSync {
 					cloud     : cloud,
 					category  : getVPCCategory(cloud),
 					code      : "${getVPCCategory(cloud)}.${cloudItem.externalId}",
-				    readOnly  : true
+				    readOnly  : true,
+				    active    : cloud.defaultPoolSyncActive
 			]
 			def add = new CloudPool(poolConfig)
 			def projectIds = []

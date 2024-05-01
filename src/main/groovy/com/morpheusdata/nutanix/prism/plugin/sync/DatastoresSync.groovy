@@ -114,7 +114,8 @@ class DatastoresSync {
 								drsEnabled  : false,
 								online      : online,
 								refType     : "ComputeZone",
-							    refId       : cloud.id
+							    refId       : cloud.id,
+								active      : cloud.defaultDatastoreSyncActive
 						]
 						Datastore add = new Datastore(datastoreConfig)
 						add.assignedZonePools = [new CloudPool(id: cluster?.id)]

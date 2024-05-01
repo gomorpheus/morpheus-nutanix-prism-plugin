@@ -87,7 +87,8 @@ class ProjectsSync {
 					refId     : cloud.id,
 					cloud     : cloud,
 					category  : getProjectCategory(cloud),
-					code      : "${getProjectCategory(cloud)}.${cloudItem.metadata.uuid}"
+					code      : "${getProjectCategory(cloud)}.${cloudItem.metadata.uuid}",
+					active    : cloud.defaultPoolSyncActive
 			]
 			if(cloudItem.metadata.default) {
 				poolConfig.defaultPool = true

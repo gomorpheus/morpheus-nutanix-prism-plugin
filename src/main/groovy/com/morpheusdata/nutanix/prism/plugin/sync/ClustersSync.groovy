@@ -110,6 +110,7 @@ class ClustersSync {
 					category  : "nutanix.prism.cluster.${cloud.id}",
 					code      : "nutanix.prism.cluster.${cloud.id}.${cloudItem.metadata.uuid}",
 					readOnly  : true,
+					active    : cloud.defaultPoolSyncActive
 			]
 
 			def add = new CloudPool(poolConfig)
