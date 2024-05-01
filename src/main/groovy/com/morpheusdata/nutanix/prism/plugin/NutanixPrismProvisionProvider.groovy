@@ -43,6 +43,7 @@ import com.morpheusdata.model.ServicePlan
 import com.morpheusdata.model.Snapshot
 import com.morpheusdata.model.StorageVolume
 import com.morpheusdata.model.StorageVolumeType
+import com.morpheusdata.model.User
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.VirtualImageLocation
 import com.morpheusdata.model.Workload
@@ -649,7 +650,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			client = new HttpApiClient()
 			client.networkProxy = buildNetworkProxy(workloadRequest.proxyConfiguration)
 
-			def imageExternalId = getOrUploadImage(client, authConfig, cloud, virtualImage)
+			def imageExternalId = getOrUploadImage(client, authConfig, cloud, virtualImage, server.createdBy)
 
 			def runConfig = buildWorkloadRunConfig(workload, workloadRequest, imageExternalId, opts)
 			runConfig.imageExternalId = imageExternalId
@@ -764,7 +765,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			client = new HttpApiClient()
 			client.networkProxy = buildNetworkProxy(hostRequest.proxyConfiguration)
 
-			def imageExternalId = getOrUploadImage(client, authConfig, cloud, virtualImage)
+			def imageExternalId = getOrUploadImage(client, authConfig, cloud, virtualImage, server.createdBy)
 
 			def runConfig = buildHostRunConfig(server, hostRequest, imageExternalId, opts)
 
@@ -1494,7 +1495,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		return networkProxy
 	}
 
-	private getOrUploadImage(HttpApiClient client, Map authConfig, Cloud cloud, VirtualImage virtualImage) {
+	private getOrUploadImage(HttpApiClient client, Map authConfig, Cloud cloud, VirtualImage virtualImage, User createdBy) {
 		def imageExternalId
 		def lock
 		def lockKey = "nutanix.prism.imageupload.${cloud.regionCode}.${virtualImage?.id}".toString()
@@ -1533,12 +1534,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				 // Create the image
 				def cloudFiles = morpheusContext.async.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
 				def imageFile = cloudFiles?.find { cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2") }
-				def contentLength = imageFile?.getContentLength()
 				// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
 				// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
-				def letNutanixDownloadImage = imageFile?.getURL()?.toString()?.contains('morpheus-images')
-				def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig,
-					virtualImage.name, 'DISK_IMAGE', letNutanixDownloadImage ? imageFile?.getURL()?.toString() : null)
+			 	def copyUrl =  morpheusContext.async.virtualImage.getCloudFileStreamUrl(virtualImage, imageFile, createdBy, cloud).blockingGet()
+				def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, virtualImage.name, 'DISK_IMAGE',copyUrl)
 				if (imageResults.success) {
 					imageExternalId = imageResults.data.metadata.uuid
 					// Create the VirtualImageLocation before waiting for the upload
@@ -1552,13 +1551,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						refType		: 'ComputeZone'
 					])
 					morpheusContext.async.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
-					if (letNutanixDownloadImage == false) {
-						waitForImageComplete(client, authConfig, imageExternalId, false)
-						def uploadResults = NutanixPrismComputeUtility.uploadImage(client, authConfig, imageExternalId, imageFile.inputStream, contentLength)
-						if (!uploadResults.success) {
-							throw new Exception("Error in uploading the image: ${uploadResults.msg}")
-						}
-					}
 				} else {
 					VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
 						virtualImage: virtualImage,
@@ -1603,7 +1595,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					pending = false
 				}
 				attempts ++
-				if(attempts > 120)
+				if(attempts > 180)
 					pending = false
 			}
 		} catch(e) {
