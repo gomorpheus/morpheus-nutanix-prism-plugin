@@ -896,7 +896,7 @@ class NutanixPrismComputeUtility {
 
 	static validateServerConfig(MorpheusContext morpheusContext, apiUrl, username, password, Map opts = [:]) {
 		log.debug("validateServerConfig: ${opts}")
-		def rtn = [success:false, errors:[:]]
+		def rtn = [success:false, errors:[]]
 		try {
 			//template
 			if(opts.validateTemplate && !opts.template)
