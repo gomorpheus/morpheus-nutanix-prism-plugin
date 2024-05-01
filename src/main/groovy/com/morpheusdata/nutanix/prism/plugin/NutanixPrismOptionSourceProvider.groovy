@@ -64,7 +64,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		if(virtualImageIds.size() > 0) {
 
 			def query = new DataQuery().withFilters([
-				new DataFilter('status', 'Active'),
+				new DataFilter('active', true),
 				new DataFilter('id', 'in', virtualImageIds),
 				new DataOrFilter(
 					new DataFilter('owner.id', accountId),
@@ -113,7 +113,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		List options = []
 		if(virtualImageIds.size() > 0) {
 			options = morpheusContext.async.virtualImage.list(new DataQuery().withFilters([
-				new DataFilter('status', 'Active'),
+				new DataFilter('active', true),
 				new DataFilter('id', 'in', virtualImageIds),
 				new DataOrFilter(
 					new DataFilter('owner.id', accountId),

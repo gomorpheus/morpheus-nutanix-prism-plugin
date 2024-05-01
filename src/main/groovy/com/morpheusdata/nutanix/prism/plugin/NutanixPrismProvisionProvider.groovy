@@ -2060,7 +2060,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							log.debug "Error configuring cloud-init - no appliance url"
 						}
 					}
-					def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
+					def startResults
+					//hack for inability to set project on cloned snapshot
+					if(runConfig.snapshotId && runConfig.projectReference) {
+						vmResource.data
+						if(vmResource.data?.spec?.resources) {
+							vmResource.data.spec.resources.power_state = 'ON'
+							vmResource.data.metadata.project_reference = runConfig.projectReference
+						}
+						startResults = NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, vmResource.data)
+					} else {
+						startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
+					}
 					log.debug("start: ${startResults.success}")
 					if (startResults.success) {
 						if (startResults.error) {
