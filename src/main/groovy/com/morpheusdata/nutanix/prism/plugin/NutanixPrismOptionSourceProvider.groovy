@@ -158,7 +158,8 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			def options = morpheusContext.async.cloud.pool.list(new DataQuery().withFilters([
 				new DataFilter("refType", "ComputeZone"),
 				new DataFilter("refId", tmpCloud.id),
-				new DataFilter("category", "nutanix.prism.cluster.${tmpCloud.id}")
+				new DataFilter("category", "nutanix.prism.cluster.${tmpCloud.id}"),
+				new DataFilter("active", true)
 			])).toList().blockingGet()
 			def projectId = getProjectId(args)
 			if(projectId) {
@@ -180,7 +181,8 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			def options = morpheusContext.async.cloud.pool.list(new DataQuery().withFilters([
 				new DataFilter("refType", "ComputeZone"),
 				new DataFilter("refId", tmpCloud.id),
-				new DataFilter("category", "nutanix.prism.vpc.${tmpCloud.id}")
+				new DataFilter("category", "nutanix.prism.vpc.${tmpCloud.id}"),
+				new DataFilter("active", true)
 			])).toList().blockingGet()
 			def projectId = getProjectId(args)
 			if(projectId) {
