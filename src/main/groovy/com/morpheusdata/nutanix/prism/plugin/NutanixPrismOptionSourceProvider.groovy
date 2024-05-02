@@ -91,7 +91,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 				])
 			}
 			query.withFilters(additionalFilters)
-			options = morpheusContext.async.virtualImage.list(query).map { [name: it.name, value: it.id, locations: it.imageLocations] }.toList().blockingGet()
+			options = morpheusContext.async.virtualImage.list(query).map { [name: it.name, value: it.id, locations: it.imageLocations, userUploaded: it.userUploaded] }.toList().blockingGet()
 		}
 
 		if(options.size() > 0) {
