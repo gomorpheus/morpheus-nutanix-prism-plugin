@@ -89,6 +89,8 @@ class TemplatesSync {
 		]))
 		SyncTask<VirtualImageIdentityProjection, Map, VirtualImage> syncTask = new SyncTask<>(domainRecords, objList)
 		syncTask.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
+			domainObject.externalId && (domainObject.externalId == cloudItem?.extId)
+		}.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
 			domainObject.name == cloudItem.templateName
 		}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItems ->
 			Map<Long, SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
@@ -133,7 +135,7 @@ class TemplatesSync {
 		def locationAdds = []
 		addItems?.each { add ->
 			VirtualImage virtualImage = add.existingItem
-			def uuid = add.masterItem.metadata?.uuid
+			def uuid = add.masterItem.extId
 			def locationConfig = [
 				virtualImage: virtualImage,
 				code        : "nutanix.prism.image.${cloud.id}.${uuid}",

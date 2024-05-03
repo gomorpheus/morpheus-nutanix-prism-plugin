@@ -155,15 +155,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	@Override
 	Collection<OptionType> getNodeOptionTypes() {
 		OptionType imageOption = new OptionType([
-				name : 'image',
-				code : 'nutanix-prism-node-image',
-				fieldName : 'virtualImage.id',
-				fieldContext : 'domain',
-				fieldLabel : 'Image',
-				inputType : OptionType.InputType.SELECT,
-				displayOrder : 100,
-				required : false,
-				optionSource : 'nutanixPrismNodeImage'
+			name : 'image',
+			code : 'nutanix-prism-node-image',
+			fieldName : 'virtualImage.id',
+			fieldContext : 'domain',
+			fieldLabel : 'Image',
+			inputType : OptionType.InputType.SELECT,
+			displayOrder : 100,
+			required : false,
+			optionSource : 'nutanixPrismNodeImage'
 		])
 		OptionType logFolder = new OptionType([
 			name : 'mountLogs',
@@ -287,12 +287,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	@Override
 	Collection<ComputeServerInterfaceType> getComputeServerInterfaceTypes() {
 		ComputeServerInterfaceType computeServerInterface = new ComputeServerInterfaceType([
-				code:'nutanix-prism-normal-nic',
-				externalId:'NORMAL_NIC',
-				name:'Nutanix Prism Central Normal NIC',
-				defaultType: true,
-				enabled: true,
-				displayOrder:1
+			code:'nutanix-prism-normal-nic',
+			externalId:'NORMAL_NIC',
+			name:'Nutanix Prism Central Normal NIC',
+			defaultType: true,
+			enabled: true,
+			displayOrder:1
 		])
 		[computeServerInterface]
 	}
@@ -389,7 +389,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 										osType: server.serverOs,
 										platform: server.computeServerType.platform,
 										imageRegion: server.cloud.regionCode
-								   ]
+									]
 									def sourceImage = server.sourceImage
 									if (sourceImage) {
 										imageConfig += [isCloudInit: sourceImage.isCloudInit, isForceCustomization: sourceImage.isForceCustomization]
@@ -403,7 +403,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 										code: "nutanix.prism.image.${server.cloud.id}.${imageId}",
 										externalId: imageId,
 										externalDiskId: imageId,
-									    refType: 'ComputeZone',
+										refType: 'ComputeZone',
 										refId: server.cloud.id,
 										imageName: opts.templateName,
 										imageRegion: server.cloud.regionCode
@@ -483,13 +483,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					createdDate = new Date(milliseconds)
 				}
 				def snapshotConfig = [
-						account        : server.account ?: server.cloud.owner,
-						name           : rawSnapshot?.data?.snapshot_name,
-						externalId     : rawSnapshot?.data?.uuid,
-						cloud          : server.cloud,
-						snapshotCreated: createdDate,
-						currentlyActive: true,
-						description    : opts.description
+					account        : server.account ?: server.cloud.owner,
+					name           : rawSnapshot?.data?.snapshot_name,
+					externalId     : rawSnapshot?.data?.uuid,
+					cloud          : server.cloud,
+					snapshotCreated: createdDate,
+					currentlyActive: true,
+					description    : opts.description
 				]
 				def add = new Snapshot(snapshotConfig)
 				Snapshot savedSnapshot = morpheusContext.async.snapshot.create(add).blockingGet()
@@ -578,7 +578,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			def validateTemplate = opts.template != null
 			def validationResults = NutanixPrismComputeUtility.validateServerConfig(morpheusContext, apiInfo.apiUrl, apiInfo.apiUsername, apiInfo.apiPassword,
-					[validateTemplate:validateTemplate] + opts)
+				[validateTemplate:validateTemplate] + opts)
 			if(!validationResults.success) {
 				validationResults.errors?.each { it ->
 					rtn.addError(it.field, it.msg)
@@ -1092,10 +1092,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			}
 
 			def updatedResources = [
-					maxMemory: resizeRequest.maxMemory.div(ComputeUtility.ONE_MEGABYTE),
-					maxCores: maxCores,
-					coresPerSocket: coresPerSocket,
-					numSockets: maxCores.toInteger() / coresPerSocket.toInteger()
+				maxMemory: resizeRequest.maxMemory.div(ComputeUtility.ONE_MEGABYTE),
+				maxCores: maxCores,
+				coresPerSocket: coresPerSocket,
+				numSockets: maxCores.toInteger() / coresPerSocket.toInteger()
 
 			]
 			def updateResourcesResult = NutanixPrismComputeUtility.adjustVmResources(client, authConfig, vmId, updatedResources, vmBody)
@@ -1174,21 +1174,21 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				def newDiskList = vmBody.spec?.resources?.disk_list
 
 				def diskConfig = [
-						device_properties: [
-								device_type: "DISK",
-								disk_address: [
-										adapter_type: storageVolumeType.name.toUpperCase(),
-										device_index: targetIndex
-								],
+					device_properties: [
+						device_type: "DISK",
+						disk_address: [
+							adapter_type: storageVolumeType.name.toUpperCase(),
+							device_index: targetIndex
 						],
-						disk_size_bytes: volumeAdd.maxStorage,
-						storage_config: [
-								storage_container_reference: [
-										uuid: datastore.externalId,
-										name: datastore.name,
-										kind: "storage_container",
-								]
+					],
+					disk_size_bytes: volumeAdd.maxStorage,
+					storage_config: [
+						storage_container_reference: [
+							uuid: datastore.externalId,
+							name: datastore.name,
+							kind: "storage_container",
 						]
+					]
 				]
 				newDiskList << diskConfig
 				vmBody.spec.resources.disk_list = newDiskList
@@ -1241,16 +1241,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				Network newNetwork = morpheusContext.async.network.listById([networkAdd.network.id.toLong()]).firstOrError().blockingGet()
 
 				def networkConfig = [
-						is_connected    : true,
-						subnet_reference: [
-								uuid: newNetwork.externalId,
-								name: newNetwork.name,
-								kind: "subnet"
-						]
+					is_connected    : true,
+					subnet_reference: [
+						uuid: newNetwork.externalId,
+						name: newNetwork.name,
+						kind: "subnet"
+					]
 				]
 				if(networkAdd.ipAddress) {
 					networkConfig["ip_endpoint_list"] = [
-							[
+						[
 							"ip": networkAdd.ipAddress
 						]
 					]
@@ -1268,14 +1268,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					vmBody = serverDetails?.data
 					def newNic = vmBody.status.resources.nic_list.find {!oldNicList.contains(it.uuid)}
 					def newInterface = new ComputeServerInterface([
-							externalId      : newNic.uuid,
-							type            : new ComputeServerInterfaceType(code: 'nutanix-prism-normal-nic'),
-							macAddress      : newNic.mac_address,
-							name            : "eth${newIndex}",
-							ipAddress       : newNic.ip_endpoint_list?.getAt(0)?.ip,
-							network         : newNetwork ? new Network(id: newNetwork.id) : null,
-							displayOrder    : newIndex,
-							primaryInterface: networkAdd?.network?.isPrimary ? true : false
+						externalId      : newNic.uuid,
+						type            : new ComputeServerInterfaceType(code: 'nutanix-prism-normal-nic'),
+						macAddress      : newNic.mac_address,
+						name            : "eth${newIndex}",
+						ipAddress       : newNic.ip_endpoint_list?.getAt(0)?.ip,
+						network         : newNetwork ? new Network(id: newNetwork.id) : null,
+						displayOrder    : newIndex,
+						primaryInterface: networkAdd?.network?.isPrimary ? true : false
 					])
 					morpheusContext.async.computeServer.computeServerInterface.create([newInterface], server).blockingGet()
 					// Need to refetch the server
@@ -1526,18 +1526,19 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					}
 				}
 			}
-			 if (!imageExternalId) { //If its userUploaded and still needs uploaded
-				 //is it a template?
+			if (!imageExternalId) { //If its userUploaded and still needs uploaded
+				//is it a template?
 				if(virtualImage.externalType == "template") {
 					throw new Exception("Error finding location for template: ${virtualImage.name}")
 				}
-				 // Create the image
+				// Create the image
 				def cloudFiles = morpheusContext.async.virtualImage.getVirtualImageFiles(virtualImage).blockingGet()
 				def imageFile = cloudFiles?.find { cloudFile -> cloudFile.name.toLowerCase().endsWith(".qcow2") }
 				// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
 				// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
-			 	def copyUrl =  morpheusContext.async.virtualImage.getCloudFileStreamUrl(virtualImage, imageFile, createdBy, cloud).blockingGet()
+				def copyUrl =  morpheusContext.async.virtualImage.getCloudFileStreamUrl(virtualImage, imageFile, createdBy, cloud).blockingGet()
 				def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, virtualImage.name, 'DISK_IMAGE',copyUrl)
+				def location
 				if (imageResults.success) {
 					imageExternalId = imageResults.data.metadata.uuid
 					// Create the VirtualImageLocation before waiting for the upload
@@ -1548,9 +1549,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
 						internalId  : imageExternalId,
 						refId		: cloud.id,
-						refType		: 'ComputeZone'
+						refType		: 'ComputeZone',
+						sharedStorage : true
 					])
-					morpheusContext.async.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
+					location = morpheusContext.async.virtualImage.location.create(virtualImageLocation, cloud).blockingGet()
 				} else {
 					VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
 						virtualImage: virtualImage,
@@ -1561,12 +1563,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						refId		: cloud.id,
 						refType		: 'ComputeZone'
 					])
-					morpheusContext.async.virtualImage.location.create([virtualImageLocation], cloud).blockingGet()
+					location = morpheusContext.async.virtualImage.location.create(virtualImageLocation, cloud).blockingGet()
 					throw new Exception("Error in creating the image: ${imageResults.msg}")
 				}
 
 				// Wait till the image is COMPLETE
 				waitForImageComplete(client, authConfig, imageExternalId)
+				//update location status
+				location = morpheusContext.async.virtualImage.location.get(location.id).blockingGet()
+				location.sharedStorage = false
+				morpheusContext.async.virtualImage.location.save(location).blockingGet()
 
 			}
 		} finally {
@@ -1803,17 +1809,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def net = networkInterface.network
 			if(net) {
 				def networkConfig = [
-						is_connected    : true,
-						subnet_reference: [
-								uuid: net.externalId,
-								name: net.name,
-								kind: "subnet"
-						]
+					is_connected    : true,
+					subnet_reference: [
+						uuid: net.externalId,
+						name: net.name,
+						kind: "subnet"
+					]
 				]
 				if(networkInterface.ipAddress) {
 					networkConfig["ip_endpoint_list"] = [
-							[
-					        "ip": networkInterface.ipAddress
+						[
+							"ip": networkInterface.ipAddress
 						]
 					]
 				}
@@ -1845,8 +1851,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		}
 
 		def clusterReference = [
-				kind: "cluster",
-				uuid: config.clusterName
+			kind: "cluster",
+			uuid: config.clusterName
 		]
 		def projectReference
 		if(server.resourcePool && server.resourcePool?.code?.startsWith("nutanix.prism.project") && server.resourcePool?.externalId && server.resourcePool?.externalId != "${cloud.id}.none") {
@@ -1858,23 +1864,22 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 		def runConfig = [:]
 		runConfig += [
-				serverId          : server.id,
-				cloudId           : cloud.id,
-				datastoreId       : datastoreId,
-				networkId         : networkId,
-				networkBackingType: networkBackingType,
-				platform          : server.osType,
-				hostname		  : hostname,
-				domainName		  : domainName,
-				fqdn		      : fqdn,
-				storageType		  : storageType,
-				diskList	      : diskList,
-				nicList			  : nicList,
-				skipNetworkWait   : false,
-				clusterReference  : clusterReference,
-				categories        : categories,
-				projectReference  : projectReference
-
+			serverId          : server.id,
+			cloudId           : cloud.id,
+			datastoreId       : datastoreId,
+			networkId         : networkId,
+			networkBackingType: networkBackingType,
+			platform          : server.osType,
+			hostname		  : hostname,
+			domainName		  : domainName,
+			fqdn		      : fqdn,
+			storageType		  : storageType,
+			diskList	      : diskList,
+			nicList			  : nicList,
+			skipNetworkWait   : false,
+			clusterReference  : clusterReference,
+			categories        : categories,
+			projectReference  : projectReference
 		]
 		return runConfig
 	}
@@ -2181,7 +2186,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				server.dataDevice = '/dev/sda'
 				server.lvmEnabled = false
 				server.capacityInfo = new ComputeCapacityInfo(maxCores:runConfig.maxCores, maxMemory:runConfig.maxMemory,
-						maxStorage:runConfig.maxStorage)
+					maxStorage:runConfig.maxStorage)
 				saveAndGet(server)
 			}
 		} catch(e) {
