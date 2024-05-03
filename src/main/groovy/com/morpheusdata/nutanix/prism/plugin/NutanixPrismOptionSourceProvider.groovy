@@ -205,7 +205,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		HttpApiClient client
 		client = new HttpApiClient()
 		client.networkProxy = proxySettings
-		if(NutanixPrismComputeUtility.testConnection(client, authConfig).success) {
+		if(authConfig.apiUrl && NutanixPrismComputeUtility.testConnection(client, authConfig).success) {
 			def projectResult = NutanixPrismComputeUtility.listProjects(client, authConfig)
 			if(projectResult.success && projectResult.data) {
 				projectResult.data.each {
