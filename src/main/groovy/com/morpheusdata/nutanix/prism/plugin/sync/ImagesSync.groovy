@@ -68,6 +68,8 @@ class ImagesSync {
 					removeMissingVirtualImageLocations(removeItems)
 				}.start()
 			}
+			//clean up any lingering images without locations
+			removeSyncedImagesWithoutLocations()
 
 		} catch(e) {
 			log.error "Error in execute of ImagesSync: ${e}", e
@@ -247,6 +249,18 @@ class ImagesSync {
 	private removeMissingVirtualImageLocations(List removeList) {
 		log.debug "removeMissingVirtualImageLocations: ${removeList?.size()}"
 		morpheusContext.async.virtualImage.location.remove(removeList).blockingGet()
+	}
+
+	private removeSyncedImagesWithoutLocations() {
+		def images = morpheusContext.async.virtualImage.list(new DataQuery().withFilters([
+			new DataFilter("category", "nutanix.prism.image.${cloud.id}"),
+			new DataFilter("userUploaded", false),
+			new DataFilter("systemImage", false),
+		])).toList().blockingGet().findAll {it.imageLocations.size() == 0}
+		if(images) {
+			log.debug "Removing ${images.size()} images without locations"
+			morpheusContext.async.virtualImage.remove(images).blockingGet()
+		}
 	}
 
 	private buildVirtualImageConfig(Map cloudItem) {
