@@ -30,10 +30,12 @@ import org.apache.http.entity.InputStreamEntity
 import org.apache.http.impl.client.BasicCookieStore
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.message.BasicNameValuePair
-
 import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
 import java.security.cert.X509Certificate
+
+import com.morpheusdata.retry.*
+import com.morpheusdata.retry.policies.*
 
 @Slf4j
 class NutanixPrismComputeUtility {
@@ -277,11 +279,11 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse stopVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
-		log.debug("startVm")
+		log.debug("stopVm")
 		if(vmBody?.spec?.resources?.power_state) {
 			vmBody.spec.resources.power_state = 'OFF'
 		}
-		return updateVm(client, authConfig, uuid, vmBody)
+		return retryableUpdateVm(client, authConfig, uuid, vmBody)
 	}
 
 	static adjustVmResources(HttpApiClient client, Map authConfig, String uuid, Map updateConfig, Map vmBody) {
@@ -307,10 +309,40 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse retryableUpdateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		log.debug("retryableUpdateVm")
+		vmBody?.remove('status')
+		vmBody?.metadata?.remove('spec_hash')
+
+		def updateCallApiClosure = { //get latest spec information everytime retry utility retries the API
+			def vmResults = waitForPowerState(client, authConfig, uuid)
+			def vmResource = vmBody
+			if (vmResults.success) {
+				vmResource = vmResults.data
+				vmResource?.remove('status')
+				vmResource?.metadata?.remove('spec_hash')
+			}
+			return ["${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmResource]
+		}
+
+		def callApiUpdater = new RetryableFunctionUpdater(updateCallApiClosure)
+
+		def results = callRetryableApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmBody, [:], null, callApiUpdater)
+
+//		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
+//			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error("Error updating vm ${uuid}", null, results.data)
+		}
+	}
+
 	static ServiceResponse destroyVm(HttpApiClient client, Map authConfig, String uuid) {
-		log.debug("updateVm")
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'DELETE')
+		log.debug("destroyVm")
+		def results = callRetryableApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'DELETE', ['Content-Type':'application/json'])
+//		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
+//				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'DELETE')
 		if(results?.success) {
 			return ServiceResponse.success(results.data)
 		} else {
@@ -747,6 +779,108 @@ class NutanixPrismComputeUtility {
 		return updateVm(client, authConfig, vmUuid, vmBody)
 	}
 
+	private static ServiceResponse callApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:]) {
+		def contentType = opts.contentType ?: ContentType.APPLICATION_JSON
+		def ignoreSsl = opts.ignoreSSL ?: true
+
+		HttpApiClient.RequestOptions requestOptions = new HttpApiClient.RequestOptions()
+		if(headers) {
+			requestOptions.headers = headers
+		}
+		if(body) {
+			requestOptions.body = body
+		}
+		requestOptions.contentType = contentType
+		requestOptions.ignoreSSL = ignoreSsl
+
+		return client.callJsonApi(authConfig.apiUrl?.toString(), path, authConfig.username?.toString(), authConfig.password?.toString(), requestOptions, method)
+	}
+
+	private static ServiceResponse callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:], RetryUtility retryUtility = null, RetryableFunctionUpdater callApiUpdater = null) {
+		if(!retryUtility) {
+			retryUtility = getSimpleRetryUtility()
+		}
+		RetryableFunction rf = new RetryableFunction(NutanixPrismComputeUtility.&_callRetryableApi, path, client, authConfig, method, headers, body, opts)
+		try {
+			def results = retryUtility.execute(rf,
+				callApiUpdater)
+			if (results instanceof ServiceResponse) {
+				return results
+			} else {
+				return ServiceResponse.error("Unable to obtains results from retryable API")
+			}
+		} catch (RetryException e) {
+			//do once more
+			return callApi(path, client, authConfig, method, headers, body, opts)
+		}
+	}
+
+	private static ServiceResponse _callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:]){
+		def results = callApi(path, client, authConfig, method, headers, body, opts)
+		if (results.getErrorCode() == "409" || results?.data?.code == 409) {
+			if(results?.data?.message_list && results?.data?.message_list?.contains{it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.")}) {
+				//we should retry this option
+				throw getRetryException()
+			}
+		}
+		return results
+	}
+
+	private static RetryUtility getExponentialRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
+		RetryUtility retryUtility
+		AbstractRetryDelayPolicy delayPolicy = new ExponentialRetryDelayPolicy()
+		delayPolicy.setInitialSleepTime(initialSleepTime)
+		delayPolicy.setMaxSleepTime(15000l)
+		delayPolicy.setMultiplier(2)
+		retryUtility = new RetryUtility(delayPolicy)
+		retryUtility.setMaxAttempts(maxAttempts)
+		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
+
+		return retryUtility
+	}
+
+	private static RetryUtility getSimpleRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 3l) {
+		RetryUtility retryUtility
+		AbstractRetryDelayPolicy delayPolicy = new SimpleRetryDelayPolicy()
+		retryUtility = new RetryUtility(delayPolicy)
+		delayPolicy.setInitialSleepTime(initialSleepTime)
+		retryUtility.setMaxAttempts(maxAttempts)
+		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
+
+		return retryUtility
+	}
+
+	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
+		RetryUtility retryUtility
+		AbstractRetryDelayPolicy delayPolicy = new LinearRetryDelayPolicy()
+		delayPolicy.setInitialSleepTime(initialSleepTime)
+		delayPolicy.setMaxSleepTime(15000l)
+		retryUtility = new RetryUtility(delayPolicy)
+		retryUtility.setMaxAttempts(maxAttempts)
+		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
+
+		return retryUtility
+	}
+
+	private Exception getRetryException() {
+		return new PrismRetryException()
+	}
+
+	private getRetryExceptionClass() {
+		return getRetryException().getClass()
+	}
+
+	class PrismRetryException extends Exception {
+		public PrismRetryException() {
+			super()
+		}
+		public PrismRetryException(String message) {
+			super(message)
+		}
+		public PrismRetryException(String message, Throwable cause) {
+			super(message, cause)
+		}
+	}
 
 	private static ServiceResponse callListApi(HttpApiClient client, String kind, String path, Map authConfig) {
 		log.debug("callListApi: kind ${kind}, path: ${path}")
