@@ -1,6 +1,8 @@
 package com.morpheusdata.nutanix.prism.plugin.sync
 
 import com.morpheusdata.core.MorpheusContext
+import com.morpheusdata.core.data.DataFilter
+import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Account
@@ -83,7 +85,10 @@ class DatastoresSync {
 			def listResults = NutanixPrismComputeUtility.listDatastores(apiClient, authConfig)
 			if(listResults.success == true) {
 
-				Observable domainRecords = morpheusContext.async.cloud.datastore.listSyncProjections(cloud.id)
+				Observable domainRecords = morpheusContext.async.cloud.datastore.list(new DataQuery().withFilters(
+					new DataFilter('refId', cloud.id),
+					new DataFilter('refType', "ComputeZone")
+				))
 				SyncTask<DatastoreIdentity, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, listResults?.data)
 				syncTask.addMatchFunction { DatastoreIdentity domainObject, Map cloudItem ->
 					domainObject.externalId == cloudItem?.entity_id

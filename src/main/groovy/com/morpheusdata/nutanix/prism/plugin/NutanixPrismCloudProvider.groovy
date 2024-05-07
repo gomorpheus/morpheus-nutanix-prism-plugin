@@ -672,7 +672,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	Collection<Datastore> filterDatastores(Cloud cloud, Collection<Datastore> datastores, Collection<CloudPool> resourcePools) {
 		if(resourcePools.size() > 0 ) {
 			def allowedPoolIds = resourcePools.collect { it.externalId }
-			return datastores.findAll({ datastore -> datastore.assignedZonePools.find { it.externalId in allowedPoolIds } })
+			return datastores.findAll({ datastore -> datastore.refType == "ComputeServerGroup" || datastore.assignedZonePools.find { it.externalId in allowedPoolIds } })
 		}
 		return datastores
 	}
