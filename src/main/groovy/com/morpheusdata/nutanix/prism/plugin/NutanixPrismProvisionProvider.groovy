@@ -719,7 +719,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	@Override
 	ServiceResponse<PrepareHostResponse> prepareHost(ComputeServer server, HostRequest hostRequest, Map opts) {
 		log.debug "prepareHost: ${server} ${hostRequest} ${opts}"
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:prepareHost- ${server.name}\u001B[0m"
 
 		def prepareResponse = new PrepareHostResponse(computeServer: server, disableCloudInit: false, options: [sendIp: true])
 		ServiceResponse<PrepareHostResponse> rtn = ServiceResponse.prepare(prepareResponse)
