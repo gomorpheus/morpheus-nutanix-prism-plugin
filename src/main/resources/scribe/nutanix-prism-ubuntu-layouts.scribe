@@ -122,22 +122,6 @@ resource "scale-action" "nutanix-prism-ubuntu-18_04-single" {
 
 //20
 
-resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20230131" {
-	code = "nutanix.prism.image.morpheus.ubuntu.20.04.20230131.ubuntu.20.04.4"
-	category = "nutanix.prism.image.morpheus.ubuntu"
-	name = "Morpheus Ubuntu 20.04.04 20230131"
-	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230131/ubuntu-20/morpheus-ubuntu-20_04-amd64-20230131.qcow2"
-	imagePath = "qemu/20230131/ubuntu-20"
-	isCloudInit = true
-	systemImage = true
-	installAgent = true
-	osType {
-		code = "ubuntu.20.04.64"
-	}
-	zoneType = "nutanix-prism-cloud"
-}
-
 resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20240304" {
 	code = "nutanix.prism.image.morpheus.ubuntu.20.04.20240304.ubuntu.20.04"
 	category = "nutanix.prism.image.morpheus.ubuntu"
