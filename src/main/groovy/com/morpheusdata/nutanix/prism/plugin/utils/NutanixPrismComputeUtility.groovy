@@ -896,24 +896,12 @@ class NutanixPrismComputeUtility {
 		return retryUtility
 	}
 
-	private Exception getRetryException() {
+	private static Exception getRetryException() {
 		return new PrismRetryException()
 	}
 
-	private getRetryExceptionClass() {
+	private static getRetryExceptionClass() {
 		return getRetryException().getClass()
-	}
-
-	class PrismRetryException extends Exception {
-		public PrismRetryException() {
-			super()
-		}
-		public PrismRetryException(String message) {
-			super(message)
-		}
-		public PrismRetryException(String message, Throwable cause) {
-			super(message, cause)
-		}
 	}
 
 	private static ServiceResponse callListApi(HttpApiClient client, String kind, String path, Map authConfig) {
@@ -1232,5 +1220,17 @@ class NutanixPrismComputeUtility {
 			}
 			return nicMap
 		}
+	}
+}
+
+class PrismRetryException extends Exception {
+	public PrismRetryException() {
+		super()
+	}
+	public PrismRetryException(String message) {
+		super(message)
+	}
+	public PrismRetryException(String message, Throwable cause) {
+		super(message, cause)
 	}
 }
