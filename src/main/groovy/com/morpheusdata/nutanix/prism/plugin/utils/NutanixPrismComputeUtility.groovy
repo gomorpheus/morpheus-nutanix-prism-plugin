@@ -324,14 +324,16 @@ class NutanixPrismComputeUtility {
 		def retryClosure = { RetryUtility ru ->
 			def currentAttempt = ru.getCurrentAttempt()
 			def maxAttempts = ru.getMaxAttempts()
+			log.debug("retryableUpdateVm attempt: ${currentAttempt}, maxAttempts: ${maxAttempts - 1}")
 			if(currentAttempt > 1 && refreshVmBody) {
 				//need to refresh the vmBody
 				vmBody = refreshVmBody()
+				log.debug("New vm body: {}", vmBody)
 			}
 			vmBody?.remove('status')
 			vmBody?.metadata?.remove('spec_hash')
-			def rtn = callApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmBody)
-			if(isApiRetryRequired(rtn) && (currentAttempt < maxAttempts - 1)) { //if reaching max attempts then just return the original results of API
+			def rtn = callApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmBody, [:])
+			if(isApiRetryRequired(rtn) && (currentAttempt < (maxAttempts - 1))) { //if reaching max attempts then just return the original results of API
 				throw retryException
 			}
 			return rtn
@@ -1137,6 +1139,7 @@ class NutanixPrismComputeUtility {
 		def retryClosure = { RetryUtility ru ->
 			def currentAttempt = ru.getCurrentAttempt()
 			def maxAttempts = ru.getMaxAttempts()
+			log.debug("callRetryableApi attempt: ${currentAttempt}, maxAttempts: ${maxAttempts - 1}")
 			def rtn = callApi(path, client, authConfig, method, headers, body, opts)
 			if(isApiRetryRequired(rtn) && (currentAttempt < maxAttempts - 1)) { //if reaching max attempts then just return the original results of API
 				throw retryException
@@ -1157,11 +1160,14 @@ class NutanixPrismComputeUtility {
 	}
 
 	private static Map refreshVmBody(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		log.debug("refreshVmBody: {}, {}, {}, {}", client, authConfig, uuid, vmBody)
 		Map vmResults = waitForPowerState(client, authConfig, uuid) //get latest spec information
+		log.debug("refresh results: {}", vmResults)
 		Map vmResource = vmBody
 		if (vmResults.success) {
 			if(vmResults instanceof Map) {
 				vmResource = vmResults.data as Map
+				log.debug("Obtained new vm body: {}", vmResource)
 			}
 		}
 		return vmResource
@@ -1169,10 +1175,14 @@ class NutanixPrismComputeUtility {
 
 	private static Boolean isApiRetryRequired(ServiceResponse results) {
 		def rtn = false
+		log.debug("isApiRetryRequired: {}", results)
+		log.debug("Error code: {}", results.getErrorCode())
+		log.debug("results.data: {}", results.data)
 		if (results.getErrorCode() == "409" || results?.data?.code == 409) {
-			if (results?.data?.message_list && results?.data?.message_list?.contains { it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.") }) {
+			if (results?.data?.message_list && results?.data?.message_list?.find { it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.") }) {
 				//we should retry this option
 				rtn = true
+				log.debug("retry required")
 			}
 		}
 		return rtn
@@ -1191,7 +1201,7 @@ class NutanixPrismComputeUtility {
 		return retryUtility
 	}
 
-	private static RetryUtility getSimpleRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 3l) {
+	private static RetryUtility getSimpleRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 5l) {
 		RetryUtility retryUtility
 		AbstractRetryDelayPolicy delayPolicy = new SimpleRetryDelayPolicy()
 		retryUtility = new RetryUtility(delayPolicy)
