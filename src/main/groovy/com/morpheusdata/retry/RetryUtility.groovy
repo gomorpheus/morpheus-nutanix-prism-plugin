@@ -14,6 +14,7 @@ class RetryUtility implements RetryUtilityInterface{
   private LinkedHashMap<Class<? extends Exception>, ArrayList<String>> retryableErrors = [(SSLHandshakeException.class): [], (SocketTimeoutException.class): []]
   private AbstractRetryDelayPolicy retryPolicy
   Long maxAttempts = 10
+  Long currentAttempt = 0
 
   RetryUtility(AbstractRetryDelayPolicy retryPolicy, LinkedHashMap<Class<? extends Exception>, ArrayList<String>> retryableErrors = [:], Long maxAttempts = null) {
     if (retryableErrors) {this.retryableErrors = retryableErrors}
@@ -28,6 +29,7 @@ class RetryUtility implements RetryUtilityInterface{
   def execute(RetryableFunction retryableFunction, RetryableFunctionUpdater retryableFunctionUpdater = null) {
     if (retryableFunctionUpdater) {retryableFunctionUpdater.setRetryableFunction(retryableFunction)}
     for (Long attempt = 1; attempt <= this.maxAttempts; attempt++) {
+      this.currentAttempt++
       try {
         return retryableFunction.execute()
       } catch (Exception e) {
@@ -63,6 +65,10 @@ class RetryUtility implements RetryUtilityInterface{
   Long getMaxAttempts() {
     return this.maxAttempts
   }
+
+  Long getCurrentAttempt() {
+    return this.currentAttempt
+  }
   
   protected isRetryRequired(Exception e) {
     def rtn = false
@@ -86,7 +92,6 @@ class RetryUtility implements RetryUtilityInterface{
    * @return
    */
   protected static goToSleep(Long sleepTime) {
-    println "Sleeping for ${sleepTime}"
     Thread.sleep(sleepTime)
   }
 }

@@ -283,7 +283,25 @@ class NutanixPrismComputeUtility {
 		if(vmBody?.spec?.resources?.power_state) {
 			vmBody.spec.resources.power_state = 'OFF'
 		}
-		return retryableUpdateVm(client, authConfig, uuid, vmBody)
+		Closure<Map> refreshVmBodyClosure = {
+			Map vmResource = refreshVmBody(client, authConfig, uuid, vmBody)
+			if(vmResource?.spec?.resources?.power_state) {
+				vmResource.spec.resources.power_state = 'OFF'
+			}
+			return vmResource
+		}
+		return retryableUpdateVm(client, authConfig, uuid, vmBody, null, refreshVmBodyClosure)
+	}
+
+	private static Map refreshVmBody(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		Map vmResults = waitForPowerState(client, authConfig, uuid) //get latest spec information
+		Map vmResource = vmBody
+		if (vmResults.success) {
+			if(vmResults instanceof Map) {
+				vmResource = vmResults.data as Map
+			}
+		}
+		return vmResource
 	}
 
 	static adjustVmResources(HttpApiClient client, Map authConfig, String uuid, Map updateConfig, Map vmBody) {
@@ -309,32 +327,41 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse retryableUpdateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+	static ServiceResponse retryableUpdateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody, RetryUtility retryUtility = null, Closure<Map> refreshVmBody = null) {
 		log.debug("retryableUpdateVm")
-		vmBody?.remove('status')
-		vmBody?.metadata?.remove('spec_hash')
-
-		def updateCallApiClosure = { //get latest spec information everytime retry utility retries the API
-			def vmResults = waitForPowerState(client, authConfig, uuid)
-			def vmResource = vmBody
-			if (vmResults.success) {
-				vmResource = vmResults.data
-				vmResource?.remove('status')
-				vmResource?.metadata?.remove('spec_hash')
+		if(!retryUtility) {
+			retryUtility = getSimpleRetryUtility()
+		}
+		def retryClosure = { RetryUtility ru ->
+			def currentAttempt = ru.getCurrentAttempt()
+			def maxAttempts = ru.getMaxAttempts()
+			if(currentAttempt > 1 && refreshVmBody) {
+				//need to refresh the vmBody
+				vmBody = refreshVmBody()
 			}
-			return ["${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmResource]
+			vmBody?.remove('status')
+			vmBody?.metadata?.remove('spec_hash')
+			def rtn = callApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmBody)
+			if(isApiRetryRequired(rtn) && (currentAttempt < maxAttempts - 1)) { //if reaching max attempts then just return the original results of API
+				throw retryException
+			}
+			return rtn
 		}
 
-		def callApiUpdater = new RetryableFunctionUpdater(updateCallApiClosure)
-
-		def results = callRetryableApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmBody, [:], null, callApiUpdater)
-
-//		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
-//			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error updating vm ${uuid}", null, results.data)
+		RetryableFunction rf = new RetryableFunction(retryClosure, retryUtility)
+		try {
+			def results = retryUtility.execute(rf)
+			if (results instanceof ServiceResponse) {
+				if(results?.success) {
+					return ServiceResponse.success(results.data)
+				} else {
+					return ServiceResponse.error("Error updating vm ${uuid}", null, results.data)
+				}
+			} else {
+				return ServiceResponse.error("Unable to obtains results from retryable update VM")
+			}
+		} catch (RetryException e) {
+			return ServiceResponse.error("Unable to obtain results from retryable update VM")
 		}
 	}
 
@@ -796,34 +823,41 @@ class NutanixPrismComputeUtility {
 		return client.callJsonApi(authConfig.apiUrl?.toString(), path, authConfig.username?.toString(), authConfig.password?.toString(), requestOptions, method)
 	}
 
-	private static ServiceResponse callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:], RetryUtility retryUtility = null, RetryableFunctionUpdater callApiUpdater = null) {
+	private static ServiceResponse callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:], RetryUtility retryUtility = null) {
 		if(!retryUtility) {
 			retryUtility = getSimpleRetryUtility()
 		}
-		RetryableFunction rf = new RetryableFunction(NutanixPrismComputeUtility.&_callRetryableApi, path, client, authConfig, method, headers, body, opts)
+		def retryClosure = { RetryUtility ru ->
+			def currentAttempt = ru.getCurrentAttempt()
+			def maxAttempts = ru.getMaxAttempts()
+			def rtn = callApi(path, client, authConfig, method, headers, body, opts)
+			if(isApiRetryRequired(rtn) && (currentAttempt < maxAttempts - 1)) { //if reaching max attempts then just return the original results of API
+				throw retryException
+			}
+			return rtn
+		}
+		RetryableFunction rf = new RetryableFunction(retryClosure, retryUtility)
 		try {
-			def results = retryUtility.execute(rf,
-				callApiUpdater)
+			def results = retryUtility.execute(rf)
 			if (results instanceof ServiceResponse) {
 				return results
 			} else {
 				return ServiceResponse.error("Unable to obtains results from retryable API")
 			}
 		} catch (RetryException e) {
-			//do once more
-			return callApi(path, client, authConfig, method, headers, body, opts)
+			return ServiceResponse.error("Unable to obtain results from retryable API")
 		}
 	}
 
-	private static ServiceResponse _callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:]){
-		def results = callApi(path, client, authConfig, method, headers, body, opts)
+	private static Boolean isApiRetryRequired(ServiceResponse results) {
+		def rtn = false
 		if (results.getErrorCode() == "409" || results?.data?.code == 409) {
-			if(results?.data?.message_list && results?.data?.message_list?.contains{it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.")}) {
+			if (results?.data?.message_list && results?.data?.message_list?.contains { it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.") }) {
 				//we should retry this option
-				throw getRetryException()
+				rtn = true
 			}
 		}
-		return results
+		return rtn
 	}
 
 	private static RetryUtility getExponentialRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
@@ -1081,7 +1115,7 @@ class NutanixPrismComputeUtility {
 	}
 
 
-	static waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
+	static Map waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
 		def rtn = [success:false]
 		try {
 			def pending = true
