@@ -293,17 +293,6 @@ class NutanixPrismComputeUtility {
 		return retryableUpdateVm(client, authConfig, uuid, vmBody, null, refreshVmBodyClosure)
 	}
 
-	private static Map refreshVmBody(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
-		Map vmResults = waitForPowerState(client, authConfig, uuid) //get latest spec information
-		Map vmResource = vmBody
-		if (vmResults.success) {
-			if(vmResults instanceof Map) {
-				vmResource = vmResults.data as Map
-			}
-		}
-		return vmResource
-	}
-
 	static adjustVmResources(HttpApiClient client, Map authConfig, String uuid, Map updateConfig, Map vmBody) {
 
 		if(vmBody?.spec?.resources) {
@@ -806,104 +795,6 @@ class NutanixPrismComputeUtility {
 		return updateVm(client, authConfig, vmUuid, vmBody)
 	}
 
-	private static ServiceResponse callApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:]) {
-		def contentType = opts.contentType ?: ContentType.APPLICATION_JSON
-		def ignoreSsl = opts.ignoreSSL ?: true
-
-		HttpApiClient.RequestOptions requestOptions = new HttpApiClient.RequestOptions()
-		if(headers) {
-			requestOptions.headers = headers
-		}
-		if(body) {
-			requestOptions.body = body
-		}
-		requestOptions.contentType = contentType
-		requestOptions.ignoreSSL = ignoreSsl
-
-		return client.callJsonApi(authConfig.apiUrl?.toString(), path, authConfig.username?.toString(), authConfig.password?.toString(), requestOptions, method)
-	}
-
-	private static ServiceResponse callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:], RetryUtility retryUtility = null) {
-		if(!retryUtility) {
-			retryUtility = getSimpleRetryUtility()
-		}
-		def retryClosure = { RetryUtility ru ->
-			def currentAttempt = ru.getCurrentAttempt()
-			def maxAttempts = ru.getMaxAttempts()
-			def rtn = callApi(path, client, authConfig, method, headers, body, opts)
-			if(isApiRetryRequired(rtn) && (currentAttempt < maxAttempts - 1)) { //if reaching max attempts then just return the original results of API
-				throw retryException
-			}
-			return rtn
-		}
-		RetryableFunction rf = new RetryableFunction(retryClosure, retryUtility)
-		try {
-			def results = retryUtility.execute(rf)
-			if (results instanceof ServiceResponse) {
-				return results
-			} else {
-				return ServiceResponse.error("Unable to obtains results from retryable API")
-			}
-		} catch (RetryException e) {
-			return ServiceResponse.error("Unable to obtain results from retryable API")
-		}
-	}
-
-	private static Boolean isApiRetryRequired(ServiceResponse results) {
-		def rtn = false
-		if (results.getErrorCode() == "409" || results?.data?.code == 409) {
-			if (results?.data?.message_list && results?.data?.message_list?.contains { it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.") }) {
-				//we should retry this option
-				rtn = true
-			}
-		}
-		return rtn
-	}
-
-	private static RetryUtility getExponentialRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
-		RetryUtility retryUtility
-		AbstractRetryDelayPolicy delayPolicy = new ExponentialRetryDelayPolicy()
-		delayPolicy.setInitialSleepTime(initialSleepTime)
-		delayPolicy.setMaxSleepTime(15000l)
-		delayPolicy.setMultiplier(2)
-		retryUtility = new RetryUtility(delayPolicy)
-		retryUtility.setMaxAttempts(maxAttempts)
-		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
-
-		return retryUtility
-	}
-
-	private static RetryUtility getSimpleRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 3l) {
-		RetryUtility retryUtility
-		AbstractRetryDelayPolicy delayPolicy = new SimpleRetryDelayPolicy()
-		retryUtility = new RetryUtility(delayPolicy)
-		delayPolicy.setInitialSleepTime(initialSleepTime)
-		retryUtility.setMaxAttempts(maxAttempts)
-		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
-
-		return retryUtility
-	}
-
-	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
-		RetryUtility retryUtility
-		AbstractRetryDelayPolicy delayPolicy = new LinearRetryDelayPolicy()
-		delayPolicy.setInitialSleepTime(initialSleepTime)
-		delayPolicy.setMaxSleepTime(15000l)
-		retryUtility = new RetryUtility(delayPolicy)
-		retryUtility.setMaxAttempts(maxAttempts)
-		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
-
-		return retryUtility
-	}
-
-	private static Exception getRetryException() {
-		return new PrismRetryException()
-	}
-
-	private static getRetryExceptionClass() {
-		return getRetryException().getClass()
-	}
-
 	private static ServiceResponse callListApi(HttpApiClient client, String kind, String path, Map authConfig) {
 		log.debug("callListApi: kind ${kind}, path: ${path}")
 		def rtn = new ServiceResponse(success: false)
@@ -1221,6 +1112,116 @@ class NutanixPrismComputeUtility {
 			return nicMap
 		}
 	}
+
+	private static ServiceResponse callApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:]) {
+		def contentType = opts.contentType ?: ContentType.APPLICATION_JSON
+		def ignoreSsl = opts.ignoreSSL ?: true
+
+		HttpApiClient.RequestOptions requestOptions = new HttpApiClient.RequestOptions()
+		if(headers) {
+			requestOptions.headers = headers
+		}
+		if(body) {
+			requestOptions.body = body
+		}
+		requestOptions.contentType = contentType
+		requestOptions.ignoreSSL = ignoreSsl
+
+		return client.callJsonApi(authConfig.apiUrl?.toString(), path, authConfig.username?.toString(), authConfig.password?.toString(), requestOptions, method)
+	}
+
+	private static ServiceResponse callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:], RetryUtility retryUtility = null) {
+		if(!retryUtility) {
+			retryUtility = getSimpleRetryUtility()
+		}
+		def retryClosure = { RetryUtility ru ->
+			def currentAttempt = ru.getCurrentAttempt()
+			def maxAttempts = ru.getMaxAttempts()
+			def rtn = callApi(path, client, authConfig, method, headers, body, opts)
+			if(isApiRetryRequired(rtn) && (currentAttempt < maxAttempts - 1)) { //if reaching max attempts then just return the original results of API
+				throw retryException
+			}
+			return rtn
+		}
+		RetryableFunction rf = new RetryableFunction(retryClosure, retryUtility)
+		try {
+			def results = retryUtility.execute(rf)
+			if (results instanceof ServiceResponse) {
+				return results
+			} else {
+				return ServiceResponse.error("Unable to obtains results from retryable API")
+			}
+		} catch (RetryException e) {
+			return ServiceResponse.error("Unable to obtain results from retryable API")
+		}
+	}
+
+	private static Map refreshVmBody(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
+		Map vmResults = waitForPowerState(client, authConfig, uuid) //get latest spec information
+		Map vmResource = vmBody
+		if (vmResults.success) {
+			if(vmResults instanceof Map) {
+				vmResource = vmResults.data as Map
+			}
+		}
+		return vmResource
+	}
+
+	private static Boolean isApiRetryRequired(ServiceResponse results) {
+		def rtn = false
+		if (results.getErrorCode() == "409" || results?.data?.code == 409) {
+			if (results?.data?.message_list && results?.data?.message_list?.contains { it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.") }) {
+				//we should retry this option
+				rtn = true
+			}
+		}
+		return rtn
+	}
+
+	private static RetryUtility getExponentialRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
+		RetryUtility retryUtility
+		AbstractRetryDelayPolicy delayPolicy = new ExponentialRetryDelayPolicy()
+		delayPolicy.setInitialSleepTime(initialSleepTime)
+		delayPolicy.setMaxSleepTime(15000l)
+		delayPolicy.setMultiplier(2)
+		retryUtility = new RetryUtility(delayPolicy)
+		retryUtility.setMaxAttempts(maxAttempts)
+		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
+
+		return retryUtility
+	}
+
+	private static RetryUtility getSimpleRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 3l) {
+		RetryUtility retryUtility
+		AbstractRetryDelayPolicy delayPolicy = new SimpleRetryDelayPolicy()
+		retryUtility = new RetryUtility(delayPolicy)
+		delayPolicy.setInitialSleepTime(initialSleepTime)
+		retryUtility.setMaxAttempts(maxAttempts)
+		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
+
+		return retryUtility
+	}
+
+	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
+		RetryUtility retryUtility
+		AbstractRetryDelayPolicy delayPolicy = new LinearRetryDelayPolicy()
+		delayPolicy.setInitialSleepTime(initialSleepTime)
+		delayPolicy.setMaxSleepTime(15000l)
+		retryUtility = new RetryUtility(delayPolicy)
+		retryUtility.setMaxAttempts(maxAttempts)
+		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
+
+		return retryUtility
+	}
+
+	private static Exception getRetryException() {
+		return new PrismRetryException()
+	}
+
+	private static getRetryExceptionClass() {
+		return getRetryException().getClass()
+	}
+
 }
 
 class PrismRetryException extends Exception {
