@@ -1482,8 +1482,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		return morpheusContext.async.computeServer.get(server.id).blockingGet()
 	}
 
-	private NetworkProxy buildNetworkProxy(ProxyConfiguration proxyConfiguration) {
-		NetworkProxy networkProxy
+	private static NetworkProxy buildNetworkProxy(ProxyConfiguration proxyConfiguration) {
+		NetworkProxy networkProxy = new NetworkProxy()
 		if(proxyConfiguration) {
 			networkProxy.proxyDomain = proxyConfiguration.proxyDomain
 			networkProxy.proxyHost = proxyConfiguration.proxyHost
@@ -1978,7 +1978,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def needsNewCloudInit = false
 
 			HttpApiClient client = new HttpApiClient()
-			Map proxyConfiguration = workloadRequest?.proxyConfiguration ?: hostRequest?.proxyConfiguration ?: null
+			ProxyConfiguration proxyConfiguration = workloadRequest?.proxyConfiguration ?: hostRequest?.proxyConfiguration ?: null
 			client.networkProxy = buildNetworkProxy(proxyConfiguration)
 
 			if(runConfig.snapshotId) {
