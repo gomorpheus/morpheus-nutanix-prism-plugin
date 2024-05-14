@@ -1212,7 +1212,7 @@ class NutanixPrismComputeUtility {
 		return retryUtility
 	}
 
-	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 60l) {
+	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 30l) {
 		RetryUtility retryUtility
 		AbstractRetryDelayPolicy delayPolicy = new LinearRetryDelayPolicy()
 		delayPolicy.setInitialSleepTime(initialSleepTime)
