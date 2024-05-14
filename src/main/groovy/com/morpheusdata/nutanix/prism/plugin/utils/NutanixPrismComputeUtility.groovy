@@ -1134,7 +1134,7 @@ class NutanixPrismComputeUtility {
 
 	private static ServiceResponse callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:], RetryUtility retryUtility = null) {
 		if(!retryUtility) {
-			retryUtility = getSimpleRetryUtility()
+			retryUtility = getLinearRetryUtility()
 		}
 		def retryClosure = { RetryUtility ru ->
 			def currentAttempt = ru.getCurrentAttempt()
@@ -1212,11 +1212,10 @@ class NutanixPrismComputeUtility {
 		return retryUtility
 	}
 
-	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
+	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 60l) {
 		RetryUtility retryUtility
 		AbstractRetryDelayPolicy delayPolicy = new LinearRetryDelayPolicy()
 		delayPolicy.setInitialSleepTime(initialSleepTime)
-		delayPolicy.setMaxSleepTime(15000l)
 		retryUtility = new RetryUtility(delayPolicy)
 		retryUtility.setMaxAttempts(maxAttempts)
 		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
