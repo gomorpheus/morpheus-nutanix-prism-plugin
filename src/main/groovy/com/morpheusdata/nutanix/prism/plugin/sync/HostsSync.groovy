@@ -381,6 +381,7 @@ class HostsSync {
 				}
 				rtn.data = hosts
 			} else {
+				rtn.success = false
 				log.warn "Error getting list of hosts: ${listResult.msg}"
 			}
 		} catch(e) {

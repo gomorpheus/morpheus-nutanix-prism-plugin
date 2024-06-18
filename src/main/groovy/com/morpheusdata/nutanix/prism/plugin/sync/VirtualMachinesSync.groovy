@@ -453,6 +453,7 @@ class VirtualMachinesSync {
 				}
 				rtn.data = vms
 			} else {
+				rtn.success = false
 				log.warn "Error getting list of vms: ${listResult.msg}"
 			}
 		} catch(e) {
