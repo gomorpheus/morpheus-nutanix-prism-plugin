@@ -65,6 +65,17 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	static ServiceResponse deleteImage(HttpApiClient client, Map authConfig, String imageId) {
+		log.debug("deleteImage")
+		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'DELETE')
+		if(results?.success) {
+			return ServiceResponse.success(results.data)
+		} else {
+			return ServiceResponse.error()
+		}
+	}
+
 	static ServiceResponse createImage(HttpApiClient client, Map authConfig, String imageName, String imageType, String sourceUri = null, String diskUuid = null) {
 		log.debug("createImage")
 		def body = [

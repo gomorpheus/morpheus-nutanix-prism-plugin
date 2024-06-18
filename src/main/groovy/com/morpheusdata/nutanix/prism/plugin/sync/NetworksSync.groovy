@@ -96,7 +96,13 @@ class NetworksSync {
 						def vpc = vpcs?.find { it.externalId == cloudItem.spec?.resources?.vpc_reference?.uuid}
 						def cloudPoolId = vpc?.id ?: clusterId
 						def networkTypeString = cloudItem.status.resources.subnet_type
-						def networkType = networkTypes?.find { it.externalType == networkTypeString }
+						def managed = cloudItem.status.resources?.ip_config?.subnet_ip ? true : false
+						def networkType = networkTypes?.find { it.code == "nutanix-prism-unmanaged-vlan-network" }
+						if(networkTypeString == 'OVERLAY') {
+							networkType = networkTypes?.find { it.code == "nutanix-prism-overlay-network" }
+						} else if(networkTypeString == 'VLAN' && managed) {
+							networkType = networkTypes?.find { it.code == "nutanix-prism-vlan-network" }
+						}
 						def networkConfig = [
 								owner       : new Account(id: cloud.owner.id),
 								category    : "nutanix.prism.network.${cloud.id}",
@@ -145,6 +151,7 @@ class NetworksSync {
 						def clusterId = cluster?.id
 						def save = false
 						if (existingItem) {
+
 							if (existingItem.cloudPool?.id != clusterId) {
 								existingItem.cloudPool = new CloudPool(id: clusterId)
 								save = true
@@ -159,13 +166,20 @@ class NetworksSync {
 								}
 								save = true
 							}
-							def networkType = masterItem.status.resources.subnet_type
-							if (existingItem.externalType != networkType) {
-								existingItem.externalType = networkType
+							def networkTypeString = masterItem.status.resources.subnet_type
+							def managed = masterItem.status.resources?.ip_config?.subnet_ip ? true : false
+							def networkType = networkTypes?.find { it.code == "nutanix-prism-unmanaged-vlan-network" }
+							if(networkTypeString == 'OVERLAY') {
+								networkType = networkTypes?.find { it.code == "nutanix-prism-overlay-network" }
+							} else if(networkTypeString == 'VLAN' && managed) {
+								networkType = networkTypes?.find { it.code == "nutanix-prism-vlan-network" }
+							}
+							if (existingItem.externalType != networkTypeString) {
+								existingItem.externalType = networkTypeString
 								save = true
 							}
-							if (!existingItem.type) {
-								existingItem.type = networkTypes?.find { it.externalType == networkType }
+							if (existingItem.type != networkType) {
+								existingItem.type = networkType
 								save = true
 							}
 
