@@ -15,13 +15,13 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20230308" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20240304" {
-	code = "nutanix.prism.image.morpheus.debian.10.20240304"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20240604" {
+	code = "nutanix.prism.image.morpheus.debian.10.20240604"
 	category = "nutanix.prism.image.morpheus.debian"
-	name = "Morpheus Debian 10 20240304"
+	name = "Morpheus Debian 10 20240604"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240304/debian-10/morpheus-debian-10-amd64-20240304.qcow2"
-	imagePath = "qemu/20240304/debian-10"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240604/debian-10/morpheus-debian-10-amd64-20240604.qcow2"
+	imagePath = "qemu/20240604/debian-10"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -52,7 +52,7 @@ resource "workload-type" "nutanix-prism-debian-10" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-10-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-10-20240604
 	provisionType  = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -118,13 +118,13 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20230308" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20240304" {
-	code = "nutanix.prism.image.morpheus.debian.11.20240304"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20240604" {
+	code = "nutanix.prism.image.morpheus.debian.11.20240604"
 	category = "nutanix.prism.image.morpheus.debian"
-	name = "Morpheus Debian 11 20240304"
+	name = "Morpheus Debian 11 20240604"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240304/debian-11/morpheus-debian-11-amd64-20240304.qcow2"
-	imagePath = "qemu/20240304/debian-11"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240604/debian-11/morpheus-debian-11-amd64-20240604.qcow2"
+	imagePath = "qemu/20240604/debian-11"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -154,7 +154,7 @@ resource "workload-type" "nutanix-prism-debian-11" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-11-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-11-20240604
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -204,13 +204,13 @@ resource "scale-action" "nutanix-prism-debian-11-single" {
 }
 
 //12
-resource "virtual-image" "nutanix-prism-image-morpheus-debian-12-20240304" {
-	code = "nutanix.prism.image.morpheus.debian.12.20240304"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-12-20240604" {
+	code = "nutanix.prism.image.morpheus.debian.12.20240604"
 	category = "nutanix.prism.image.morpheus.debian"
-	name = "Morpheus Debian 12 20240304"
+	name = "Morpheus Debian 12 20240604"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240304/debian-12/morpheus-debian-12-amd64-20240304.qcow2"
-	imagePath = "qemu/20240304/debian-12"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240604/debian-12/morpheus-debian-12-amd64-20240604.qcow2"
+	imagePath = "qemu/20240604/debian-12"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -240,7 +240,7 @@ resource "workload-type" "nutanix-prism-debian-12" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-12-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-12-20240604
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
