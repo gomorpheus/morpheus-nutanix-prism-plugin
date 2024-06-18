@@ -291,7 +291,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				gatewayEditable   : true,
 				vlanIdEditable    : true,
 				canAssignPool     : true,
-				name              : 'Nutanix Prism Central VLAN Network'
+				name              : 'Nutanix Prism Central Managed VLAN Network'
 		])
 		NetworkType overlayNetwork = new NetworkType([
 				code              : 'nutanix-prism-overlay-network',
@@ -304,7 +304,18 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				canAssignPool     : true,
 				name              : 'Nutanix Prism Central Overlay Network'
 		])
-		[vlanNetwork, overlayNetwork]
+		NetworkType unmanagedVlanNetwork = new NetworkType([
+			code              : 'nutanix-prism-unmanaged-vlan-network',
+			externalType      : 'VLAN',
+			cidrEditable      : true,
+			dhcpServerEditable: true,
+			dnsEditable       : true,
+			gatewayEditable   : true,
+			vlanIdEditable    : true,
+			canAssignPool     : true,
+			name              : 'Nutanix Prism Central VLAN Network'
+		])
+		[vlanNetwork, overlayNetwork, unmanagedVlanNetwork]
 	}
 
 	@Override

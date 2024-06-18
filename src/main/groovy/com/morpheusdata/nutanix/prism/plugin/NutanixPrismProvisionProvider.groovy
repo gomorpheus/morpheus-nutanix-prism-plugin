@@ -1248,7 +1248,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						kind: "subnet"
 					]
 				]
-				if(networkAdd.ipAddress) {
+				def managedNetwork = newNetwork?.type?.code == 'nutanix-prism-vlan-network' || newNetwork?.type?.code == 'nutanix-prism-overlay-network'
+				if(networkAdd.ipAddress && managedNetwork) {
 					networkConfig["ip_endpoint_list"] = [
 						[
 							"ip": networkAdd.ipAddress
@@ -1810,6 +1811,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		if(networkConfiguration.primaryInterface) {
 			def networkInterface = networkConfiguration.primaryInterface
 			def net = networkInterface.network
+			def managedNetwork = net?.type?.code == 'nutanix-prism-vlan-network' || net?.type?.code == 'nutanix-prism-overlay-network'
 			if(net) {
 				def networkConfig = [
 					is_connected    : true,
@@ -1819,7 +1821,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						kind: "subnet"
 					]
 				]
-				if(networkInterface.ipAddress) {
+				if(networkInterface.ipAddress && managedNetwork) {
 					networkConfig["ip_endpoint_list"] = [
 						[
 							"ip": networkInterface.ipAddress
@@ -1841,7 +1843,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							kind: "subnet"
 						]
 					]
-					if(networkInterface.ipAddress) {
+					def managedNetwork = net?.type?.code == 'nutanix-prism-vlan-network' || net?.type?.code == 'nutanix-prism-overlay-network'
+					if(networkInterface.ipAddress && managedNetwork) {
 						networkConfig["ip_endpoint_list"] = [
 							[
 								"ip": networkInterface.ipAddress
@@ -1865,6 +1868,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			]
 		}
 
+		//check for unmanaged non dhcp networks
+		def unmanagedNetwork = false
+		if(networkConfiguration.primaryInterface?.network?.type?.code == 'nutanix-prism-unmanaged-vlan-network' &&
+			networkConfiguration.primaryInterface?.doDhcp == false) {
+			unmanagedNetwork = true
+		} else {
+			def badMatch = networkConfiguration?.extraInterfaces?.find{ it.network?.type?.code == 'nutanix-prism-unmanaged-vlan-network' && it.doDhcp == false }
+			if(badMatch)
+				unmanagedNetwork = true
+		}
+
 		def runConfig = [:]
 		runConfig += [
 			serverId          : server.id,
@@ -1882,7 +1896,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			skipNetworkWait   : false,
 			clusterReference  : clusterReference,
 			categories        : categories,
-			projectReference  : projectReference
+			projectReference  : projectReference,
+			unmanagedNetwork  : unmanagedNetwork
 		]
 		return runConfig
 	}
@@ -1906,7 +1921,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	def insertVm(Cloud cloud, Map runConfig, ProvisionResponse provisionResponse, WorkloadRequest workloadRequest, HostRequest hostRequest) {
 		log.debug "insertVm: ${runConfig}"
 
+		HttpApiClient client = new HttpApiClient()
 		Map authConfig = plugin.getAuthConfig(cloud)
+		def imageResults
 		try {
 			//prep for insert
 
@@ -1963,6 +1980,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, provisionResponse.installAgent: ${provisionResponse.installAgent}, provisionResponse.noAgent: ${provisionResponse.noAgent}"
 
+
+			def insertIso = isCloudInitIso(runConfig)
 			def cloudConfigUser
 			//cloud_init && sysprep
 			if(virtualImage?.isCloudInit && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
@@ -1971,22 +1990,19 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				runConfig.isSysprep = true
 				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
 			}
-			if(cloudConfigUser) {
+			if(cloudConfigUser && !insertIso) {
 				runConfig.cloudInitUserData = cloudConfigUser.encodeAsBase64()
 			}
 
 			//main create or clone
 			log.debug("create server: ${runConfig}")
 			def createResults
-			def needsNewCloudInit = false
 
-			HttpApiClient client = new HttpApiClient()
 			ProxyConfiguration proxyConfiguration = workloadRequest?.proxyConfiguration ?: hostRequest?.proxyConfiguration ?: null
 			client.networkProxy = buildNetworkProxy(proxyConfiguration)
 
 			if(runConfig.snapshotId) {
 				createResults = NutanixPrismComputeUtility.cloneSnapshot(client, authConfig, runConfig, runConfig.snapshotId as String)
-				needsNewCloudInit = true
 				log.debug("clone snapshot results: ${createResults}")
 			} else if(runConfig.cloneContainerId) {
 				sourceWorkload = morpheusContext.async.workload.get(runConfig.cloneContainerId).blockingGet()
@@ -2039,13 +2055,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						server = saveAndGet(server)
 					}
 					def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
-					if(needsNewCloudInit) {
+					if(insertIso) {
 						//upload cloud-init iso
 						def applianceServerUrl = workloadRequest?.cloudConfigOpts?.applianceUrl ?: hostRequest?.cloudConfigOpts?.applianceUrl ?: null
 						if(applianceServerUrl) {
 							def fileName = "morpheus_${server.id}.iso"
 							def fileUrl = applianceServerUrl + (applianceServerUrl.endsWith('/') ? '' : '/') + 'api/cloud-config/' + server.apiKey
-							def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", fileUrl)
+							imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", fileUrl)
 							def imageExternalId
 							if (imageResults.success) {
 								imageExternalId = imageResults.data.metadata.uuid
@@ -2177,6 +2193,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			log.error("runException: ${e}", e)
 			provisionResponse.setError('Error running vm')
 		}
+
+		if(imageResults) {
+			//clean up iso
+			def imageExternalId = imageResults?.data?.metadata?.uuid
+			if(imageExternalId) {
+				def imageDeleteResults = NutanixPrismComputeUtility.deleteImage(client, authConfig, imageExternalId)
+			}
+		}
+
 	}
 
 	def finalizeVm(Map runConfig, ProvisionResponse provisionResponse) {
@@ -2255,5 +2280,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		return rtn
 	}
 
+
+	private isCloudInitIso(Map createOpts) {
+		def rtn = false
+		if(createOpts.snapshotId) {
+			rtn = true
+		} else {
+			return createOpts.unmanagedNetwork
+		}
+		return rtn
+	}
 
 }
