@@ -183,6 +183,7 @@ class ClustersSync {
 				}
 				rtn.data = clusters
 			} else {
+				rtn.success = false
 				log.warn "Error getting list of clusters: ${listResult.msg}"
 			}
 		} catch(e) {

@@ -184,6 +184,7 @@ class VirtualPrivateCloudSync {
 				}
 				rtn.data = vpcs
 			} else {
+				rtn.success = false
 				log.warn "Error getting list of vpcs: ${listResult.msg}"
 			}
 		} catch(e) {

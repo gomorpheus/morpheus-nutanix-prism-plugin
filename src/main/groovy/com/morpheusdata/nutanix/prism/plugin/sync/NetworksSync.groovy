@@ -233,6 +233,7 @@ class NetworksSync {
 				}
 				rtn.data = networks
 			} else {
+				rtn.success = false
 				log.warn "Error getting list of networks: ${listResult.msg}"
 			}
 		} catch(e) {

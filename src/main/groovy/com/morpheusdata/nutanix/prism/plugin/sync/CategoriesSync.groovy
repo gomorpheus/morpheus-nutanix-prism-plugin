@@ -111,6 +111,7 @@ class CategoriesSync {
 					}
 				}
 			} else {
+				rtn.success = false
 				log.warn "Error getting list of categories: ${listResult.msg}"
 			}
 		} catch(e) {
