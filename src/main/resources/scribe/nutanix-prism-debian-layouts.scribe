@@ -267,8 +267,8 @@ resource "instance-type-layout" "nutanix-prism-debian-12-single" {
 	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
-	enabled = true
-	creatable = true
+	enabled = false
+	creatable = false
 	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-debian-12-set
