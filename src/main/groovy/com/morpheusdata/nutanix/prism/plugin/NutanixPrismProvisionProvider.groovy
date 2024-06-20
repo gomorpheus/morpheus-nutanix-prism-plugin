@@ -1499,6 +1499,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	private getOrUploadImage(HttpApiClient client, Map authConfig, Cloud cloud, VirtualImage virtualImage, User createdBy) {
 		def imageExternalId
 		def lock
+		def location
 		def lockKey = "nutanix.prism.imageupload.${cloud.regionCode}.${virtualImage?.id}".toString()
 		try {
 			lock = morpheusContext.acquireLock(lockKey, [timeout: 2l * 60l * 1000l, ttl: 2l * 60l * 1000l]).blockingGet()
@@ -1527,6 +1528,25 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					}
 				}
 			}
+			if(virtualImage.systemImage || virtualImage.userUploaded) {
+				def imageList = NutanixPrismComputeUtility.listImages(client, authConfig)
+				if(imageList.success) {
+					def existingImage = imageList.data.find {it.status?.name == virtualImage.name}
+					if(existingImage) {
+						imageExternalId = existingImage.metadata?.uuid
+						VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
+							virtualImage: virtualImage,
+							externalId  : imageExternalId,
+							imageRegion : cloud.regionCode,
+							code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
+							internalId  : imageExternalId,
+							refId		: cloud.id,
+							refType		: 'ComputeZone'
+						])
+						location = morpheusContext.async.virtualImage.location.create(virtualImageLocation, cloud).blockingGet()
+					}
+				}
+			}
 			if (!imageExternalId) { //If its userUploaded and still needs uploaded
 				//is it a template?
 				if(virtualImage.externalType == "template") {
@@ -1539,7 +1559,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
 				def copyUrl =  morpheusContext.async.virtualImage.getCloudFileStreamUrl(virtualImage, imageFile, createdBy, cloud).blockingGet()
 				def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, virtualImage.name, 'DISK_IMAGE',copyUrl)
-				def location
 				if (imageResults.success) {
 					imageExternalId = imageResults.data.metadata.uuid
 					// Create the VirtualImageLocation before waiting for the upload
