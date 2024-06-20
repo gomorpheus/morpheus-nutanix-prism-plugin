@@ -1508,7 +1508,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				VirtualImageLocation virtualImageLocation
 				try {
 					virtualImageLocation = morpheusContext.async.virtualImage.location.findVirtualImageLocation(virtualImage.id, cloud.id, cloud.regionCode, null, false).blockingGet()
-					println "\u001B[33mAC Log - NutanixPrismProvisionProvider:getOrUploadImage- ${virtualImageLocation?.dump()}\u001B[0m"
 					if (!virtualImageLocation) {
 						imageExternalId = null
 					} else {
@@ -1530,12 +1529,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				}
 			}
 			if(!imageExternalId && virtualImage.systemImage || virtualImage.userUploaded) {
-				println "\u001B[33mAC Log - NutanixPrismProvisionProvider:getOrUploadImage- here\u001B[0m"
 				def imageList = NutanixPrismComputeUtility.listImages(client, authConfig)
 				if(imageList.success) {
 					def existingImage = imageList.data.find {it.status?.name == virtualImage.name}
 					if(existingImage) {
-						println "\u001B[33mAC Log - NutanixPrismProvisionProvider:getOrUploadImage- ${existingImage}\u001B[0m"
 						imageExternalId = existingImage.metadata?.uuid
 						VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
 							virtualImage: virtualImage,
