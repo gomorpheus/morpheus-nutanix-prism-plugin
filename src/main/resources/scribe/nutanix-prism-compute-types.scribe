@@ -420,22 +420,22 @@ resource "compute-type-set" "kubernetes-1_28_3-ubuntu-20_04-worker-nutanix-prism
 
 resource "compute-type-layout" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-single" {
 	code = "kubernetes-1.28.3-ubuntu-20.04-nutanix-prism-single"
-	name = "MKS Kubernetes 1.28 Cluster on Ubuntu 20.04"
+	name = "MKS Kubernetes 1.28 Cluster on Ubuntu 22.04"
 	enabled = true
 	sortOrder = 10
-	computeVersion = "20.04"
-	clusterVersion = "1.28.3"
-	description = "provision a Kubernetes 1.28 cluster on Ubuntu 20.04"
+	computeVersion = "22.04"
+	clusterVersion = "1.28.x"
+	description = "provision a Kubernetes 1.28 cluster on Ubuntu 22.04"
 	type = "nutanix-prism-kube-master"
 	serverCount = 4
 	memoryRequirement = 1073741824
 	hasAutoScale = true
 	containerRuntime = "containerd"
 	networkRuntime = "calico"
-	computeServers = [
-		{code = "kubernetes-1.28.3-ubuntu-20.04-nutanix-prism-set"},
-		{code = "kubernetes-1.28.3-ubuntu-20.04-worker-nutanix-prism-set"}
-	]
+    computeServers = [
+        compute-type-set.kubernetes-ubuntu-22_04-nutanix-prism-amd64-set,
+        compute-type-set.kubernetes-ubuntu-22_04-worker-nutanix-prism-amd64-set
+    ]
 	groupType = "kubernetes-cluster"
 	provisionType = "nutanix-prism-provision-provider"
 	optionTypes = [
@@ -444,14 +444,13 @@ resource "compute-type-layout" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-sin
 		{code = "nutanix-prism-provision-categories"},
 		{code = "kubernetes.master.podCidr"},
 		{code = "kubernetes.master.serviceCidr"}
-	]
-	packages = [
-    		{code = "kubernetes-calico-3-26-0-package"},
-    		{code = "kubernetes-rook-1-13-package"},
-    		{code = "kubernetes-fluentbit-1-8-9-1-modified-package"},
-    		{code = "kubernetes-prometheus-0-9-modified-package"},
-    		{code = "kubernetes-nginx-ingress-operator-1-9-4-package"}
-    	]
-
+	]   
+    packages = [
+        "kubernetes-calico-3-26-0-package",
+        "kubernetes-rook-1-13-package",
+        "kubernetes-fluentbit-3-0-7-package",
+        "kubernetes-prometheus-0-12-package",
+        "kubernetes-nginx-ingress-operator-1-10-1-package"
+    ]
 }
 
