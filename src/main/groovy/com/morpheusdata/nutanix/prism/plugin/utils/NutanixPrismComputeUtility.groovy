@@ -286,7 +286,14 @@ class NutanixPrismComputeUtility {
 		if(vmBody?.spec?.resources?.power_state) {
 			vmBody.spec.resources.power_state = 'ON'
 		}
-		return updateVm(client, authConfig, uuid, vmBody)
+		Closure<Map> refreshVmBodyClosure = {
+			Map vmResource = refreshVmBody(client, authConfig, uuid, vmBody)
+			if(vmResource?.spec?.resources?.power_state) {
+				vmResource.spec.resources.power_state = 'ON'
+			}
+			return vmResource
+		}
+		return retryableUpdateVm(client, authConfig, uuid, vmBody, null, refreshVmBodyClosure)
 	}
 
 	static ServiceResponse stopVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
