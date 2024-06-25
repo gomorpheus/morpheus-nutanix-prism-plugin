@@ -208,26 +208,29 @@ class ImagesSync {
 				existingItem.imageRegion = cloud.regionCode
 				save = true
 			}
-			if (virtualImage.remotePath != virtualImageConfig.remotePath) {
-				virtualImage.remotePath = virtualImageConfig.remotePath
-				saveImage = true
-			}
-			if (virtualImage.imageRegion != virtualImageConfig.imageRegion) {
-				virtualImage.imageRegion = virtualImageConfig.imageRegion
-				saveImage = true
-			}
-			if (virtualImage.minDisk != virtualImageConfig.minDisk) {
-				virtualImage.minDisk = virtualImageConfig.minDisk as Long
-				saveImage = true
-			}
-			if (virtualImage.bucketId != virtualImageConfig.bucketId) {
-				virtualImage.bucketId = virtualImageConfig.bucketId
-				saveImage = true
-			}
 			if(virtualImage.systemImage == null) {
 				virtualImage.systemImage = false
 				saveImage = true
 			}
+			if(!virtualImage.systemImage && !virtualImage.userUploaded) {
+				if (virtualImage.remotePath != virtualImageConfig.remotePath) {
+					virtualImage.remotePath = virtualImageConfig.remotePath
+					saveImage = true
+				}
+				if (virtualImage.imageRegion != virtualImageConfig.imageRegion) {
+					virtualImage.imageRegion = virtualImageConfig.imageRegion
+					saveImage = true
+				}
+				if (virtualImage.minDisk != virtualImageConfig.minDisk) {
+					virtualImage.minDisk = virtualImageConfig.minDisk as Long
+					saveImage = true
+				}
+				if (virtualImage.bucketId != virtualImageConfig.bucketId) {
+					virtualImage.bucketId = virtualImageConfig.bucketId
+					saveImage = true
+				}
+			}
+
 
 			if(save) {
 				saveLocationList << existingItem
