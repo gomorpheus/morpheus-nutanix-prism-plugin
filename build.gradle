@@ -112,6 +112,11 @@ shadowJar {
 
 tasks.assemble.dependsOn tasks.shadowJar
 
+task copyRuntimeLibs(type: Copy) {
+	into "lib"
+	from project.configurations.runtimeClasspath - project.configurations.provided
+}
+
 tasks.register('moveToPlugin') {
 	doLast {
 		ant.move file: "${buildDir}/libs/${project.name}-${version}-all.jar",
