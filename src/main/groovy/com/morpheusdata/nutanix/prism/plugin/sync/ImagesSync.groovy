@@ -99,7 +99,7 @@ class ImagesSync {
 					new DataFilter<Long>("owner.id", cloud.owner.id)
 				)
 			)
-		]))
+		]).withSort('systemImage', DataQuery.SortOrder.desc))
 		SyncTask<VirtualImageIdentityProjection, Map, VirtualImage> syncTask = new SyncTask<>(domainRecords, objList)
 		syncTask.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
 			domainObject.externalId && (domainObject.externalId == cloudItem.metadata?.uuid)
