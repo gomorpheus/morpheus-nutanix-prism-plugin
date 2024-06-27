@@ -125,7 +125,7 @@ resource "scale-action" "nutanix-prism-ubuntu-18_04-single" {
 resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20240604" {
 	code = "nutanix.prism.image.morpheus.ubuntu.20.04.20240604.ubuntu.20.04"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name = "Morpheus Ubuntu 20.04.04 20240604"
+	name = "Morpheus Ubuntu 20.04 20240604"
 	imageType = "qcow2"
 	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20240604/ubuntu-20/morpheus-ubuntu-20_04-amd64-20240604.qcow2"
 	imagePath = "qemu/20240604/ubuntu-20"
