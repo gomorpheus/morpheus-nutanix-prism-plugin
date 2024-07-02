@@ -124,10 +124,6 @@ class NetworksSync {
 							networkConfig.displayName = "${cloudItem.status.name} ${cluster.name}"
 						}
 
-						Network networkAdd = new Network(networkConfig)
-						if(networkTypeString == 'OVERLAY') {
-							networkAdd.setConfigProperty("vpc", cloudItem.spec.resources.vpc_reference.uuid)
-						}
 						networkConfig.assignedZonePools = []
 						if(clusterId) {
 							networkConfig.assignedZonePools += new CloudPool(id: clusterId)
@@ -137,6 +133,10 @@ class NetworksSync {
 						}
 						if(networkProjectsMapping[cloudItem.metadata.uuid]) {
 							networkConfig.assignedZonePools += networkProjectsMapping[cloudItem.metadata.uuid]
+						}
+						Network networkAdd = new Network(networkConfig)
+						if(networkTypeString == 'OVERLAY') {
+							networkAdd.setConfigProperty("vpc", cloudItem.spec.resources.vpc_reference.uuid)
 						}
 						networkAdds << networkAdd
 					}
