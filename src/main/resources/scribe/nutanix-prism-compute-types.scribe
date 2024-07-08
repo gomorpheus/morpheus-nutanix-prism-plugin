@@ -59,6 +59,7 @@ resource "compute-type-layout" "docker-nutanix-prism-ubuntu-18_04-single" {
 resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
 	code = "docker-nutanix-prism-ubuntu-16.04-single"
 	name = "Nutanix Prism Central Docker Ubuntu 16.04"
+	computeVersion = "16.04"
 	enabled = false
 	creatable = false
 }
