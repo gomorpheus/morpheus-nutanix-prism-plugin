@@ -61,8 +61,8 @@ resource "instance-type-layout" "nutanix-prism-centos-7_3-single" {
 	serverCount = 1
 	hasAutoScale = true
 	portCount = 1
-	enabled = true
-	creatable = true
+	enabled = false
+	creatable = false
 	supportsConvertToManaged = true
 	serverType = "vm"
 	containers = [
@@ -147,8 +147,8 @@ resource "instance-type-layout" "nutanix-prism-centos-7_5-single" {
 	serverCount = 1
 	hasAutoScale = true
 	portCount = 1
-	enabled = true
-	creatable = true
+	enabled = false
+	creatable = false
 	supportsConvertToManaged = true
 	serverType = "vm"
 	containers = [
