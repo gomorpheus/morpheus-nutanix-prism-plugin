@@ -30,6 +30,8 @@ import groovy.util.logging.Slf4j
 class NutanixPrismPlugin extends Plugin {
 
 	private String cloudProviderCode
+	private String networkProviderCode
+
 
 	@Override
 	String getCode() {
@@ -44,12 +46,14 @@ class NutanixPrismPlugin extends Plugin {
 		def backupProvider = new NutanixPrismBackupProvider(this, morpheus)
 		def nutanixPrismOptionSourceProvider = new NutanixPrismOptionSourceProvider(this, morpheus)
 		def iacResourceMappingProvider = new NutanixPrismIacResourceMappingProvider(this, morpheus)
+		def nutanixPrismNetworkProvider = new NutanixPrismNetworkProvider(this, this.morpheus)
 
 		registerProviders(
 			nutanixPrismCloud, nutanixProvision, nutanixPrismOptionSourceProvider, backupProvider, iacResourceMappingProvider
 		)
 
 		cloudProviderCode = nutanixPrismCloud.code
+		networkProviderCode = nutanixPrismNetworkProvider.code
 		pluginProviders.put(backupProvider.code, backupProvider)
 	}
 
@@ -58,7 +62,7 @@ class NutanixPrismPlugin extends Plugin {
 
 	}
 
-	def MorpheusContext getMorpheusContext() {
+	MorpheusContext getMorpheusContext() {
 		this.morpheus
 	}
 
@@ -108,6 +112,10 @@ class NutanixPrismPlugin extends Plugin {
 
 	NutanixPrismCloudProvider getCloudProvider() {
 		return this.getProviderByCode(cloudProviderCode) as NutanixPrismCloudProvider
+	}
+
+	NutanixPrismNetworkProvider getNetworkProvider() {
+		return this.getProviderByCode(networkProviderCode) as NutanixPrismNetworkProvider
 	}
 
 	static getApiUrl(String apiUrl) {

@@ -239,6 +239,11 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	}
 
+	def nutanixPrismVirtualSwitch(args) {
+
+	}
+
+
 	private static getCloudId(args) {
 		def cloudId = null
 		if(args?.size() > 0) {

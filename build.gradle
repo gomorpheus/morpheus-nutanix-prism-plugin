@@ -120,7 +120,7 @@ task copyRuntimeLibs(type: Copy) {
 tasks.register('moveToPlugin') {
 	doLast {
 		ant.move file: "${buildDir}/libs/${project.name}-${version}-all.jar",
-			todir: "../morpheus-plugins"
+			todir: "../morpheus-plugin-core/plugins"
 	}
 }
 
