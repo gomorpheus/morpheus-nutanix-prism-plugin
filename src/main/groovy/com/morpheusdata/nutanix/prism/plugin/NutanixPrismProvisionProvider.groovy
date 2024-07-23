@@ -865,7 +865,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, server.externalId, vmResource.data)
 			log.debug("stopResults: ${stopResults}")
 			if(stopResults.success == true) {
-				return ServiceResponse.success()
+				def taskId = stopResults?.data?.status?.execution_context?.task_uuid
+				if(taskId) {
+					def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+					if(taskResults.success == true) {
+						return ServiceResponse.success()
+					} else {
+						return ServiceResponse.error(stopResults.msg ?: 'Error stopping VM')
+					}
+				} else {
+					return ServiceResponse.error(stopResults.msg ?: 'Error stopping VM')
+				}
 			} else {
 				return ServiceResponse.error(stopResults.msg ?: 'Error stopping VM')
 			}
@@ -887,7 +897,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
 			log.debug("startResults: ${startResults}")
 			if(startResults.success == true) {
-				return ServiceResponse.success()
+				def taskId = startResults?.data?.status?.execution_context?.task_uuid
+				if(taskId) {
+					def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+					if(taskResults.success == true) {
+						return ServiceResponse.success()
+					} else {
+						return ServiceResponse.error(startResults.msg ?: 'Error starting VM')
+					}
+				} else {
+					return ServiceResponse.error(startResults.msg ?: 'Error starting VM')
+				}
 			} else {
 				return ServiceResponse.error(startResults.msg ?: 'Error starting VM')
 			}
@@ -909,7 +929,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
 				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, computeServer.externalId, vmResource.data)
 				if(startResults.success == true) {
-					rtn.success = true
+					def taskId = startResults?.data?.status?.execution_context?.task_uuid
+					if(taskId) {
+						def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+						if (taskResults.success == true) {
+							rtn.success = true
+						}
+					}
 				}
 			} else {
 				log.info("startServer - ignoring request for unmanaged instance")
@@ -934,7 +960,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
 				def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, computeServer.externalId, vmResource.data)
 				if(stopResults.success == true) {
-					rtn.success = true
+					def taskId = stopResults?.data?.status?.execution_context?.task_uuid
+					if(taskId) {
+						def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+						if (taskResults.success == true) {
+							rtn.success = true
+						}
+					}
 				}
 			} else {
 				log.info("stopServer - ignoring request for unmanaged instance")
@@ -958,7 +990,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
 				def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, computeServer.externalId)
 				if(removeResults.success == true) {
-					rtn.success = true
+					def taskId = removeResults?.data?.status?.execution_context?.task_uuid
+					if(taskId) {
+						def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+						if (taskResults.success == true) {
+							rtn.success = true
+						}
+					}
 				}
 			} else {
 				log.info("deleteServer - ignoring request for unmanaged instance")
@@ -983,7 +1021,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 			def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, server.externalId)
 			if(removeResults.success == true) {
-				return ServiceResponse.success()
+				def taskId = removeResults?.data?.status?.execution_context?.task_uuid
+				if(taskId) {
+					def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+					if(taskResults.success == true) {
+						return ServiceResponse.success()
+					} else {
+						return ServiceResponse.error(removeResults.msg ?: 'Failed to remove vm')
+					}
+				} else {
+					return ServiceResponse.error(removeResults.msg ?: 'Failed to remove vm')
+				}
 			} else {
 				return ServiceResponse.error('Failed to remove vm')
 			}
