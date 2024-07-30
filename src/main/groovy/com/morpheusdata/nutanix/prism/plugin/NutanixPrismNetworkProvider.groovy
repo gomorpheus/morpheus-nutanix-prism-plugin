@@ -22,8 +22,9 @@ import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.providers.NetworkProvider
 import com.morpheusdata.core.providers.CloudInitializationProvider
 import com.morpheusdata.core.providers.SecurityGroupProvider
+import com.morpheusdata.model.AccountIntegration
+import com.morpheusdata.model.AccountIntegrationType
 import com.morpheusdata.model.Cloud
-import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.Network
 import com.morpheusdata.model.NetworkRoute
 import com.morpheusdata.model.NetworkRouter
@@ -41,16 +42,16 @@ import groovy.util.logging.Slf4j
 class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializationProvider {
 
 	NutanixPrismPlugin plugin
-	MorpheusContext morpheus
+	MorpheusContext morpheusContext
 	SecurityGroupProvider securityGroupProvider
 
-	final String code = 'nutanix-prism-network-server'
+	final String code = 'nutanix-prism-network-provider'
 	final String name = 'Nutanix Prism'
 	final String description = 'Flow'
 
 	NutanixPrismNetworkProvider(NutanixPrismPlugin plugin, MorpheusContext morpheusContext) {
 		this.plugin = plugin
-		this.morpheus = morpheusContext
+		this.morpheusContext = morpheusContext
 	}
 
 	@Override
@@ -58,7 +59,21 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		return 'nutanix-prism-network-provider'
 	}
 
-	/**
+	@Override
+	ServiceResponse refresh() {
+		return ServiceResponse.success()
+	}
+
+	@Override
+	ServiceResponse<Network> prepareNetwork(Network network, Map opts) {
+		return super.prepareNetwork(network, opts)
+	}
+
+	@Override
+	ServiceResponse validateNetwork(Network network, Map opts) {
+		return super.validateNetwork(network, opts)
+	}
+/**
 	 * The CloudProvider code that this NetworkProvider should be attached to.
 	 * When this NetworkProvider is registered with Morpheus, all Clouds that match this code will have a
 	 * NetworkServer of this type attached to them. Network actions will then be handled via this provider.
@@ -67,6 +82,11 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 	@Override
 	String getCloudProviderCode() {
 		return 'nutanix-prism-cloud'
+	}
+
+	@Override
+	Boolean isUserVisible() {
+		return true
 	}
 
 	/**
@@ -82,6 +102,9 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 			dhcpServerEditable: true,
 			dnsEditable       : true,
 			gatewayEditable   : true,
+			creatable         : true,
+			deletable         : true,
+			hasCidr           : true,
 			vlanIdEditable    : true,
 			canAssignPool     : true,
 			name              : 'Nutanix Prism Central Managed VLAN Network'
@@ -237,12 +260,25 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 	ServiceResponse initializeProvider(Cloud cloud) {
 		log.info("Initializing network provider for ${cloud.name}")
 		ServiceResponse rtn = ServiceResponse.prepare()
+		def authConfig = plugin.getAuthConfig(cloud)
 		try {
+
+			AccountIntegration accountIntegration = new AccountIntegration(
+				name: cloud.name + ' Flow',
+				integrationType: new AccountIntegrationType(code: 'nutanix-prism-flow'),
+				serviceUrl: authConfig.apiUrl,
+				serviceUsername: authConfig.username,
+				servicePassword: authConfig.password,
+			)
+			ServiceResponse<AccountIntegration> accountIntegrationResponse = morpheusContext.services.integration.registerCloudIntegration(cloud.id, accountIntegration) as ServiceResponse<AccountIntegration>
+			AccountIntegration savedIntegration = accountIntegrationResponse.data
+			println "\u001B[33mAC Log - NutanixPrismNetworkProvider:initializeProvider- ${savedIntegration}\u001B[0m"
 			NetworkServer networkServer = new NetworkServer(
 				name: cloud.name,
-				type: new NetworkServerType(code:getNetworkServerTypeCode())
+				type: new NetworkServerType(code:getNetworkServerTypeCode()),
+				integration: new AccountIntegration(id: savedIntegration.id)
 			)
-			morpheus.services.integration.registerCloudIntegration(cloud.id, networkServer)
+			morpheusContext.services.integration.registerCloudIntegration(cloud.id, networkServer)
 			rtn.success = true
 		} catch (Exception e) {
 			rtn.success = false
@@ -262,7 +298,12 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 				name: cloud.name,
 				type: new NetworkServerType(code:getNetworkServerTypeCode())
 			)
-			morpheus.services.integration.deleteCloudIntegration(cloud.id, networkServer)
+			morpheusContext.services.integration.deleteCloudIntegration(cloud.id, networkServer)
+			AccountIntegration accountIntegration = new AccountIntegration(
+				name: cloud.name + ' Flow',
+				type: new AccountIntegrationType(code: 'nutanix-prism-flow'),
+			)
+			morpheusContext.services.integration.deleteCloudIntegration(cloud.id, accountIntegration)
 			rtn.success = true
 		} catch (Exception e) {
 			rtn.success = false
@@ -282,32 +323,32 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 	ServiceResponse createNetwork(Network network, Map opts) {
 		def rtn = ServiceResponse.prepare()
 		try {
-			if(network.networkServer) {
-				Cloud cloud = network.cloud
-				CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
-				AmazonEC2Client amazonClient = plugin.getAmazonClient(cloud, false, resourcePool?.regionCode)
-				def networkConfig = [:]
-				networkConfig.name = network.name
-				networkConfig.vpcId = resourcePool?.externalId
-				networkConfig.availabilityZone = network.availabilityZone
-				networkConfig.active = network.active
-				networkConfig.assignPublicIp = network.assignPublicIp
-				networkConfig.type = network.type?.externalType
-				networkConfig.cidr = network.cidr
-				log.debug("sending network config: {}", networkConfig)
-				def apiResults = AmazonComputeUtility.createSubnet(opts + [amazonClient: amazonClient, config: networkConfig])
-				log.debug("network apiResults: {}", apiResults)
-				//create it
-				if(apiResults?.success && apiResults?.error != true) {
-					rtn.success = true
-					network.externalId = apiResults.externalId
-					network.uniqueId = apiResults.externalId
-					network.regionCode = resourcePool?.regionCode
-				}
-				rtn.data = network
-				rtn.msg = apiResults.msg
-				log.debug("results: {}", rtn.results)
-			}
+//			if(network.networkServer) {
+//				Cloud cloud = network.cloud
+//				CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
+//				AmazonEC2Client amazonClient = plugin.getAmazonClient(cloud, false, resourcePool?.regionCode)
+//				def networkConfig = [:]
+//				networkConfig.name = network.name
+//				networkConfig.vpcId = resourcePool?.externalId
+//				networkConfig.availabilityZone = network.availabilityZone
+//				networkConfig.active = network.active
+//				networkConfig.assignPublicIp = network.assignPublicIp
+//				networkConfig.type = network.type?.externalType
+//				networkConfig.cidr = network.cidr
+//				log.debug("sending network config: {}", networkConfig)
+//				def apiResults = AmazonComputeUtility.createSubnet(opts + [amazonClient: amazonClient, config: networkConfig])
+//				log.debug("network apiResults: {}", apiResults)
+//				//create it
+//				if(apiResults?.success && apiResults?.error != true) {
+//					rtn.success = true
+//					network.externalId = apiResults.externalId
+//					network.uniqueId = apiResults.externalId
+//					network.regionCode = resourcePool?.regionCode
+//				}
+//				rtn.data = network
+//				rtn.msg = apiResults.msg
+//				log.debug("results: {}", rtn.results)
+//			}
 		} catch(e) {
 			log.error("createNetwork error: ${e}", e)
 		}
@@ -336,19 +377,19 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		def rtn = ServiceResponse.prepare()
 		//remove the network
 		if(network.externalId) {
-			CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
-			AmazonEC2Client amazonClient = plugin.getAmazonClient(network.cloud, false, resourcePool?.regionCode)
-			def deleteResults = AmazonComputeUtility.deleteSubnet([amazonClient: amazonClient, network: network])
-			log.debug("deleteResults: {}", deleteResults)
-			if(deleteResults.success == true) {
-				rtn.success = true
-			} else if(deleteResults.errorCode == 404) {
-				//not found - success
-				log.warn("not found")
-				rtn.success = true
-			} else {
-				rtn.msg = deleteResults.msg
-			}
+//			CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
+//			AmazonEC2Client amazonClient = plugin.getAmazonClient(network.cloud, false, resourcePool?.regionCode)
+//			def deleteResults = AmazonComputeUtility.deleteSubnet([amazonClient: amazonClient, network: network])
+//			log.debug("deleteResults: {}", deleteResults)
+//			if(deleteResults.success == true) {
+//				rtn.success = true
+//			} else if(deleteResults.errorCode == 404) {
+//				//not found - success
+//				log.warn("not found")
+//				rtn.success = true
+//			} else {
+//				rtn.msg = deleteResults.msg
+//			}
 		} else {
 			rtn.success = true
 		}
@@ -401,31 +442,31 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		log.debug("createRouter: ${router} ${opts}")
 		def rtn = ServiceResponse.prepare()
 		try {
-			def name = router.name
-			def cloud = router.cloud
-
-			def vpcId
-			CloudPool pool
-			def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
-			if(poolId) {
-				pool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
-				vpcId = pool?.externalId
-			}
-			opts += [
-				amazonClient: plugin.getAmazonClient(cloud, false, pool.regionCode),
-				name: name,
-				vpcId: vpcId
-			]
-
-			def apiResults = AmazonComputeUtility.createRouter(opts)
-			log.debug("route apiResults: {}", apiResults)
-			if(apiResults?.success && apiResults?.error != true) {
-				router.externalId = apiResults.internetGatewayId
-				router.regionCode = pool.regionCode
-				rtn.success = true
-			} else {
-				rtn.msg = apiResults.msg ?: 'error creating router'
-			}
+//			def name = router.name
+//			def cloud = router.cloud
+//
+//			def vpcId
+//			CloudPool pool
+//			def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
+//			if(poolId) {
+//				pool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
+//				vpcId = pool?.externalId
+//			}
+//			opts += [
+//				amazonClient: plugin.getAmazonClient(cloud, false, pool.regionCode),
+//				name: name,
+//				vpcId: vpcId
+//			]
+//
+//			def apiResults = AmazonComputeUtility.createRouter(opts)
+//			log.debug("route apiResults: {}", apiResults)
+//			if(apiResults?.success && apiResults?.error != true) {
+//				router.externalId = apiResults.internetGatewayId
+//				router.regionCode = pool.regionCode
+//				rtn.success = true
+//			} else {
+//				rtn.msg = apiResults.msg ?: 'error creating router'
+//			}
 		} catch(e) {
 			log.error("createRouter error: ${e}", e)
 			rtn.msg = 'unknown error creating router'
@@ -444,58 +485,58 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		log.debug("updateRouter: ${router} ${opts}")
 		def rtn = ServiceResponse.prepare()
 		try {
-			if(router.type.code == 'amazonVpcRouter') {
-				rtn.success = true
-			} else if(router.type.code == 'amazonInternetGateway') {
-				def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
-				String regionCode = router.regionCode
-				CloudPool desiredAttachedPool
-				if(poolId) {
-					desiredAttachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
-					regionCode = desiredAttachedPool?.regionCode
-				}
-				def name = router.name
-				def zone = router.cloud
-				def internetGatewayId = router.externalId
-				opts += [
-					amazonClient:plugin.getAmazonClient(zone,false, regionCode),
-					name: name,
-					internetGatewayId: internetGatewayId
-				]
-
-				// See if attaching, detaching, or changing
-				def listResults = AmazonComputeUtility.listInternetGateways(opts, [internetGatewayId: internetGatewayId])
-				if(listResults.success && listResults.internetGateways?.size()) {
-					def amazonInternetGateway = listResults.internetGateways.getAt(0)
-					def currentAttachedVpcId = amazonInternetGateway.getAttachments().getAt(0)?.getVpcId()
-					def desiredAttachedVpcId = desiredAttachedPool?.externalId
-
-					if(currentAttachedVpcId != desiredAttachedVpcId) {
-						if(currentAttachedVpcId) {
-							AmazonComputeUtility.detachInternetGateway([vpcId: currentAttachedVpcId] + opts)
-						}
-						if(desiredAttachedVpcId) {
-							def attachResults = AmazonComputeUtility.attachInternetGateway([vpcId: desiredAttachedVpcId] + opts)
-							if(!attachResults.success) {
-								rtn.msg = attachResults.msg
-								return rtn
-							}
-						}
-					}
-
-					def apiResults = AmazonComputeUtility.updateInternetGateway(opts)
-					log.debug("route apiResults: {}", apiResults)
-					if(apiResults?.success && apiResults?.error != true) {
-						rtn.success = true
-					} else {
-						rtn.msg = apiResults.msg ?: 'error updating router'
-					}
-				} else {
-					rtn.msg = "Unable to locate internet gateway ${internetGatewayId}"
-				}
-			} else {
-				throw new Exception("Unknown router type ${router.type.code}")
-			}
+//			if(router.type.code == 'amazonVpcRouter') {
+//				rtn.success = true
+//			} else if(router.type.code == 'amazonInternetGateway') {
+//				def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
+//				String regionCode = router.regionCode
+//				CloudPool desiredAttachedPool
+//				if(poolId) {
+//					desiredAttachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
+//					regionCode = desiredAttachedPool?.regionCode
+//				}
+//				def name = router.name
+//				def zone = router.cloud
+//				def internetGatewayId = router.externalId
+//				opts += [
+//					amazonClient:plugin.getAmazonClient(zone,false, regionCode),
+//					name: name,
+//					internetGatewayId: internetGatewayId
+//				]
+//
+//				// See if attaching, detaching, or changing
+//				def listResults = AmazonComputeUtility.listInternetGateways(opts, [internetGatewayId: internetGatewayId])
+//				if(listResults.success && listResults.internetGateways?.size()) {
+//					def amazonInternetGateway = listResults.internetGateways.getAt(0)
+//					def currentAttachedVpcId = amazonInternetGateway.getAttachments().getAt(0)?.getVpcId()
+//					def desiredAttachedVpcId = desiredAttachedPool?.externalId
+//
+//					if(currentAttachedVpcId != desiredAttachedVpcId) {
+//						if(currentAttachedVpcId) {
+//							AmazonComputeUtility.detachInternetGateway([vpcId: currentAttachedVpcId] + opts)
+//						}
+//						if(desiredAttachedVpcId) {
+//							def attachResults = AmazonComputeUtility.attachInternetGateway([vpcId: desiredAttachedVpcId] + opts)
+//							if(!attachResults.success) {
+//								rtn.msg = attachResults.msg
+//								return rtn
+//							}
+//						}
+//					}
+//
+//					def apiResults = AmazonComputeUtility.updateInternetGateway(opts)
+//					log.debug("route apiResults: {}", apiResults)
+//					if(apiResults?.success && apiResults?.error != true) {
+//						rtn.success = true
+//					} else {
+//						rtn.msg = apiResults.msg ?: 'error updating router'
+//					}
+//				} else {
+//					rtn.msg = "Unable to locate internet gateway ${internetGatewayId}"
+//				}
+//			} else {
+//				throw new Exception("Unknown router type ${router.type.code}")
+//			}
 		} catch(e) {
 			log.error("updateRouter error: ${e}", e)
 			rtn.msg = 'unknown error creating router'
@@ -513,54 +554,54 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 	ServiceResponse deleteRouter(NetworkRouter router, Map opts) {
 		ServiceResponse rtn = ServiceResponse.prepare()
 		try {
-			if(router.type.code == 'amazonVpcRouter') {
-				rtn.success = true
-			} else if(router.type.code == 'amazonInternetGateway') {
-				if(router.externalId) {
-					Cloud cloud = router.cloud
-					def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
-					String regionCode = router.regionCode
-					CloudPool attachedPool
-					if(poolId) {
-						attachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
-						regionCode = attachedPool?.regionCode
-					}
-					opts += [
-						amazonClient:plugin.getAmazonClient(cloud,false, regionCode),
-						internetGatewayId: router.externalId
-					]
-
-					def performDelete = true
-
-					if(attachedPool && attachedPool.externalId) {
-						// Must first detach from the VPC
-						def detachResults = AmazonComputeUtility.detachInternetGateway([vpcId: attachedPool.externalId] + opts)
-
-						log.debug("detachResults: {}", detachResults)
-						if(!detachResults.success) {
-							if(detachResults.msg?.contains('InvalidInternetGatewayID')){
-								performDelete = true
-							} else {
-								log.error("Error in detaching internet gateway: ${detachResults}")
-								performDelete = false
-							}
-						}
-					}
-
-					if(performDelete) {
-						def deleteResults = AmazonComputeUtility.deleteInternetGateway(opts)
-						if(deleteResults.success || deleteResults.msg?.contains('InvalidInternetGatewayID')) {
-							rtn.success = true
-						} else {
-							rtn.msg = deleteResults.msg ?: 'unknown error removing internet gateway'
-						}
-					}
-				} else {
-					rtn.success = true
-				}
-			} else {
-				log.error "Unknown router type: ${router.type}"
-			}
+//			if(router.type.code == 'amazonVpcRouter') {
+//				rtn.success = true
+//			} else if(router.type.code == 'amazonInternetGateway') {
+//				if(router.externalId) {
+//					Cloud cloud = router.cloud
+//					def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
+//					String regionCode = router.regionCode
+//					CloudPool attachedPool
+//					if(poolId) {
+//						attachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
+//						regionCode = attachedPool?.regionCode
+//					}
+//					opts += [
+//						amazonClient:plugin.getAmazonClient(cloud,false, regionCode),
+//						internetGatewayId: router.externalId
+//					]
+//
+//					def performDelete = true
+//
+//					if(attachedPool && attachedPool.externalId) {
+//						// Must first detach from the VPC
+//						def detachResults = AmazonComputeUtility.detachInternetGateway([vpcId: attachedPool.externalId] + opts)
+//
+//						log.debug("detachResults: {}", detachResults)
+//						if(!detachResults.success) {
+//							if(detachResults.msg?.contains('InvalidInternetGatewayID')){
+//								performDelete = true
+//							} else {
+//								log.error("Error in detaching internet gateway: ${detachResults}")
+//								performDelete = false
+//							}
+//						}
+//					}
+//
+//					if(performDelete) {
+//						def deleteResults = AmazonComputeUtility.deleteInternetGateway(opts)
+//						if(deleteResults.success || deleteResults.msg?.contains('InvalidInternetGatewayID')) {
+//							rtn.success = true
+//						} else {
+//							rtn.msg = deleteResults.msg ?: 'unknown error removing internet gateway'
+//						}
+//					}
+//				} else {
+//					rtn.success = true
+//				}
+//			} else {
+//				log.error "Unknown router type: ${router.type}"
+//			}
 		} catch(e) {
 			log.error("deleteRouter error: ${e}", e)
 			rtn.msg = 'unknown error removing amazon internet gateway'
@@ -584,7 +625,7 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		Long routeTableId = MorpheusUtils.parseLongConfig(opts.route.routeTable)
 		log.debug("routeTableID: $routeTableId")
 		if(routeTableId) {
-			route.routeTable = morpheus.network.routeTable.listById([routeTableId]).toList().blockingGet().getAt(0)
+			route.routeTable = morpheusContext.network.routeTable.listById([routeTableId]).toList().blockingGet().getAt(0)
 			log.debug("routeTable: $route.routeTable")
 		}
 
@@ -603,30 +644,30 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		log.debug "createRoute: ${router}, ${route}, ${opts}"
 		def rtn = ServiceResponse.prepare(route)
 		try {
-			Cloud cloud = router.cloud
-			def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
-			String regionCode = router.regionCode
-			CloudPool attachedPool
-			if(poolId) {
-				attachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
-				regionCode = attachedPool?.regionCode
-			}
-
-			def amazonClient = plugin.getAmazonClient(cloud, false, regionCode)
-			opts += [
-				amazonClient: amazonClient,
-				destinationCidrBlock: route.source, destinationType: route.destinationType, destination: route.destination, routeTableId: route.routeTable.externalId
-			]
-
-			def apiResults = AmazonComputeUtility.createRoute(opts)
-			log.debug("route apiResults: {}", apiResults)
-			if(apiResults?.success && apiResults?.error != true) {
-				rtn.success = true
-				route.status = 'active'
-				rtn.data.externalId = buildRouteExternalId(apiResults.routeRequest)
-			} else {
-				rtn.msg = apiResults.msg ?: 'error creating route'
-			}
+//			Cloud cloud = router.cloud
+//			def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
+//			String regionCode = router.regionCode
+//			CloudPool attachedPool
+//			if(poolId) {
+//				attachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
+//				regionCode = attachedPool?.regionCode
+//			}
+//
+//			def amazonClient = plugin.getAmazonClient(cloud, false, regionCode)
+//			opts += [
+//				amazonClient: amazonClient,
+//				destinationCidrBlock: route.source, destinationType: route.destinationType, destination: route.destination, routeTableId: route.routeTable.externalId
+//			]
+//
+//			def apiResults = AmazonComputeUtility.createRoute(opts)
+//			log.debug("route apiResults: {}", apiResults)
+//			if(apiResults?.success && apiResults?.error != true) {
+//				rtn.success = true
+//				route.status = 'active'
+//				rtn.data.externalId = buildRouteExternalId(apiResults.routeRequest)
+//			} else {
+//				rtn.msg = apiResults.msg ?: 'error creating route'
+//			}
 		} catch(e) {
 			log.error("createRoute error: ${e}", e)
 			rtn.msg = 'unknown error creating route'
@@ -644,37 +685,37 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		log.debug "deleteRoute: ${router}, ${route}"
 		def rtn = ServiceResponse.prepare()
 		try {
-			Cloud cloud = router.cloud
-			def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
-			String regionCode = router.regionCode
-			CloudPool attachedPool
-			if(poolId) {
-				attachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
-				regionCode = attachedPool?.regionCode
-			}
-			opts += [
-				amazonClient:plugin.getAmazonClient(cloud,false, regionCode),
-				routeTableId: route.routeTable.externalId
-			]
-
-			if(route.source?.indexOf(':') > -1) {
-				opts.destinationIpv6CidrBlock = route.source
-			} else {
-				opts.destinationCidrBlock = route.source
-			}
-
-			def deleteResults = AmazonComputeUtility.deleteRoute(opts)
-
-			log.debug("deleteResults: {}", deleteResults)
-			if(deleteResults.success == true) {
-				rtn.success = true
-			} else if(deleteResults.errorCode == 404) {
-				//not found - success
-				log.warn("not found")
-				rtn.success = true
-			} else {
-				rtn.msg = deleteResults.msg
-			}
+//			Cloud cloud = router.cloud
+//			def poolId = MorpheusUtils.parseLongConfig(router.poolId ? router.poolId : (router.refType == 'ComputeZonePool' ? router.refId : null))
+//			String regionCode = router.regionCode
+//			CloudPool attachedPool
+//			if(poolId) {
+//				attachedPool = morpheus.cloud.pool.listById([poolId]).toList().blockingGet().getAt(0)
+//				regionCode = attachedPool?.regionCode
+//			}
+//			opts += [
+//				amazonClient:plugin.getAmazonClient(cloud,false, regionCode),
+//				routeTableId: route.routeTable.externalId
+//			]
+//
+//			if(route.source?.indexOf(':') > -1) {
+//				opts.destinationIpv6CidrBlock = route.source
+//			} else {
+//				opts.destinationCidrBlock = route.source
+//			}
+//
+//			def deleteResults = AmazonComputeUtility.deleteRoute(opts)
+//
+//			log.debug("deleteResults: {}", deleteResults)
+//			if(deleteResults.success == true) {
+//				rtn.success = true
+//			} else if(deleteResults.errorCode == 404) {
+//				//not found - success
+//				log.warn("not found")
+//				rtn.success = true
+//			} else {
+//				rtn.msg = deleteResults.msg
+//			}
 		} catch(e) {
 			log.error("deleteRoute error: ${e}", e)
 			rtn.msg = 'unknown error deleting route'
@@ -682,26 +723,30 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		return rtn
 	};
 
-	private buildRouteExternalId(CreateRouteRequest amazonRoute) {
-		def externalId = amazonRoute.getDestinationCidrBlock()
-		if(amazonRoute.getEgressOnlyInternetGatewayId()){
-			externalId += amazonRoute.getEgressOnlyInternetGatewayId()
-		} else if(amazonRoute.getGatewayId()){
-			externalId += amazonRoute.getGatewayId()
-		} else if(amazonRoute.getInstanceId()) {
-			externalId += amazonRoute.getInstanceId()
-		} else if(amazonRoute.getLocalGatewayId()){
-			externalId += amazonRoute.getLocalGatewayId()
-		} else if(amazonRoute.getNatGatewayId()){
-			externalId += amazonRoute.getNatGatewayId()
-		} else if(amazonRoute.getNetworkInterfaceId()){
-			externalId += amazonRoute.getNetworkInterfaceId()
-		} else if(amazonRoute.getTransitGatewayId()){
-			externalId += amazonRoute.getTransitGatewayId()
-		} else if(amazonRoute.getVpcPeeringConnectionId()){
-			externalId += amazonRoute.getVpcPeeringConnectionId()
-		}
-		externalId
-	}
+//	private buildRouteExternalId(CreateRouteRequest amazonRoute) {
+//		def externalId = amazonRoute.getDestinationCidrBlock()
+//		if(amazonRoute.getEgressOnlyInternetGatewayId()){
+//			externalId += amazonRoute.getEgressOnlyInternetGatewayId()
+//		} else if(amazonRoute.getGatewayId()){
+//			externalId += amazonRoute.getGatewayId()
+//		} else if(amazonRoute.getInstanceId()) {
+//			externalId += amazonRoute.getInstanceId()
+//		} else if(amazonRoute.getLocalGatewayId()){
+//			externalId += amazonRoute.getLocalGatewayId()
+//		} else if(amazonRoute.getNatGatewayId()){
+//			externalId += amazonRoute.getNatGatewayId()
+//		} else if(amazonRoute.getNetworkInterfaceId()){
+//			externalId += amazonRoute.getNetworkInterfaceId()
+//		} else if(amazonRoute.getTransitGatewayId()){
+//			externalId += amazonRoute.getTransitGatewayId()
+//		} else if(amazonRoute.getVpcPeeringConnectionId()){
+//			externalId += amazonRoute.getVpcPeeringConnectionId()
+//		}
+//		externalId
+//	}
 
+	@Override
+	MorpheusContext getMorpheus() {
+		return morpheusContext
+	}
 }
