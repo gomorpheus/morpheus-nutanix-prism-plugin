@@ -78,6 +78,9 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 		if (iacProvider == 'terraform') {
 			InstanceResourceMappingResponse response = new InstanceResourceMappingResponse()
 			def ip_address = resourceResult?.values?.nic_list?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
+			if(!ip_address) {
+				ip_address = resourceResult?.values?.nic_list_status?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
+			}
 			def externalId = resourceResult?.values?.metadata?.uuid
 			response.privateIp = ip_address
 			response.publicIp = ip_address
@@ -150,6 +153,9 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 		if (iacProvider == 'terraform') {
 			WorkloadResourceMappingResponse response = new WorkloadResourceMappingResponse()
 			def ip_address = resourceResult?.values?.nic_list?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
+			if(!ip_address) {
+				ip_address = resourceResult?.values?.nic_list_status?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
+			}
 			def externalId = resourceResult?.values?.metadata?.uuid
 			response.privateIp = ip_address
 			response.publicIp = ip_address
