@@ -717,6 +717,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def ipAddress = null
 			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
 				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
+			} else if(serverDetails.success == true && serverResource.nic_list_status?.size() > 0 && serverResource.nic_list_status.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
+				ipAddress = serverResource.nic_list_status.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
 			}
 			NutanixPrismSyncUtils.updateServerContainersAndInstances(server, null, morpheusContext)
 			def privateIp = ipAddress
@@ -836,6 +838,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def ipAddress = null
 			if(serverDetails.success == true && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
 				ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
+			} else if(serverDetails.success == true && serverResource.nic_list_status?.size() > 0 && serverResource.nic_list_status.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)} ) {
+				ipAddress = serverResource.nic_list_status.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{NutanixPrismComputeUtility.checkIpv4Ip(it)}
 			}
 			def privateIp = ipAddress
 			def publicIp = ipAddress
