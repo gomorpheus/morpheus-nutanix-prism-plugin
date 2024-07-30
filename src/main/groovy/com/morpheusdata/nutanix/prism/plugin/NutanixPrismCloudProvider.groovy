@@ -429,8 +429,9 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
-	ServiceResponse refresh(Cloud cloudInfo) {
-		initializeCloud(cloudInfo)
+	ServiceResponse initializeCloud(Cloud cloud) {
+		plugin.getNetworkProvider().initializeProvider(cloud)
+		refresh(cloud)
 	}
 
 	@Override
@@ -440,6 +441,8 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	ServiceResponse deleteCloud(Cloud cloud) {
+
+		plugin.getNetworkProvider().deleteProvider(cloud)
 
 		//clean up images and templates
 		List<VirtualImageLocationIdentityProjection> virtualImageLocations = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
@@ -585,7 +588,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 	}
 
 	@Override
-	ServiceResponse initializeCloud(Cloud cloud) {
+	ServiceResponse refresh(Cloud cloud) {
 		ServiceResponse rtn = new ServiceResponse(success: false)
 		log.info "Initializing Cloud: ${cloud.code}"
 		log.info "config: ${cloud.configMap}"

@@ -1,0 +1,21 @@
+resource "account-integration-type" "nutanix-prism-flow" {
+	code = "nutanix-prism-flow"
+	name = "NPC Flow"
+	category = "network"
+	enabled = true
+	creatable = true
+	viewSet = "npc-flow"
+	hasCmdb = false
+	hasCmdbDiscovery = false
+	hasCm = false
+	hasApprovals = false
+	hasDeleteApprovals = false
+	hasReconfigureApprovals = false
+	integrationService = "networkService"
+
+	option_types = [
+		{code = "accountIntegrationType.global.serviceUrl"},
+		{code = "accountIntegrationType.global.serviceUsername"},
+		{code = "accountIntegrationType.global.servicePassword"},
+	]
+}
