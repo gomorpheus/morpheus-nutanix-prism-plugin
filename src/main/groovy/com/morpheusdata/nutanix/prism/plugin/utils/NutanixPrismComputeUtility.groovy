@@ -636,12 +636,17 @@ class NutanixPrismComputeUtility {
 		//expand is no longer a query parameter
 		//templateVersionSpec.vmSpec is no longer a string but a map, so don't need to JSON parse anymore
 		//
-		if(authConfig.vmmApiVersion == VMM_API_VERSION.V4_0_B1) {
-			println "BETA!"
+		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion
+		def results = [success: false]
+		if(apiVersion == VMM_API_VERSION.V4_0_B1) {
+			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/content/templates", authConfig.username, authConfig.password,
+							new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		} else if (apiVersion == VMM_API_VERSION.V4_0_A1) {
+			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/templates", authConfig.username, authConfig.password,
+							new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: ["\$expand":"vmSpec"], ignoreSSL: true), 'GET')
 		}
-		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: ["\$expand":"vmSpec"], ignoreSSL: true), 'GET')
 		if(results?.success) {
+			//TODO:: method to normaliseVmSpec
 			return ServiceResponse.success(results?.data)
 		} else {
 			return ServiceResponse.error("Error listing templates", null, results.data)
