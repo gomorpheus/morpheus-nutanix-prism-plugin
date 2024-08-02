@@ -191,7 +191,7 @@ class NutanixPrismSyncUtils {
 			volume.maxStorage = volume.disk_size_bytes
 			DatastoreIdentityProjection datastore = volume.storage_config?.storage_container_reference?.uuid ? new DatastoreIdentityProjection(cloud.id, volume.storage_config?.storage_container_reference?.uuid) : null
 			def volumeConfig = [
-					name        : volume.uuid,
+					name        : volume.uuid ?: generateVolumeDeviceName(volume, volumes),
 					size        : volume.maxStorage,
 					deviceName  : generateVolumeDeviceName(volume, volumes),
 					externalId  : volume.uuid,

@@ -195,8 +195,7 @@ class TemplatesSync {
 			def diskList = []
 			try {
 				if(vmSpec) {
-					//TODO:: vmSpec in v4 is different, normalize vmSpec in utility and check this works.
-					diskList = vmSpec?.spec?.resources?.disk_list ?: []
+					diskList = vmSpec?.disk_list ?: []
 					diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
 				}
 
@@ -322,8 +321,7 @@ class TemplatesSync {
 		def diskList = []
 		try {
 			if(vmSpec) {
-				//TODO:: vmSpec in v4 is different, normalize vmSpec in utility and check this works.
-				diskList = vmSpec?.spec?.resources?.disk_list ?: []
+				diskList = vmSpec?.disk_list ?: []
 				diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
 			}
 

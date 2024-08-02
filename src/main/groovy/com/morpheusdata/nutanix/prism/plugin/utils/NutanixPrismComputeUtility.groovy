@@ -643,7 +643,15 @@ class NutanixPrismComputeUtility {
 		if(results?.success) {
 			results.data?.data?.each { template ->
 				if (template && template?.templateVersionSpec) {
-					template.templateVersionSpec?.vmSpec = normalizeVmSpec(template.templateVersionSpec?.vmSpec, apiVersion)
+					//have to fetch full template to get vmSpec with storage containers and disk info
+					if(apiVersion == VMM_API_VERSION.V4_0_B1) {
+						def getResponse = getTemplate(client, authConfig, template.extId)
+						if(getResponse.success) {
+							template.templateVersionSpec?.vmSpec = getResponse.data?.data?.templateVersionSpec?.vmSpec
+						}
+					} else if (apiVersion == VMM_API_VERSION.V4_0_A1) {
+						template.templateVersionSpec?.vmSpec = normalizeVmSpec(template.templateVersionSpec?.vmSpec, apiVersion)
+					}
 				}
 			}
 			return ServiceResponse.success(results?.data)
@@ -654,17 +662,48 @@ class NutanixPrismComputeUtility {
 
 	static normalizeVmSpec(Object vmSpec, VMM_API_VERSION vmmApiVersion) {
 		def rtn = [:]
+		def diskList = []
 		if(vmSpec) {
 			if (vmmApiVersion == VMM_API_VERSION.V4_0_A1) {
 				if (vmSpec instanceof String) {
-						rtn = new JsonSlurper().parseText(vmSpec)
+					rtn.rawSpec = new JsonSlurper().parseText(vmSpec)
+					diskList = rtn.rawSpec?.spec?.resources?.disk_list
+					rtn.disk_list = diskList
 				}
 			} else if (vmmApiVersion == VMM_API_VERSION.V4_0_B1) {
 				if (vmSpec instanceof Map) {
-					rtn = vmSpec
+					//ugly, but normalise to v3 style for now
+					rtn.rawSpec = vmSpec
+					diskList = rtn.rawSpec?.disks
+					diskList = diskList.collect { disk ->
+						def diskData = disk.backingInfo
+						def size = diskData?.diskSizeBytes
+						//no CDs listed under disk
+						def type = "DISK"
+						def busType = disk?.diskAddress?.busType
+						def deviceIndex = disk?.diskAddress?.index
+						def storageContainer = diskData?.storageContainer?.extId
+						return [
+							device_properties: [
+								device_type: type,
+								disk_address: [
+									device_bus: busType,
+									device_index: deviceIndex,
+									adapter_type: busType,
+								]
+							],
+							disk_size_bytes: size,
+							storage_config: [
+								storage_container_reference: [
+									uuid: storageContainer
+								]
+							]
+						]
+					}
+					rtn.disk_list = diskList
 				}
 			}
-			//TODO:: normalize the rest of the spec against the V3/V2 APIs
+
 		}
 		return rtn
 	}
