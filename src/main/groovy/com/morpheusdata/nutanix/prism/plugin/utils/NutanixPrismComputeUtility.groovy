@@ -615,6 +615,11 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse listTemplates(HttpApiClient client, Map authConfig) {
+		//beta changes
+		//api/vmm/v4.0.b1/content/templates
+		//expand is no longer a query parameter
+		//templateVersionSpec.vmSpec is no longer a string but a map, so don't need to JSON parse anymore
+		//
 		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates", authConfig.username, authConfig.password,
 			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: ["\$expand":"vmSpec"], ignoreSSL: true), 'GET')
 		if(results?.success) {
@@ -625,6 +630,9 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse getTemplate(HttpApiClient client, Map authConfig, String templateUuid) {
+		//beta changes
+		//api/vmm/v4.0.b1/content/templates/{extId}
+		//templateVersionSpec.vmSpec is no longer a string but a map, so don't need to JSON parse anymore
 		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates/${templateUuid}", authConfig.username, authConfig.password,
 			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
 		if(results?.success) {
@@ -657,6 +665,11 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse createVmFromTemplate(HttpApiClient client, Map authConfig, Map runConfig) {
+		//beta changes
+		//api/vmm/v4.0.b1/content/templates/{extId}/$actions/deploy
+		//NTNX-Request-Id is still required
+		//versionNumber is now versionId, this is not required so should not be needed as not used currently
+		// response should be the same format
 		def templateUuid = runConfig.imageExternalId
 		def headers = [
 			'Content-Type':'application/json',

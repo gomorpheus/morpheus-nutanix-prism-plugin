@@ -197,6 +197,7 @@ class TemplatesSync {
 				if(specString) {
 					def parsedSpec = new JsonSlurper().parseText(specString)
 					diskList = parsedSpec?.spec?.resources?.disk_list ?: []
+					//TODO:: diskList will be structured differently in beta VM spec.
 					diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
 				}
 
@@ -324,6 +325,7 @@ class TemplatesSync {
 			if(specString) {
 				def parsedSpec = new JsonSlurper().parseText(specString)
 				diskList = parsedSpec?.spec?.resources?.disk_list ?: []
+				//TODO:: diskList will be structured differently in beta VM spec.
 				diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
 			}
 
