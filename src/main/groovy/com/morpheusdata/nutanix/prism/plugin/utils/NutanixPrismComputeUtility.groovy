@@ -69,6 +69,9 @@ class NutanixPrismComputeUtility {
 		protected String desc
 		def getCode() { return this.code }
 		def getDescription() { return this.desc}
+		static VMM_API_VERSION findByCode(String code) {
+			return values()?.find{it.getCode() == code}
+		}
 	}
 
 	static testConnection(HttpApiClient client, Map authConfig) {
@@ -633,6 +636,9 @@ class NutanixPrismComputeUtility {
 		//expand is no longer a query parameter
 		//templateVersionSpec.vmSpec is no longer a string but a map, so don't need to JSON parse anymore
 		//
+		if(authConfig.vmmApiVersion == VMM_API_VERSION.V4_0_B1) {
+			println "BETA!"
+		}
 		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates", authConfig.username, authConfig.password,
 			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: ["\$expand":"vmSpec"], ignoreSSL: true), 'GET')
 		if(results?.success) {

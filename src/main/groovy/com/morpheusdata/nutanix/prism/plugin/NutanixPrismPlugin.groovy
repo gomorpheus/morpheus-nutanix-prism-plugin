@@ -23,6 +23,7 @@ import com.morpheusdata.core.Plugin
 import com.morpheusdata.model.AccountCredential
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.nutanix.prism.plugin.backup.NutanixPrismBackupProvider
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import groovy.util.logging.Slf4j
 
 @Slf4j
@@ -69,9 +70,16 @@ class NutanixPrismPlugin extends Plugin {
 				basePath: 'api/nutanix/v3',
 				v2basePath: 'api/nutanix/v2.0',
 				username: null,
-				password: null
+				password: null,
+			  vmmApiVersion: NutanixPrismComputeUtility.VMM_API_VERSION.V4_0_A1
 		]
-
+		String vmmApiVersionCode = cloud.configMap?.vmmApiVersion?.toString()
+		if(vmmApiVersionCode) {
+			def vmmApiVersion = NutanixPrismComputeUtility.VMM_API_VERSION.findByCode(vmmApiVersionCode)
+			if(vmmApiVersion) {
+				rtn.vmmApiVersion = vmmApiVersion
+			}
+		}
 		if(!cloud.accountCredentialLoaded) {
 			AccountCredential accountCredential
 			try {
