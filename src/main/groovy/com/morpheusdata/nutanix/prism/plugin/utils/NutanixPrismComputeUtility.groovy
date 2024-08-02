@@ -631,11 +631,6 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse listTemplates(HttpApiClient client, Map authConfig) {
-		//beta changes
-		//api/vmm/v4.0.b1/content/templates
-		//expand is no longer a query parameter
-		//templateVersionSpec.vmSpec is no longer a string but a map, so don't need to JSON parse anymore
-		//
 		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion
 		def results = [success: false]
 		if(apiVersion == VMM_API_VERSION.V4_0_B1) {
@@ -646,20 +641,49 @@ class NutanixPrismComputeUtility {
 							new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: ["\$expand":"vmSpec"], ignoreSSL: true), 'GET')
 		}
 		if(results?.success) {
-			//TODO:: method to normaliseVmSpec
+			results.data?.data?.each { template ->
+				if (template && template?.templateVersionSpec) {
+					template.templateVersionSpec?.vmSpec = normalizeVmSpec(template.templateVersionSpec?.vmSpec, apiVersion)
+				}
+			}
 			return ServiceResponse.success(results?.data)
 		} else {
 			return ServiceResponse.error("Error listing templates", null, results.data)
 		}
 	}
 
+	static normalizeVmSpec(Object vmSpec, VMM_API_VERSION vmmApiVersion) {
+		def rtn = [:]
+		if(vmSpec) {
+			if (vmmApiVersion == VMM_API_VERSION.V4_0_A1) {
+				if (vmSpec instanceof String) {
+						rtn = new JsonSlurper().parseText(vmSpec)
+				}
+			} else if (vmmApiVersion == VMM_API_VERSION.V4_0_B1) {
+				if (vmSpec instanceof Map) {
+					rtn = vmSpec
+				}
+			}
+			//TODO:: normalize the rest of the spec against the V3/V2 APIs
+		}
+		return rtn
+	}
+
 	static ServiceResponse getTemplate(HttpApiClient client, Map authConfig, String templateUuid) {
-		//beta changes
-		//api/vmm/v4.0.b1/content/templates/{extId}
-		//templateVersionSpec.vmSpec is no longer a string but a map, so don't need to JSON parse anymore
-		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates/${templateUuid}", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion
+		def results = [success: false]
+		if(apiVersion == VMM_API_VERSION.V4_0_B1) {
+			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/content/templates/${templateUuid}", authConfig.username, authConfig.password,
+							new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		} else if (apiVersion == VMM_API_VERSION.V4_0_A1) {
+			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/templates/${templateUuid}", authConfig.username, authConfig.password,
+							new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		}
 		if(results?.success) {
+			def template = results.data?.data
+			if (template && template?.templateVersionSpec) {
+				template.templateVersionSpec?.vmSpec = normalizeVmSpec(template.templateVersionSpec?.vmSpec, apiVersion)
+			}
 			return ServiceResponse.success(results?.data)
 		} else {
 			return ServiceResponse.error("Error getting template ${templateUuid}", null, results.data)
@@ -689,11 +713,6 @@ class NutanixPrismComputeUtility {
 	}
 
 	static ServiceResponse createVmFromTemplate(HttpApiClient client, Map authConfig, Map runConfig) {
-		//beta changes
-		//api/vmm/v4.0.b1/content/templates/{extId}/$actions/deploy
-		//NTNX-Request-Id is still required
-		//versionNumber is now versionId, this is not required so should not be needed as not used currently
-		// response should be the same format
 		def templateUuid = runConfig.imageExternalId
 		def headers = [
 			'Content-Type':'application/json',
@@ -740,8 +759,16 @@ class NutanixPrismComputeUtility {
 			}
 
 		}
-		def results = client.callJsonApi(authConfig.apiUrl, "api/vmm/v4.0.a1/templates/${templateUuid}/\$actions/deploy", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
+		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion
+		def results = [success: false]
+		if(apiVersion == VMM_API_VERSION.V4_0_B1) {
+			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/content/templates/${templateUuid}/\$actions/deploy", authConfig.username, authConfig.password,
+							new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
+		} else if (apiVersion == VMM_API_VERSION.V4_0_A1) {
+			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/templates/${templateUuid}/\$actions/deploy", authConfig.username, authConfig.password,
+							new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
+		}
+
 		if(results?.success) {
 			return ServiceResponse.success(results?.data)
 		} else {

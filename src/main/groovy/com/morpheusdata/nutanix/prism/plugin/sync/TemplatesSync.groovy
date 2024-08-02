@@ -191,18 +191,17 @@ class TemplatesSync {
 			def virtualImage = virtualImagesById[existingItem.virtualImage.id]
 			def cloudItem = updateItem.masterItem
 			def virtualImageConfig = buildVirtualImageConfig(cloudItem)
-			def specString = cloudItem.templateVersionSpec.vmSpec
+			def vmSpec = cloudItem.templateVersionSpec.vmSpec
 			def diskList = []
 			try {
-				if(specString) {
-					def parsedSpec = new JsonSlurper().parseText(specString)
-					diskList = parsedSpec?.spec?.resources?.disk_list ?: []
-					//TODO:: diskList will be structured differently in beta VM spec.
+				if(vmSpec) {
+					//TODO:: vmSpec in v4 is different, normalize vmSpec in utility and check this works.
+					diskList = vmSpec?.spec?.resources?.disk_list ?: []
 					diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
 				}
 
 			} catch (e) {
-				log.debug("Error saving template disks ${e}")
+				log.warn("Error saving template disks ${e}")
 
 			}
 			def save = false
@@ -319,18 +318,17 @@ class TemplatesSync {
 	}
 
 	private performPostSaveSync(location, cloudItem) {
-		def specString = cloudItem.templateVersionSpec.vmSpec
+		def vmSpec = cloudItem.templateVersionSpec.vmSpec
 		def diskList = []
 		try {
-			if(specString) {
-				def parsedSpec = new JsonSlurper().parseText(specString)
-				diskList = parsedSpec?.spec?.resources?.disk_list ?: []
-				//TODO:: diskList will be structured differently in beta VM spec.
+			if(vmSpec) {
+				//TODO:: vmSpec in v4 is different, normalize vmSpec in utility and check this works.
+				diskList = vmSpec?.spec?.resources?.disk_list ?: []
 				diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
 			}
 
 		} catch (e) {
-			log.debug("Error saving template disks ${e}")
+			log.warn("Error saving template disks ${e}")
 		}
 		def syncResults = NutanixPrismSyncUtils.syncVolumes(location, diskList, cloud, morpheusContext)
 		if(syncResults.changed) {
