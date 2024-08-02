@@ -299,11 +299,6 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 				type: new NetworkServerType(code:getNetworkServerTypeCode())
 			)
 			morpheusContext.services.integration.deleteCloudIntegration(cloud.id, networkServer)
-			AccountIntegration accountIntegration = new AccountIntegration(
-				name: cloud.name + ' Flow',
-				type: new AccountIntegrationType(code: 'nutanix-prism-flow'),
-			)
-			morpheusContext.services.integration.deleteCloudIntegration(cloud.id, accountIntegration)
 			rtn.success = true
 		} catch (Exception e) {
 			rtn.success = false
