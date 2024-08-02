@@ -58,6 +58,19 @@ import com.morpheusdata.retry.policies.*
 @Slf4j
 class NutanixPrismComputeUtility {
 
+	public static enum VMM_API_VERSION {
+		V4_0_A1('v4.0.a1', '4.0.a1'),
+		V4_0_B1('v4.0.b1', '4.0.b1')
+		VMM_API_VERSION(String code, String desc) {
+			this.code = code
+			this.desc = desc
+		}
+		protected String code
+		protected String desc
+		def getCode() { return this.code }
+		def getDescription() { return this.desc}
+	}
+
 	static testConnection(HttpApiClient client, Map authConfig) {
 		def rtn = [success:false, invalidLogin:false]
 		try {

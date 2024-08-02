@@ -63,7 +63,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage', 'nutanixPrismProjects', 'nutanixPrismVPC'])
+		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage', 'nutanixPrismProjects', 'nutanixPrismVPC', 'supportedVmmApiVersions'])
 	}
 
 	def nutanixPrismProvisionImage(args) {
@@ -190,6 +190,10 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		} else {
 			return []
 		}
+	}
+
+	def supportedVmmApiVersions(args) {
+		return NutanixPrismComputeUtility.VMM_API_VERSION.values()?.collect{[name: it.getDescription(), value: it.getCode()]}?.sort({it.name}) ?: []
 	}
 
 	def nutanixPrismVPC(args){
