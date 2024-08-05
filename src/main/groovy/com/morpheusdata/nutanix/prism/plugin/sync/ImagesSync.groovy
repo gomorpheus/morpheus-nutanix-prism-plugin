@@ -63,7 +63,6 @@ class ImagesSync {
 				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
 					new DataFilter("refType", "ComputeZone"),
 					new DataFilter("refId", cloud.id),
-					new DataFilter("sharedStorage", false),
 					new DataOrFilter(
 						new DataFilter("virtualImage.externalType","!=", "template"),
 						new DataFilter("virtualImage.externalType", "null")
