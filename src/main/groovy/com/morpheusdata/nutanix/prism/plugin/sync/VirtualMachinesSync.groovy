@@ -255,9 +255,6 @@ class VirtualMachinesSync {
 						if(currentServer.powerState != vmConfig.powerState) {
 							currentServer.powerState = vmConfig.powerState
 							save = true
-							if (currentServer.computeServerType?.guestVm) {
-								morpheusContext.async.computeServer.updatePowerState(currentServer.id, currentServer.powerState).blockingGet()
-							}
 						}
 
 						//check for restart usage records
