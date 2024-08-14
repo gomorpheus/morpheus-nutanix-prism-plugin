@@ -228,6 +228,8 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		client = new HttpApiClient()
 		client.networkProxy = proxySettings
 		if(authConfig.apiUrl) {
+			authConfig.timeout = 5000
+			def now = new Date().time
 			def projectResult = NutanixPrismComputeUtility.listProjects(client, authConfig)
 			if(projectResult.success && projectResult.data) {
 				projectResult.data.each {
