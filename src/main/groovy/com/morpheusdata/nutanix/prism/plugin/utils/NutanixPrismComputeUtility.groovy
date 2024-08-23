@@ -95,7 +95,7 @@ class NutanixPrismComputeUtility {
 		if(results?.success) {
 			return ServiceResponse.success(results.data)
 		} else {
-			return ServiceResponse.error()
+			return ServiceResponse.error("Error getting image with ID ${imageId}", null, results.data)
 		}
 	}
 

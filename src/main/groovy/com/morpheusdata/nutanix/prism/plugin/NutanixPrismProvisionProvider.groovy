@@ -1680,7 +1680,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				sleep(1000l * 20l)
 				def imageDetail = NutanixPrismComputeUtility.getImage(apiClient, authConfig, imageExternalId)
 				log.debug("imageDetail: ${imageDetail}")
-				if(!imageDetail.success && imageDetail.data.code == 404 ) {
+				if(!imageDetail.success && imageDetail.data?.code == 404 ) {
 					pending = false
 				}
 				def imageStatus = imageDetail?.data?.status
@@ -2154,7 +2154,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							def imageExternalId
 							if (imageResults.success) {
 								imageExternalId = imageResults.data.metadata.uuid
-								waitForImageComplete(client, authConfig, imageExternalId)
+								def imageWaitResults = waitForImageComplete(client, authConfig, imageExternalId)
+								if(!imageWaitResults.success) {
+									log.warn("Error uploading user-data via ISO image. Cloud-init or unattend data will not be available to the resource.")
+								}
 							} else {
 								log.debug "Error configuring cloud-init - failed to upload iso"
 							}
