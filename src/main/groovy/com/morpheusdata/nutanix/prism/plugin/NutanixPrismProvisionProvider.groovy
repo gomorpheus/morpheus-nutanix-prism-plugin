@@ -2070,7 +2070,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, provisionResponse.installAgent: ${provisionResponse.installAgent}, provisionResponse.noAgent: ${provisionResponse.noAgent}"
 
 
-			def insertIso = isCloudInitIso(runConfig)
 			def cloudConfigUser
 			//cloud_init && sysprep
 			if(virtualImage?.isCloudInit && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
@@ -2079,6 +2078,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				runConfig.isSysprep = true
 				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
 			}
+			def insertIso = isCloudInitIso(runConfig)
 			if(cloudConfigUser && !insertIso) {
 				runConfig.cloudInitUserData = cloudConfigUser.encodeAsBase64()
 			}
@@ -2375,7 +2375,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	private isCloudInitIso(Map createOpts) {
 		def rtn = false
-		if(createOpts.snapshotId) {
+		if(createOpts.platform == 'windows') {
+			//don't want to do cloudbase init for nutanix, instead rely on sysprep/unattend.xml in the API
+			if(createOpts.isSysprep != true)
+				rtn = true
+		} else if(createOpts.snapshotId) {
 			rtn = true
 		} else {
 			return createOpts.unmanagedNetwork

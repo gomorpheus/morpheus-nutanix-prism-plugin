@@ -343,7 +343,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 			gatewayEditable   : true,
 			vlanIdEditable    : true,
 			canAssignPool     : true,
-			name              : 'Nutanix Prism Central VLAN Network'
+			name              : 'Nutanix Prism Central Unmanaged VLAN Network'
 		])
 		[vlanNetwork, overlayNetwork, unmanagedVlanNetwork]
 	}
