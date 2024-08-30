@@ -66,14 +66,16 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 
 	@Override
 	ServiceResponse<Network> prepareNetwork(Network network, Map opts) {
-		return super.prepareNetwork(network, opts)
+		return ServiceResponse.success(network)
 	}
 
 	@Override
 	ServiceResponse validateNetwork(Network network, Map opts) {
-		return super.validateNetwork(network, opts)
+		println "\u001B[33mAC Log - NutanixPrismNetworkProvider:validateNetwork- ${opts}\u001B[0m"
+		return ServiceResponse.success()
 	}
-/**
+
+	/**
 	 * The CloudProvider code that this NetworkProvider should be attached to.
 	 * When this NetworkProvider is registered with Morpheus, all Clouds that match this code will have a
 	 * NetworkServer of this type attached to them. Network actions will then be handled via this provider.
@@ -95,6 +97,32 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 	 */
 	@Override
 	Collection<NetworkType> getNetworkTypes() {
+
+		def networkCluster =  new OptionType([
+				name : 'cluster',
+				code : 'nutanix-prism-network-cluster',
+				fieldName : 'clusterName',
+				noBlank: true,
+				fieldContext : 'config',
+				fieldLabel : 'Cluster',
+				required : true,
+				inputType : OptionType.InputType.SELECT,
+				displayOrder : 100,
+				optionSource: 'nutanixPrismCluster',
+		])
+		def networkVPC = new OptionType([
+				name : 'vpc',
+				code : 'nutanix-prism-network-vpc',
+				fieldName : 'vpcId',
+				fieldContext : 'config',
+				fieldLabel : 'VPC',
+				required : false,
+				inputType : OptionType.InputType.SELECT,
+				displayOrder : 100,
+				optionSource: 'nutanixPrismVPC',
+
+		])
+
 		NetworkType vlanNetwork = new NetworkType([
 			code              : 'nutanix-prism-vlan-network',
 			externalType      : 'VLAN',
@@ -107,7 +135,8 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 			hasCidr           : true,
 			vlanIdEditable    : true,
 			canAssignPool     : true,
-			name              : 'Nutanix Prism Central Managed VLAN Network'
+			name              : 'Nutanix Prism Central Managed VLAN Network',
+			optionTypes       : [networkCluster]
 		])
 		NetworkType overlayNetwork = new NetworkType([
 			code              : 'nutanix-prism-overlay-network',
@@ -117,8 +146,11 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 			dnsEditable       : true,
 			gatewayEditable   : true,
 			vlanIdEditable    : true,
+			creatable         : true,
+			deletable         : true,
 			canAssignPool     : true,
-			name              : 'Nutanix Prism Central Overlay Network'
+			name              : 'Nutanix Prism Central Overlay Network',
+			optionTypes       : [networkVPC]
 		])
 		NetworkType unmanagedVlanNetwork = new NetworkType([
 			code              : 'nutanix-prism-unmanaged-vlan-network',
@@ -128,8 +160,11 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 			dnsEditable       : true,
 			gatewayEditable   : true,
 			vlanIdEditable    : true,
+			creatable         : true,
+			deletable         : true,
 			canAssignPool     : true,
-			name              : 'Nutanix Prism Central VLAN Network'
+			name              : 'Nutanix Prism Central VLAN Network',
+			optionTypes       : [networkCluster]
 		])
 		[vlanNetwork, overlayNetwork, unmanagedVlanNetwork]
 //		NetworkType amazonSubnet = new NetworkType([
@@ -318,32 +353,34 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 	ServiceResponse createNetwork(Network network, Map opts) {
 		def rtn = ServiceResponse.prepare()
 		try {
-//			if(network.networkServer) {
-//				Cloud cloud = network.cloud
-//				CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
-//				AmazonEC2Client amazonClient = plugin.getAmazonClient(cloud, false, resourcePool?.regionCode)
-//				def networkConfig = [:]
-//				networkConfig.name = network.name
-//				networkConfig.vpcId = resourcePool?.externalId
-//				networkConfig.availabilityZone = network.availabilityZone
-//				networkConfig.active = network.active
-//				networkConfig.assignPublicIp = network.assignPublicIp
-//				networkConfig.type = network.type?.externalType
-//				networkConfig.cidr = network.cidr
-//				log.debug("sending network config: {}", networkConfig)
-//				def apiResults = AmazonComputeUtility.createSubnet(opts + [amazonClient: amazonClient, config: networkConfig])
-//				log.debug("network apiResults: {}", apiResults)
-//				//create it
-//				if(apiResults?.success && apiResults?.error != true) {
-//					rtn.success = true
-//					network.externalId = apiResults.externalId
-//					network.uniqueId = apiResults.externalId
-//					network.regionCode = resourcePool?.regionCode
-//				}
-//				rtn.data = network
-//				rtn.msg = apiResults.msg
-//				log.debug("results: {}", rtn.results)
-//			}
+			if(network.networkServer) {
+				Cloud cloud = network.cloud
+				println "\u001B[33mAC Log - NutanixPrismNetworkProvider:createNetwork- ${network.dump()} ${opts}\u001B[0m"
+				return rtn
+				//CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
+				//AmazonEC2Client amazonClient = plugin.getAmazonClient(cloud, false, resourcePool?.regionCode)
+				def networkConfig = [:]
+				networkConfig.name = network.name
+				networkConfig.vpcId = resourcePool?.externalId
+				networkConfig.availabilityZone = network.availabilityZone
+				networkConfig.active = network.active
+				networkConfig.assignPublicIp = network.assignPublicIp
+				networkConfig.type = network.type?.externalType
+				networkConfig.cidr = network.cidr
+				log.debug("sending network config: {}", networkConfig)
+				def apiResults = AmazonComputeUtility.createSubnet(opts + [amazonClient: amazonClient, config: networkConfig])
+				log.debug("network apiResults: {}", apiResults)
+				//create it
+				if(apiResults?.success && apiResults?.error != true) {
+					rtn.success = true
+					network.externalId = apiResults.externalId
+					network.uniqueId = apiResults.externalId
+					network.regionCode = resourcePool?.regionCode
+				}
+				rtn.data = network
+				rtn.msg = apiResults.msg
+				log.debug("results: {}", rtn.results)
+			}
 		} catch(e) {
 			log.error("createNetwork error: ${e}", e)
 		}

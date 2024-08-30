@@ -237,7 +237,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 	}
 
 
-	private static getCloudId(args) {
+	private getCloudId(args) {
 		def cloudId = null
 		if(args?.size() > 0) {
 			def firstArg =  args.getAt(0)
@@ -248,9 +248,16 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			} else if (firstArg?.server?.zone?.id) {
 				cloudId = firstArg.server.zone.id
 			}
+			if(!cloudId && firstArg?.networkServer?.id) {
+				NetworkServer networkServer = morpheusContext.async.network.server.get(firstArg.networkServer.id).blockingGet()
+				cloudId = networkServer.zoneId
+			}
 		}
 		if(!cloudId) {
 			cloudId = args.cloudId ?: args.zoneId
+		}
+		if(cloudId instanceof List && cloudId.size() > 0) {
+			cloudId = cloudId[0]
 		}
 		cloudId ? cloudId.toLong() : null
 	}
