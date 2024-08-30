@@ -310,8 +310,6 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		return getAvailableProvisionProviders().find { it.code == providerCode }
 	}
 
-
-
 	@Override
 	Collection<NetworkType> getNetworkTypes() {
 		plugin.getNetworkProvider().getNetworkTypes()

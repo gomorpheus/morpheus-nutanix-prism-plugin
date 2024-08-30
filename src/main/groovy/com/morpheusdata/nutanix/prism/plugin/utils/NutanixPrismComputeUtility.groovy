@@ -95,7 +95,7 @@ class NutanixPrismComputeUtility {
 		if(results?.success) {
 			return ServiceResponse.success(results.data)
 		} else {
-			return ServiceResponse.error()
+			return ServiceResponse.error("Error getting image with ID ${imageId}", null, results.data)
 		}
 	}
 
@@ -947,8 +947,9 @@ class NutanixPrismComputeUtility {
 			def attempt = 0
 			while(hasMore && attempt < 100) {
 				def body = [kind: kind, offset: offset, length: maxResults]
+				def now = new Date().time
 				def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/${path}", authConfig.username, authConfig.password,
-						new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], body:body, contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'POST')
+						new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], body:body, contentType: ContentType.APPLICATION_JSON, ignoreSSL: true, timeout: authConfig.timeout), 'POST')
 				log.debug("callListApi results: ${results.toMap()}")
 				if(results?.success && !results?.hasErrors()) {
 					rtn.success = true

@@ -106,10 +106,6 @@ class ImagesSync {
 			new DataFilter<String>("imageType", "in", allowedImageTypes),
 			new DataFilter<Collection<String>>("name", "in", names),
 			new DataOrFilter(
-				new DataFilter("code", "=~", "nutanix.prism.image"),
-				new DataFilter<Boolean>("userUploaded", true)
-			),
-			new DataOrFilter(
 				new DataFilter<Boolean>("systemImage", true),
 				new DataOrFilter(
 					new DataFilter("owner", null),
@@ -121,7 +117,7 @@ class ImagesSync {
 		syncTask.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
 			domainObject.externalId && (domainObject.externalId == cloudItem.metadata?.uuid)
 		}.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
-			!domainObject.externalId && (domainObject.name == cloudItem.status.name)
+			domainObject.name == cloudItem.status.name
 		}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItems ->
 			Map<Long, SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 			morpheusContext.async.virtualImage.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImage virtualImage ->
