@@ -25,6 +25,7 @@ import com.morpheusdata.model.Account
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.CloudPool
 import com.morpheusdata.model.Network
+import com.morpheusdata.model.NetworkServer
 import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.model.projection.NetworkIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
@@ -58,6 +59,8 @@ class NetworksSync {
 		log.debug "BEGIN: execute NetworksSync: ${cloud.id}"
 		try {
 			def networkTypes = plugin.cloudProvider.getNetworkTypes()
+
+			def networkServer = morpheusContext.async.network.server.listIdentityProjections(cloud.id, plugin.networkProvider.getNetworkServerTypeCode()).toList().blockingGet()[0]
 
 			def clusters = morpheusContext.async.cloud.pool.listIdentityProjections(cloud.id, '', null).filter { CloudPoolIdentity projection ->
 				return projection.type == 'Cluster' && projection.internalId != null
@@ -135,11 +138,15 @@ class NetworksSync {
 								refType     : 'ComputeZone',
 								refId       : cloud.id,
 								cloudPool   : new CloudPool(id: cloudPoolId),
-								active      : cloud.defaultNetworkSyncActive
+								active      : cloud.defaultNetworkSyncActive,
+							    status      : convertNetworkStatus(cloudItem.status.state)
 						]
 
 						if(clusterId) {
 							networkConfig.displayName = "${cloudItem.status.name} ${cluster.name}"
+						}
+						if(networkServer) {
+							networkConfig.networkServer = new NetworkServer(id:networkServer.id)
 						}
 
 						networkConfig.assignedZonePools = []
@@ -174,6 +181,10 @@ class NetworksSync {
 								existingItem.cloudPool = new CloudPool(id: clusterId)
 								save = true
 							}
+							if(existingItem.networkServer?.id != networkServer?.id) {
+								existingItem.networkServer = new NetworkServer(id:networkServer.id)
+								save = true
+							}
 							def name = masterItem.status.name
 							if (existingItem.name != name) {
 								existingItem.name = name
@@ -198,6 +209,10 @@ class NetworksSync {
 							}
 							if (existingItem.type != networkType) {
 								existingItem.type = networkType
+								save = true
+							}
+							if (existingItem.status != convertNetworkStatus(masterItem.status.state)) {
+								existingItem.status = convertNetworkStatus(masterItem.status.state)
 								save = true
 							}
 
@@ -259,5 +274,16 @@ class NetworksSync {
 			log.error "Error in getting networks: ${e}", e
 		}
 		rtn
+	}
+
+	private convertNetworkStatus(String status) {
+		switch(status) {
+			case 'COMPLETE':
+				return 'available'
+			default:
+				return status.toLowerCase()
+		}
+
+
 	}
 }

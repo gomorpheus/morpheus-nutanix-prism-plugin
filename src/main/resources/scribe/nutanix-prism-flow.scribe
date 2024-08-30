@@ -12,10 +12,14 @@ resource "account-integration-type" "nutanix-prism-flow" {
 	hasDeleteApprovals = false
 	hasReconfigureApprovals = false
 	integrationService = "networkService"
-
+	isPlugin = true
 	option_types = [
 		{code = "accountIntegrationType.global.serviceUrl"},
 		{code = "accountIntegrationType.global.serviceUsername"},
 		{code = "accountIntegrationType.global.servicePassword"},
 	]
+	pluginIconPath = "nutanix-prism.svg"
+	pluginIconHidpiPath= "nutanix-prism.svg"
+	pluginIconDarkPath = "nutanix-prism-dark.svg"
+	pluginIconDarkHidpiPath = "nutanix-prism-dark.svg"
 }
