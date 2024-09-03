@@ -125,7 +125,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 
 		// Grab the projections.. doing a filter pass first
-		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
+		ImageType[] imageTypes = [ImageType.qcow2]
 		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false}.map{it.id}.toList().blockingGet()
 
 		List options = []
@@ -137,19 +137,11 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 					new DataFilter('owner.id', accountId),
 					new DataFilter('owner.id', null),
 					new DataFilter('visibility', 'public')
-				),
-				new DataOrFilter(
-					new DataFilter('category', '=~', 'nutanix.prism.image'),
-					new DataAndFilter(
-						new DataFilter('imageType', 'in', ['qcow2', 'vmdk']),
-						new DataFilter('userUploaded', true)
-					)
 				)
 			]).withJoins('owner')).map {[name: it.name, value: it.id]}.toList().blockingGet()
 		}
-
 		if(options.size() > 0) {
-			options = options.sort { it.name }
+			options = options.sort { it.name.toLowerCase() }
 		}
 
 		options
