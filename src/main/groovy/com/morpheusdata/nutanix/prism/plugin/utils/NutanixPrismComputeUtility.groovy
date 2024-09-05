@@ -1180,7 +1180,10 @@ class NutanixPrismComputeUtility {
 					rtn.virtualMachine = serverDetail.data
 					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
 					rtn.diskList = serverResource.disk_list
-					rtn.nicList = serverResource.nic_list
+					rtn.nicList = serverResource.nic_list ?: []
+					if(serverResource.nic_list_status && serverResource.nic_list_status instanceof List) {
+						rtn.nicList += serverResource.nic_list_status
+					}
 					rtn.name = serverDetail?.data?.spec?.name
 					pending = false
 				}
