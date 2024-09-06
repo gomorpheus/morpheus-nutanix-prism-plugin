@@ -1566,6 +1566,46 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		return networkProxy
 	}
 
+	private setNetworkInfo(ComputeServer server, List externalNetworks, List<ComputeServerInterfaceType> netTypes) {
+		log.debug("setNetworkInfo: serverInterfaces: ${server.interfaces}, externalNetworks: ${externalNetworks}")
+		def serverInterfaces = server.interfaces
+		try {
+			if(externalNetworks?.size() > 0) {
+				externalNetworks.eachWithIndex { item, i ->
+					item.primary = (i == 0)
+					item.displayOrder = i
+				}
+				def saveList = []
+				serverInterfaces?.eachWithIndex { networkInterface, index ->
+					if(!networkInterface.externalId) {
+						def matchNetwork
+						if(networkInterface.primaryInterface) {
+							log.debug("setNetworkInfo: finding primaryInterface {}", networkInterface)
+							matchNetwork = externalNetworks.find{(networkInterface.type?.externalId == it.nic_type || networkInterface.type == null) && it.primary}
+						} else {
+							log.debug("setNetworkInfo: finding interface {}", networkInterface)
+							matchNetwork = externalNetworks.find{(networkInterface.type?.externalId == it.nic_type  || networkInterface.type == null) && it.displayOrder == networkInterface.displayOrder}
+						}
+						if(matchNetwork) {
+							log.debug("setNetworkInfo: found matching interface {}", matchNetwork)
+							networkInterface.externalId = matchNetwork.uuid
+							networkInterface.type = netTypes.find { it.externalId == matchNetwork.nic_type }
+							if(matchNetwork.mac_address && matchNetwork.mac_address != networkInterface.macAddress) {
+								networkInterface.macAddress = matchNetwork.mac_address
+							}
+							saveList << networkInterface
+						}
+					}
+				}
+				if(saveList?.size() > 0) {
+					morpheusContext.async.computeServer.computeServerInterface.save(saveList).blockingGet()
+				}
+			}
+		} catch(e) {
+			log.error("setNetworkInfo error: ${e}", e)
+		}
+	}
+
 	private getOrUploadImage(HttpApiClient client, Map authConfig, Cloud cloud, VirtualImage virtualImage, User createdBy) {
 		def imageExternalId
 		def lock
@@ -2201,6 +2241,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								server.resourcePool = new ComputeZonePool(id: resourcePool.id)
 								//sync interfaces
 								def networks = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id).toMap {it.externalId }.blockingGet()
+								setNetworkInfo(server, serverDetail.nicList, getComputeServerInterfaceTypes())
 								NutanixPrismSyncUtils.syncInterfaces(server, serverDetail.nicList, networks, getComputeServerInterfaceTypes(), morpheusContext)
 
 								//update disks
