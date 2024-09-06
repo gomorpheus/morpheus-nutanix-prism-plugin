@@ -2201,7 +2201,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								server.resourcePool = new ComputeZonePool(id: resourcePool.id)
 								//sync interfaces
 								def networks = morpheusContext.async.cloud.network.listIdentityProjections(cloud.id).toMap {it.externalId }.blockingGet()
-								NutanixPrismSyncUtils.syncInterfaces(server, serverDetail.nicList, networks, getComputeServerInterfaceTypes(), morpheusContext, true)
+								NutanixPrismSyncUtils.syncInterfaces(server, serverDetail.nicList, networks, getComputeServerInterfaceTypes(), morpheusContext)
 
 								//update disks
 								def disks = serverDetail.diskList
