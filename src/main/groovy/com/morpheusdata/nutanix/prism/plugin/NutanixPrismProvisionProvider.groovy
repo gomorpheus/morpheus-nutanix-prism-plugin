@@ -172,6 +172,17 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	Collection<OptionType> getNodeOptionTypes() {
+		OptionType osTypeOption = new OptionType([
+			name : 'osType',
+			code : 'nutanix-prism-node-os-type',
+			fieldName : 'osType.id',
+			fieldContext : 'domain',
+			fieldLabel : 'OsType',
+			inputType : OptionType.InputType.SELECT,
+			displayOrder : 100,
+			required : false,
+			optionSource : 'osTypes'
+		])
 		OptionType imageOption = new OptionType([
 			name : 'image',
 			code : 'nutanix-prism-node-image',
@@ -179,7 +190,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			fieldContext : 'domain',
 			fieldLabel : 'Image',
 			inputType : OptionType.InputType.SELECT,
-			displayOrder : 100,
+			displayOrder : 99,
 			required : false,
 			optionSource : 'nutanixPrismNodeImage'
 		])
@@ -258,7 +269,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			displayOrder : 107,
 			required : false,
 		])
-		return [imageOption, logFolder, configFolder, deployFolder, checkTypeCode, statTypeCode, showServerLogs, logTypeCode]
+		return [osTypeOption, imageOption, logFolder, configFolder, deployFolder, checkTypeCode, statTypeCode, showServerLogs, logTypeCode]
 	}
 
 	@Override
@@ -742,6 +753,10 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 		def prepareResponse = new PrepareHostResponse(computeServer: server, disableCloudInit: false, options: [sendIp: true])
 		ServiceResponse<PrepareHostResponse> rtn = ServiceResponse.prepare(prepareResponse)
+		if(server.sourceImage){
+			rtn.success = true
+			return rtn
+		}
 
 		try {
 			VirtualImage virtualImage
