@@ -11,10 +11,21 @@ resource "virtual-image" "nutanix-prism-image-morpheus-almalinux-9" {
 	installAgent = true
 	osType {
 		code = "almalinux.9.64"
+		owner = null
 	}
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "os-type-image" "nutanix-prism-image-morpheus-almalinux-9" {
+  code               = "nutanix.prism.image.morpheus.almalinux.9.20240604"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-almalinux-9
+  account            = null
+  osType = {
+     code = "almalinux.9.64"
+     owner = null
+  }
+}
 
 resource "workload-type" "nutanix-prism-almalinux-9" {
 	code = "nutanix-prism-almalinux-9"

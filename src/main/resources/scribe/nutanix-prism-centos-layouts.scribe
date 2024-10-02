@@ -11,8 +11,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-7_3" {
 	installAgent = true
 	osType {
 		code = "cent.7.64"
+		owner = null
 	}
 	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-centos-7_3" {
+  code               = "nutanix.prism.image.morpheus.centos.7.3"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-centos-7_3
+  account            = null
+  osType = {
+     code = "cent.7.64"
+     owner = null
+  }
 }
 
 
@@ -97,9 +109,22 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-7_5" {
 	installAgent = true
 	osType {
 		code = "cent.7.64"
+		owner = null
 	}
 	zoneType = "nutanix-prism-cloud"
 }
+
+resource "os-type-image" "nutanix-prism-image-morpheus-centos-7_5" {
+  code               = "nutanix.prism.image.morpheus.centos.7.5"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-centos-7_5
+  account            = null
+  osType = {
+     code = "cent.7.64"
+     owner = null
+  }
+}
+
 
 
 resource "workload-type" "nutanix-prism-centos-7_5" {
@@ -183,8 +208,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-8-stream" {
 	installAgent = true
 	osType {
 		code = "cent.8.64"
+		owner = null
 	}
 	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-centos-8-stream" {
+  code               = "nutanix.prism.image.morpheus.centos.8-stream"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-centos-8-stream
+  account            = null
+  osType = {
+     code = "cent.8.64"
+     owner = null
+  }
 }
 
 resource "virtual-image" "nutanix-prism-image-morpheus-centos-8-stream-20240304" {
@@ -199,8 +236,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-8-stream-20240304"
 	installAgent = true
 	osType {
 		code = "cent.8.64"
+		owner = null
 	}
 	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-centos-8-stream-20240304" {
+  code               = "nutanix.prism.image.morpheus.centos.8-stream.20240304"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-centos-8-stream-20240304
+  account            = null
+  osType = {
+     code = "cent.8.64"
+     owner = null
+  }
 }
 
 
@@ -289,6 +338,17 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-9-stream" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+resource "os-type-image" "nutanix-prism-image-morpheus-centos-9-stream" {
+  code               = "nutanix.prism.image.morpheus.centos.9-stream"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-centos-9-stream
+  account            = null
+  osType = {
+     code = "cent.9.64"
+     owner = null
+  }
+}
+
 resource "virtual-image" "nutanix-prism-image-morpheus-centos-9-stream-20240604" {
 	code = "nutanix.prism.image.morpheus.centos.9-stream.20240604"
 	category = "nutanix.prism.image.morpheus.centos"
@@ -303,6 +363,17 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-9-stream-20240604"
 		code = "cent.9.64"
 	}
 	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-centos-9-stream-20240604" {
+  code               = "nutanix.prism.image.morpheus.centos.9-stream.20240604"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-centos-9-stream-20240604
+  account            = null
+  osType = {
+     code = "cent.9.64"
+     owner = null
+  }
 }
 
 

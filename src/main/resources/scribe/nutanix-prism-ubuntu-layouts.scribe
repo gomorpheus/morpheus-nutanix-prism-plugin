@@ -134,8 +134,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20240604" {
 	installAgent = true
 	osType {
 		code = "ubuntu.20.04.64"
+		owner = null
 	}
 	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20240604" {
+  code               = "nutanix.prism.image.morpheus.ubuntu.20.04.20240604.ubuntu.20.04"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20240604
+  account            = null
+  osType = {
+     code = "ubuntu.20.04.64"
+     owner = null
+  }
 }
 
 resource "workload-type" "nutanix-prism-ubuntu-20_04" {
@@ -225,6 +237,7 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20230307" {
 	zoneType = "nutanix-prism-cloud"
 }
 
+
 resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20240604" {
 	code = "nutanix.prism.image.morpheus.ubuntu.22.04.20240604"
 	category = "nutanix.prism.image.morpheus.ubuntu"
@@ -237,8 +250,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20240604" {
 	installAgent = true
 	osType {
 		code = "ubuntu.22.04.64"
+		account = null
 	}
 	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20240604" {
+  code               = "nutanix.prism.image.morpheus.ubuntu.22.04.20240604"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20240604
+  account            = null
+  osType = {
+     code = "ubuntu.22.04.64"
+     owner = null
+  }
 }
 
 
@@ -326,8 +351,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-24_04-20240604" {
 	installAgent = true
 	osType {
 		code = "ubuntu.24.04.64"
+		account = null
 	}
 	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-24_04-20240604" {
+  code               = "nutanix.prism.image.morpheus.ubuntu.24.04.20240604"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20240604
+  account            = null
+  osType = {
+     code = "ubuntu.24.04.64"
+     owner = null
+  }
 }
 
 
