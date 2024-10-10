@@ -79,7 +79,7 @@ jar {
 	manifest {
 		attributes(
 				'Plugin-Class': 'com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin',
-				'Plugin-Version': version,
+				'Plugin-Version': pluginVersion,
 				'Morpheus-Name': 'Nutanix Prism Central',
 				'Morpheus-Organization': 'morpheus',
 				'Morpheus-Code': 'morpheus-nutanix-prism',
@@ -89,7 +89,7 @@ jar {
 				'Morpheus-Color': '#ffffff',
 				'Morpheus-Labels': 'Plugin, Cloud',
 				'Morpheus-Repo': 'https://github.com/gomorpheus/morpheus-nutanix-prism-plugin',
-				'Morpheus-Min-Appliance-Version': minversion
+				'Morpheus-Min-Appliance-Version': minVersion
 		)
 	}
 }
