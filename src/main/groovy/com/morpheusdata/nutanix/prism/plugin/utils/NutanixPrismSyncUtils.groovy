@@ -30,7 +30,7 @@ import com.morpheusdata.model.ServicePlan
 import com.morpheusdata.model.StorageVolume
 import com.morpheusdata.model.StorageVolumeType
 import com.morpheusdata.model.Workload
-import com.morpheusdata.model.projection.DatastoreIdentity
+import com.morpheusdata.model.projection.DatastoreIdentityProjection
 import com.morpheusdata.model.projection.NetworkIdentityProjection
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
@@ -142,7 +142,7 @@ class NutanixPrismSyncUtils {
 					save = true
 				}
 				if(existingVolume.datastore?.externalId != volume.storage_config?.storage_container_reference?.uuid) {
-					existingVolume.datastore = new DatastoreIdentity(cloud.id, volume.storage_config?.storage_container_reference?.uuid)
+					existingVolume.datastore = new DatastoreIdentityProjection(cloud.id, volume.storage_config?.storage_container_reference?.uuid)
 					save = true
 				}
 				if(save) {
@@ -187,7 +187,7 @@ class NutanixPrismSyncUtils {
 
 		volumes?.eachWithIndex { volume, index ->
 			volume.maxStorage = volume.disk_size_bytes
-			DatastoreIdentity datastore = volume.storage_config?.storage_container_reference?.uuid ? new DatastoreIdentity(cloud.id, volume.storage_config?.storage_container_reference?.uuid) : null
+			DatastoreIdentityProjection datastore = volume.storage_config?.storage_container_reference?.uuid ? new DatastoreIdentityProjection(cloud.id, volume.storage_config?.storage_container_reference?.uuid) : null
 			def volumeConfig = [
 					name        : volume.uuid ?: generateVolumeDeviceName(volume, volumes),
 					size        : volume.maxStorage,
@@ -227,7 +227,7 @@ class NutanixPrismSyncUtils {
 		if(volume.unitNumber)
 			storageVolume.unitNumber = volume.unitNumber
 		if(volume.datastoreId) {
-			storageVolume.datastore = new DatastoreIdentity(id: volume.datastoreId.toLong())
+			storageVolume.datastore = new DatastoreIdentityProjection(id: volume.datastoreId.toLong())
 		}
 		if(volume.datastore) {
 			storageVolume.datastore = volume.datastore
