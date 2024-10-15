@@ -81,12 +81,12 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		OptionType apiUrl = new OptionType(
 				name: 'Api Url',
 				code: 'nutanix-prism-api-url',
-				fieldName: 'serviceUrl',
+				fieldName: 'apiUrl',
 				displayOrder: 0,
 				fieldLabel: 'Api Url',
 				required: true,
 				inputType: OptionType.InputType.TEXT,
-				fieldContext: 'domain'
+				fieldContext: 'config'
 		)
 		OptionType credentials = new OptionType(
 				code: 'nutanix-prism-credential',
@@ -104,23 +104,23 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		OptionType username = new OptionType(
 				name: 'Username',
 				code: 'nutanix-prism-username',
-				fieldName: 'serviceUsername',
+				fieldName: 'username',
 				displayOrder: 20,
 				fieldLabel: 'Username',
 				required: true,
 				inputType: OptionType.InputType.TEXT,
-				fieldContext: 'domain',
+				fieldContext: 'config',
 				localCredential: true
 		)
 		OptionType password = new OptionType(
 				name: 'Password',
 				code: 'nutanix-prism-password',
-				fieldName: 'servicePassword',
+				fieldName: 'password',
 				displayOrder: 25,
 				fieldLabel: 'Password',
 				required: true,
 				inputType: OptionType.InputType.PASSWORD,
-				fieldContext: 'domain',
+				fieldContext: 'config',
 				localCredential: true
 		)
 
@@ -134,7 +134,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 			inputType: OptionType.InputType.SELECT,
 			fieldContext: 'config',
 			optionSource: 'nutanixPrismProjects',
-			dependsOnCode: 'zone.serviceUrl, serviceUrl, zone.serviceUsername, serviceUsername, zone.servicePassword, servicePassword, credential.type, credential.username, credential.password'
+			dependsOnCode: 'config.apiUrl, apiUrl, config.username, username, config.password, password, credential.type, credential.username, credential.password'
 		)
 
 		OptionType vmmApiVersion = new OptionType(
@@ -628,28 +628,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 			client = new HttpApiClient()
 			client.networkProxy = proxySettings
 
-			//hack to move credentials to new locations
-			def updatedCreds = false
-			if(cloud.serviceUsername == null && cloud.getConfigProperty('username')) {
-				cloud.serviceUsername = cloud.getConfigProperty('username')
-				cloud.setConfigProperty('username', null)
-				updatedCreds = true
-			}
-			if(cloud.servicePassword == null && cloud.getConfigProperty('password')) {
-				cloud.servicePassword = cloud.getConfigProperty('password')
-				cloud.setConfigProperty('password', null)
-				updatedCreds = true
-			}
-			if(cloud.serviceUrl == null && cloud.getConfigProperty('apiUrl')) {
-				cloud.serviceUrl = cloud.getConfigProperty('apiUrl')
-				cloud.setConfigProperty('apiUrl', null)
-				updatedCreds = true
-			}
-			if(updatedCreds) {
-				cloud = morpheusContext.services.cloud.save(cloud)
-			}
 			def authConfig = plugin.getAuthConfig(cloud)
-
 			def apiUrlObj = new URL(authConfig.apiUrl)
 			def apiHost = apiUrlObj.getHost()
 			def apiPort = apiUrlObj.getPort() > 0 ? apiUrlObj.getPort() : (apiUrlObj?.getProtocol()?.toLowerCase() == 'https' ? 443 : 80)
