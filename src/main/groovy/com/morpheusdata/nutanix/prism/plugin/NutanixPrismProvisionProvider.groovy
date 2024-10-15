@@ -1790,7 +1790,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			installAgent      : (opts.config?.containsKey("noAgent") == false || (opts.config?.containsKey("noAgent") && opts.config.noAgent != true))
 
 		]
-		println "\u001B[33mAC Log - NutanixPrismProvisionProvider:buildWorkloadRunConfig- ${runConfig}\u001B[0m"
 		return runConfig
 	}
 
