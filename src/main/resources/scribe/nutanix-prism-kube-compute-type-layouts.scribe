@@ -75,3 +75,40 @@ resource "compute-type-layout" "kubernetes-1_30-ubuntu-22_04-nutanix-prism-amd64
     "kubernetes-nginx-ingress-operator-1-10-1-package"
   ]
 }
+
+resource "compute-type-layout" "kubernetes-1_31-ubuntu-22_04-nutanix-prism-amd64-single" {
+  code = "kubernetes-1_31-ubuntu-22_04-nutanix-prism-amd64-single"
+  enabled = true
+  name = "MKS Kubernetes 1.30 Cluster on Ubuntu 22.04"
+  sortOrder = 0
+  computeVersion = "22.04"
+  clusterVersion = "1.31.x"
+  description = "provision a kubernetes 1.31 cluster on ubuntu 22.04"
+  type = "nutanixPrismKubeMaster"
+  serverCount = 4
+  memoryRequirement = 1073741824
+  hasAutoScale = true
+  containerRuntime = "containerd"
+  networkRuntime = "calico"
+  computeServers = [
+    compute-type-set.kubernetes-ubuntu-22_04-nutanix-prism-amd64-set,
+    compute-type-set.kubernetes-ubuntu-22_04-worker-nutanix-prism-amd64-set
+  ]
+  groupType = "kubernetes-cluster"
+  provisionType =  "nutanix-prism-provision-provider"
+  optionTypes = [
+    {code = "nutanix-prism-provision-vpc"},
+    {code = "nutanix-prism-provision-cluster"},
+    {code = "nutanix-prism-provision-categories"},
+    {code = "kubernetes.master.podCidr"},
+    {code = "kubernetes.master.serviceCidr"}
+  ]
+  specTemplates = []
+  packages = [
+    "kubernetes-calico-3-25-0-package",
+    "kubernetes-rook-1-15-0-package",
+    "kubernetes-fluentbit-3-0-7-package",
+    "kubernetes-prometheus-0-12-package",
+    "kubernetes-nginx-ingress-operator-1-11-2-package"
+  ]
+}
