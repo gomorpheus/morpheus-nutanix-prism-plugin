@@ -159,7 +159,7 @@ class NetworksSync {
 						networkAdds << networkAdd
 					}
 					//create networks
-					morpheusContext.async.cloud.network.create(networkAdds).blockingGet()
+					morpheusContext.async.cloud.network.bulkCreate(networkAdds).blockingGet()
 				}.onUpdate { List<SyncTask.UpdateItem<Network, Map>> updateItems ->
 					List<Network> itemsToUpdate = []
 					for (item in updateItems) {
@@ -223,11 +223,11 @@ class NetworksSync {
 						}
 					}
 					if (itemsToUpdate.size() > 0) {
-						morpheusContext.async.cloud.network.save(itemsToUpdate).blockingGet()
+						morpheusContext.async.cloud.network.bulkSave(itemsToUpdate).blockingGet()
 					}
 
 				}.onDelete { removeItems ->
-					morpheusContext.async.cloud.network.remove(removeItems).blockingGet()
+					morpheusContext.async.cloud.network.bulkRemove(removeItems).blockingGet()
 				}.start()
 
 			}
