@@ -722,6 +722,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def vmId = server.externalId
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
+
+			//check if need to unmount cdrom from user data ISO
+			if(server.sourceImage?.isCloudInit || (server.sourceImage?.platform == 'windows' && !server.sourceImage?.isSysprep)) {
+				log.info("Ejecting any existing CDROM disks")
+				NutanixPrismComputeUtility.ejectCdrom(client, authConfig, vmId)
+			}
+
 			def serverDetails = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
 			//check if ip changed and update
 			def serverResource = serverDetails?.data?.status?.resources
