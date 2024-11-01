@@ -221,7 +221,6 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		client.networkProxy = proxySettings
 		if(authConfig.apiUrl) {
 			authConfig.timeout = 5000
-			def now = new Date().time
 			def projectResult = NutanixPrismComputeUtility.listProjects(client, authConfig)
 			if(projectResult.success && projectResult.data) {
 				projectResult.data.each {
@@ -286,25 +285,26 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		}
 
 		// load existing credentials when not passed in
-		if(args.credential == null && !(args.username ?: args.config?.username)) {
+		if(args.credential == null && !(args.serviceUsername ?: args.username ?: args.config?.username)) {
 			// check for passed in credentials
 			if(!rtn.accountCredentialLoaded) {
 				AccountCredential credentials = morpheusContext.services.accountCredential.loadCredentials(rtn)
 				rtn.accountCredentialData = credentials?.data
 			}
 		} else {
-			def url = args.apiUrl ?: args.config?.apiUrl
+			def url = args.serviceUrl ?: args["zone.serviceUrl"]
 			url = decodeUrl(url)
-			def config = [
-				username: args.username ?: args.config?.username,
-				password: args.password ?: args.config?.password,
-				apiUrl: url
+
+			rtn.serviceUsername =  args.serviceUsername ?: args["zone.serviceUsername"]
+			rtn.servicePassword =   args.servicePassword ?: args["zone.servicePassword"]
+			rtn.serviceUrl =  url
+
+			def credentialConfig = [
+			    username: rtn.serviceUsername,
+				password: rtn.servicePassword,
+				url: url
 			]
-			if (config.password == '*' * 12) {
-				config.remove('secretKey')
-			}
-			rtn.setConfigMap(rtn.getConfigMap() + config)
-			rtn.accountCredentialData = morpheusContext.services.accountCredential.loadCredentialConfig(args.credential, config).data
+			rtn.accountCredentialData = morpheusContext.services.accountCredential.loadCredentialConfig(args.credential, credentialConfig).data
 		}
 		rtn.accountCredentialLoaded = true
 

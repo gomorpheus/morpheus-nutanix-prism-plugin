@@ -1445,7 +1445,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	Boolean disableRootDatastore() {
-		return false
+		return true
 	}
 
 	@Override
@@ -1849,19 +1849,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		VirtualImage virtualImage = server.sourceImage
 		StorageVolume rootVolume = server.volumes?.find{it.rootVolume == true}
 
-
-		def datastoreId = rootVolume.datastore?.id
-		def rootDatastore = morpheusContext.async.cloud.datastore.listById([datastoreId?.toLong()]).firstOrError().blockingGet()
-		if(!rootDatastore) {
-			log.error("buildRunConfig error: Datastore option is invalid for selected host")
-			throw new Exception("There are no available datastores to use based on provisioning options for the target host.")
-		}
-
-		if(rootVolume) {
-			rootVolume.datastore = rootDatastore
-			morpheusContext.async.storageVolume.save([rootVolume]).blockingGet()
-		}
-
 		// Network stuff
 		def primaryInterface = networkConfiguration.primaryInterface
 		Network network = primaryInterface?.network
@@ -1925,20 +1912,23 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						device_index: index
 					],
 				],
-				disk_size_bytes: volume.maxStorage,
-				storage_config: [
+				disk_size_bytes: volume.maxStorage
+			]
+			if(volume.rootVolume) {
+				if (virtualImage) {
+					diskConfig['data_source_reference'] = [
+						uuid: imageExternalId ?: virtualImage.externalId,
+						name: virtualImage.name,
+						kind: "image"
+					]
+				}
+			} else {
+				diskConfig['storage_config'] = [
 					storage_container_reference: [
 						uuid: datastore.externalId,
 						name: datastore.name,
 						kind: "storage_container",
 					]
-				]
-			]
-			if(virtualImage && volume.rootVolume) {
-				diskConfig['data_source_reference'] = [
-					uuid: imageExternalId ?: virtualImage.externalId,
-					name: virtualImage.name,
-					kind: "image"
 				]
 			}
 			diskList << diskConfig
@@ -2019,7 +2009,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		runConfig += [
 			serverId          : server.id,
 			cloudId           : cloud.id,
-			datastoreId       : datastoreId,
 			networkId         : networkId,
 			networkBackingType: networkBackingType,
 			platform          : server.osType,
