@@ -936,6 +936,25 @@ class NutanixPrismComputeUtility {
 		return updateVm(client, authConfig, vmUuid, vmBody)
 	}
 
+	static ServiceResponse ejectCdrom(HttpApiClient client, Map authConfig, String vmUuid) {
+		log.debug("ejectCdrom")
+		def vmResults = waitForPowerState(client, authConfig, vmUuid) //get latest spec information
+		if(vmResults.success && vmResults.data) {
+			def vmBody = vmResults.data
+			def cdromDisks = vmBody?.spec?.resources?.disk_list?.findAll { it.device_properties?.device_type?.toLowerCase() == 'cdrom' }
+			if(cdromDisks) {
+				cdromDisks.each { disk ->
+					//disk['device_properties']['is_empty'] = true //does not work
+					disk?.remove('data_source_reference')
+					disk?.remove('disk_size_bytes')
+					disk?.remove('disk_size_mib')
+				}
+				return updateVm(client, authConfig, vmUuid, vmBody)
+			}
+		}
+		return ServiceResponse.success()
+	}
+
 	private static ServiceResponse callListApi(HttpApiClient client, String kind, String path, Map authConfig) {
 		log.debug("callListApi: kind ${kind}, path: ${path}")
 		def rtn = new ServiceResponse(success: false)
