@@ -683,6 +683,7 @@ class NutanixPrismComputeUtility {
 						def busType = disk?.diskAddress?.busType
 						def deviceIndex = disk?.diskAddress?.index
 						def storageContainer = diskData?.storageContainer?.extId
+						def uuid = disk?.extId //todo:: Fix volumes re-creating on every cloud sync. documented property but it does not exist in my testing. Perhaps a 4_0_B1 bug
 						return [
 							device_properties: [
 								device_type: type,
@@ -697,7 +698,8 @@ class NutanixPrismComputeUtility {
 								storage_container_reference: [
 									uuid: storageContainer
 								]
-							]
+							],
+							uuid: uuid
 						]
 					}
 					rtn.disk_list = diskList
