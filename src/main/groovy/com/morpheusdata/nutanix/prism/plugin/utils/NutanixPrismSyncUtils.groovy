@@ -215,7 +215,7 @@ class NutanixPrismSyncUtils {
 
 
 	static StorageVolume buildStorageVolume(Account account, locationOrServer, volume, index, size = null) {
-		log.debug "buildStorageVolume: ${account} ${locationOrServer} ${volume} ${index}"
+		log.debug "buildStorageVolume: ${account.id} ${locationOrServer.id} ${volume} ${index}"
 		StorageVolume storageVolume = new StorageVolume()
 		storageVolume.name = volume.name
 		storageVolume.account = account
@@ -239,7 +239,11 @@ class NutanixPrismSyncUtils {
 		}
 		storageVolume.rootVolume = volume.rootVolume == true
 		storageVolume.removable = storageVolume.rootVolume != true
-		storageVolume.displayOrder = volume.displayOrder ?: locationOrServer?.volumes?.size() ?: 0
+		if(volume.displayOrder != null) { //explicit null check required
+			storageVolume.displayOrder = volume.displayOrder
+		} else {
+			storageVolume.displayOrder = locationOrServer?.volumes?.size() ?: 0
+		}
 		storageVolume.diskIndex = index
 		return storageVolume
 	}
