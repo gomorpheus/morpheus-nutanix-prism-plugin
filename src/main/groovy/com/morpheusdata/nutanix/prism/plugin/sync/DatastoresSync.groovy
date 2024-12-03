@@ -130,8 +130,8 @@ class DatastoresSync {
 								name        : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'container_name'),
 								externalId  : cloudItem.entity_id,
 								cloud       : cloud,
-								storageSize : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'storage.user_capacity_bytes')?.toLong(),
-								freeSpace   : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'storage.user_free_bytes')?.toLong(),
+								storageSize : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'storage.capacity_bytes')?.toLong(),
+								freeSpace   : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'storage.free_bytes')?.toLong(),
 								type        : 'generic',
 								category    : "nutanix-prism-datastore.${cloud.id}",
 								drsEnabled  : false,
@@ -170,13 +170,13 @@ class DatastoresSync {
 							save = true
 						}
 
-						Long freeSpace = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'storage.user_free_bytes')?.toLong()
+						Long freeSpace = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'storage.free_bytes')?.toLong()
 						if(existingItem.freeSpace != freeSpace) {
 							existingItem.freeSpace = freeSpace
 							save = true
 						}
 
-						Long storageSize = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'storage.user_capacity_bytes')?.toLong()
+						Long storageSize = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'storage.capacity_bytes')?.toLong()
 						if(existingItem.storageSize != storageSize) {
 							existingItem.storageSize = storageSize
 							save = true
