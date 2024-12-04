@@ -125,9 +125,14 @@ class DatastoresSync {
 							it.externalId == clusterId
 						}
 
+						def name = NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'container_name')
+						if(cluster) {
+							name += " (${cluster.name})"
+						}
+
 						def datastoreConfig = [
 								owner       : new Account(id: cloud.owner.id),
-								name        : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'container_name'),
+								name        : name,
 								externalId  : cloudItem.entity_id,
 								cloud       : cloud,
 								storageSize : NutanixPrismComputeUtility.getGroupEntityValue(cloudItem.data, 'storage.capacity_bytes')?.toLong(),
@@ -158,6 +163,9 @@ class DatastoresSync {
 						Datastore existingItem = item.existingItem
 						def save = false
 
+						def clusterId = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'cluster')
+						def cluster = clusters.find { it.externalId == clusterId }
+
 						def online = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'state') == 'kComplete'
 						if(existingItem.online != online) {
 							existingItem.online = online
@@ -165,6 +173,9 @@ class DatastoresSync {
 						}
 
 						def name = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'container_name')
+						if(cluster) {
+							name += " (${cluster.name})"
+						}
 						if(existingItem.name != name) {
 							existingItem.name = name
 							save = true
@@ -182,8 +193,7 @@ class DatastoresSync {
 							save = true
 						}
 
-						def clusterId = NutanixPrismComputeUtility.getGroupEntityValue(masterItem.data, 'cluster')
-						def cluster = clusters.find { it.externalId == clusterId }
+
 						//don't associate zone pool
 						if(existingItem.zonePool?.id) {
 							existingItem.zonePool = null
