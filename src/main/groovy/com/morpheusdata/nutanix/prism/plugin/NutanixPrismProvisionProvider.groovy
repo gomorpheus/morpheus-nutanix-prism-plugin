@@ -527,7 +527,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				} else {
 					morpheusContext.async.snapshot.addSnapshot(savedSnapshot, server).blockingGet()
 				}
-				return ServiceResponse.success()
+				return ServiceResponse.success([id: savedSnapshot.id])
 			} else {
 				return ServiceResponse.error("Error fetching snapshot after creation", null, taskResults)
 			}
