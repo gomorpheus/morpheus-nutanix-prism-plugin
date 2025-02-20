@@ -60,7 +60,8 @@ class NutanixPrismComputeUtility {
 
 	public static enum VMM_API_VERSION {
 		V4_0_A1('v4.0.a1', '4.0.a1'),
-		V4_0_B1('v4.0.b1', '4.0.b1')
+		V4_0_B1('v4.0.b1', '4.0.b1'),
+		V4_0('v4.0', '4.0')
 		VMM_API_VERSION(String code, String desc) {
 			this.code = code
 			this.desc = desc
