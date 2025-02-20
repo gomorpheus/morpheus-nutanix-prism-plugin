@@ -162,6 +162,8 @@ class HostsSync {
 					log.error "Error in creating host server ${newServer}"
 				}
 
+				def cpuPercent = Math.min (100.0, (cloudItem.stats.hypervisor_cpu_usage_ppm?.toLong() ?: 0) / 10000)
+
 				def (maxStorage, usedStorage) = syncHostVolumes(newServer, volumeType, cloudHostDisks)
 				updateMachineMetrics(
 						newServer,
@@ -170,7 +172,7 @@ class HostsSync {
 						usedStorage?.toLong(),
 						cloudItem.memory_capacity_in_bytes?.toLong(),
 						((cloudItem.memory_capacity_in_bytes ?: 0 ) * (cloudItem.stats.hypervisor_memory_usage_ppm?.toLong() / 1000000.0))?.toLong(),
-						(cloudItem.stats.hypervisor_cpu_usage_ppm?.toLong() / 10000.0)
+						cpuPercent
 				)
 			} catch(e) {
 				log.error "Error in creating host: ${e}", e
