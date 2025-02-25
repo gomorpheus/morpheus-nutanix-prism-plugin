@@ -327,8 +327,8 @@ resource "virtual-image" "nutanix-prism-image-morpheus-centos-9-stream" {
 	category = "nutanix.prism.image.morpheus.centos"
 	name = "Morpheus CentOS 9-stream"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20230131/centos-9-stream/morpheus-centos-9-stream-x86_64-20230131.qcow2"
-	imagePath = "qemu/20230131/centos-9-stream"
+	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20250218/centos-9-stream/morpheus-centos-9-stream-x86_64-20250218.qcow2"
+	imagePath = "qemu/20250218/centos-9-stream"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
