@@ -16,15 +16,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-rocky-8" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "os-type-image" "nutanix-prism-image-morpheus-rocky-8" {
+resource "os-type-image" "nutanix-prism-image-morpheus-rocky-8-disabled" {
   code               = "nutanix.prism.image.morpheus.rocky.8.20240604"
-  provisionType      = "nutanix-prism-provision-provider"
-  virtualImage       = virtual-image.nutanix-prism-image-morpheus-rocky-8
-  account            = null
-  osType = {
-     code = "rocky.8.64"
-     owner = null
-  }
+  enabled            = false
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-rocky-8" {
+	code               = "nutanix.prism.image.morpheus.rocky.8"
+	provisionType      = "nutanix-prism-provision-provider"
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-rocky-8
+	account            = null
+	osType = {
+		code = "rocky.8.64"
+		owner = null
+	}
 }
 
 
@@ -114,15 +119,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-rocky-9" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "os-type-image" "nutanix-prism-image-morpheus-rocky-9" {
+resource "os-type-image" "nutanix-prism-image-morpheus-rocky-9-disabled" {
   code               = "nutanix.prism.image.morpheus.rocky.9.20240604"
-  provisionType      = "nutanix-prism-provision-provider"
-  virtualImage       = virtual-image.nutanix-prism-image-morpheus-rocky-9
-  account            = null
-  osType = {
-     code = "rocky.9.64"
-     owner = null
-  }
+  enabled            = false
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-rocky-9" {
+	code               = "nutanix.prism.image.morpheus.rocky.9"
+	provisionType      = "nutanix-prism-provision-provider"
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-rocky-9
+	account            = null
+	osType = {
+		code = "rocky.9.64"
+		owner = null
+	}
 }
 
 

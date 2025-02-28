@@ -16,15 +16,9 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20230308" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "os-type-image" "nutanix-prism-image-morpheus-debian-10-20230308" {
+resource "os-type-image" "nutanix-prism-image-morpheus-debian-10-20230308-disabled" {
   code               = "nutanix.prism.image.morpheus.debian.10.20230308"
-  provisionType      = "nutanix-prism-provision-provider"
-  virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-10-20230308
-  account            = null
-  osType = {
-     code = "debian.10.64"
-     owner = null
-  }
+  false              = false
 }
 
 resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20240604" {
@@ -43,15 +37,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-10-20240604" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "os-type-image" "nutanix-prism-image-morpheus-debian-10-20240604" {
+resource "os-type-image" "nutanix-prism-image-morpheus-debian-10-20240604-disabled" {
   code               = "nutanix.prism.image.morpheus.debian.10.20240604"
-  provisionType      = "nutanix-prism-provision-provider"
-  virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-10-20240604
-  account            = null
-  osType = {
-     code = "debian.10.64"
-     owner = null
-  }
+  enabled            = false
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-debian-10" {
+	code               = "nutanix.prism.image.morpheus.debian.10"
+	provisionType      = "nutanix-prism-provision-provider"
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-10-20240604
+	account            = null
+	osType = {
+		code = "debian.10.64"
+		owner = null
+	}
 }
 
 resource "workload-type" "nutanix-prism-debian-10" {
@@ -141,15 +140,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20230308" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "os-type-image" "nutanix-prism-image-morpheus-debian-11-20230308" {
+resource "os-type-image" "nutanix-prism-image-morpheus-debian-11-disabled" {
   code               = "nutanix.prism.image.morpheus.debian.11.20230308"
-  provisionType      = "nutanix-prism-provision-provider"
-  virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-11-20230308
-  account            = null
-  osType = {
-     code = "debian.11.64"
-     owner = null
-  }
+  enabled            = false
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-debian-11" {
+	code               = "nutanix.prism.image.morpheus.debian.11"
+	provisionType      = "nutanix-prism-provision-provider"
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-11-20250218
+	account            = null
+	osType = {
+		code = "debian.11.64"
+		owner = null
+	}
 }
 
 resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20250218" {
@@ -167,17 +171,6 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-11-20250218" {
 		owner = null
 	}
 	zoneType = "nutanix-prism-cloud"
-}
-
-resource "os-type-image" "nutanix-prism-image-morpheus-debian-11-20240604" {
-  code               = "nutanix.prism.image.morpheus.debian.11.20240604"
-  provisionType      = "nutanix-prism-provision-provider"
-  virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-11-20240604
-  account            = null
-  osType = {
-     code = "debian.11.64"
-     owner = null
-  }
 }
 
 resource "workload-type" "nutanix-prism-debian-11" {
@@ -267,15 +260,20 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-12-20250218" {
 	zoneType = "nutanix-prism-cloud"
 }
 
-resource "os-type-image" "nutanix-prism-image-morpheus-debian-12-20240604" {
+resource "os-type-image" "nutanix-prism-image-morpheus-debian-12-disabled" {
   code               = "nutanix.prism.image.morpheus.debian.12.20240604"
-  provisionType      = "nutanix-prism-provision-provider"
-  virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-12-20240604
-  account            = null
-  osType = {
-     code = "debian.12.64"
-     owner = null
-  }
+  enabled            = false
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-debian-12" {
+	code               = "nutanix.prism.image.morpheus.debian.12"
+	provisionType      = "nutanix-prism-provision-provider"
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-12-20250218
+	account            = null
+	osType = {
+		code = "debian.12.64"
+		owner = null
+	}
 }
 
 resource "workload-type" "nutanix-prism-debian-12" {
