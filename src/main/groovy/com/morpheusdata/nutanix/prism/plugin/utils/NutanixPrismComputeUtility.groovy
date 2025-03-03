@@ -353,7 +353,7 @@ class NutanixPrismComputeUtility {
 			vmBody?.spec?.resources['memory_size_mib'] = updateConfig.maxMemory
 			vmBody?.spec?.resources['num_vcpus_per_socket'] = updateConfig.coresPerSocket
 		}
-		return updateVm(client, authConfig, uuid, vmBody)
+		return retryableUpdateVm(client, authConfig, uuid, vmBody)
 	}
 
 	static ServiceResponse updateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
