@@ -724,7 +724,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			client.networkProxy = cloud.apiProxy
 
 			//check if need to unmount cdrom from user data ISO
-			if(server.sourceImage?.isCloudInit || (server.sourceImage?.platform == 'windows' && !server.sourceImage?.isSysprep)) {
+			def guestCustomized = server?.getConfigProperty("guestCustomized")
+			if(guestCustomized?.toString()?.toBoolean() == true) {
 				log.info("Ejecting any existing CDROM disks")
 				NutanixPrismComputeUtility.ejectCdrom(client, authConfig, vmId)
 			}
@@ -2123,6 +2124,22 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				server.computeServerType = newType
 			}
 
+			def cloudConfigUser
+			//cloud_init && sysprep
+			if(virtualImage?.isCloudInit && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
+				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
+			} else if (virtualImage?.isSysprep && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
+				runConfig.isSysprep = true
+				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
+			}
+			def insertIso = isCloudInitIso(runConfig)
+			if(cloudConfigUser) {
+				if(!insertIso) {
+					runConfig.cloudInitUserData = cloudConfigUser.encodeAsBase64()
+				}
+				server.setConfigProperty("guestCustomized", true)
+			}
+
 			server.name = runConfig.name
 			server = saveAndGet(server)
 
@@ -2137,20 +2154,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			provisionResponse.installAgent = runConfig.installAgent
 
 			log.debug "runConfig.installAgent = ${runConfig.installAgent}, runConfig.noAgent: ${runConfig.noAgent}, provisionResponse.installAgent: ${provisionResponse.installAgent}, provisionResponse.noAgent: ${provisionResponse.noAgent}"
-
-
-			def cloudConfigUser
-			//cloud_init && sysprep
-			if(virtualImage?.isCloudInit && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
-				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
-			} else if (virtualImage?.isSysprep && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
-				runConfig.isSysprep = true
-				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
-			}
-			def insertIso = isCloudInitIso(runConfig)
-			if(cloudConfigUser && !insertIso) {
-				runConfig.cloudInitUserData = cloudConfigUser.encodeAsBase64()
-			}
 
 			//main create or clone
 			log.debug("create server: ${runConfig}")
