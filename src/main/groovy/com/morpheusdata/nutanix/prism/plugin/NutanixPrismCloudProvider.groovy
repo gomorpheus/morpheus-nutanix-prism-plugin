@@ -312,40 +312,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 
 	@Override
 	Collection<NetworkType> getNetworkTypes() {
-		NetworkType vlanNetwork = new NetworkType([
-				code              : 'nutanix-prism-vlan-network',
-				externalType      : 'VLAN',
-				cidrEditable      : true,
-				dhcpServerEditable: true,
-				dnsEditable       : true,
-				gatewayEditable   : true,
-				vlanIdEditable    : true,
-				canAssignPool     : true,
-				name              : 'Nutanix Prism Central Managed VLAN Network'
-		])
-		NetworkType overlayNetwork = new NetworkType([
-				code              : 'nutanix-prism-overlay-network',
-				externalType      : 'OVERLAY',
-				cidrEditable      : true,
-				dhcpServerEditable: true,
-				dnsEditable       : true,
-				gatewayEditable   : true,
-				vlanIdEditable    : true,
-				canAssignPool     : true,
-				name              : 'Nutanix Prism Central Overlay Network'
-		])
-		NetworkType unmanagedVlanNetwork = new NetworkType([
-			code              : 'nutanix-prism-unmanaged-vlan-network',
-			externalType      : 'VLAN',
-			cidrEditable      : true,
-			dhcpServerEditable: true,
-			dnsEditable       : true,
-			gatewayEditable   : true,
-			vlanIdEditable    : true,
-			canAssignPool     : true,
-			name              : 'Nutanix Prism Central Unmanaged VLAN Network'
-		])
-		[vlanNetwork, overlayNetwork, unmanagedVlanNetwork]
+		plugin.getNetworkProvider().getNetworkTypes()
 	}
 
 	@Override
