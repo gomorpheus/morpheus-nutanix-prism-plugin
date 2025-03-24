@@ -270,6 +270,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeMasterType.supportsConsoleKeymap = true
 		kubeMasterType.platform = PlatformType.linux
 		kubeMasterType.managed = true
+		kubeMasterType.hasMaintenanceMode = true
 		kubeMasterType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		kubeMasterType.agentType = ComputeServerType.AgentType.host
 		kubeMasterType.clusterType = ComputeServerType.ClusterType.kubernetes
@@ -283,6 +284,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeWorkerType.containerHypervisor = true
 		kubeWorkerType.reconfigureSupported = true
 		kubeWorkerType.hasAutomation = true
+		kubeWorkerType.hasMaintenanceMode = true
 		kubeWorkerType.supportsConsoleKeymap = true
 		kubeWorkerType.platform = PlatformType.linux
 		kubeWorkerType.managed = true
