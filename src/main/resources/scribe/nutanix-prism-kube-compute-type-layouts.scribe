@@ -40,7 +40,7 @@ resource "compute-type-layout" "kubernetes-32-ubuntu-22_04-nutanix-prism-amd64-s
     "kubernetes-rook-1-15-0-package",
     "kubernetes-fluentbit-3-0-7-package",
     "kubernetes-prometheus-0-12-package",
-    "kubernetes-nginx-ingress-operator-1-11-2-package"
+    "kubernetes-nginx-ingress-operator-1-12-1-package"
   ]
 }
 
@@ -85,7 +85,7 @@ resource "compute-type-layout" "kubernetes-1_31-ubuntu-22_04-nutanix-prism-amd64
     "kubernetes-rook-1-15-0-package",
     "kubernetes-fluentbit-3-0-7-package",
     "kubernetes-prometheus-0-12-package",
-    "kubernetes-nginx-ingress-operator-1-11-2-package"
+    "kubernetes-nginx-ingress-operator-1-12-1-package"
   ]
 }
 
@@ -130,7 +130,7 @@ resource "compute-type-layout" "kubernetes-1_30-ubuntu-22_04-nutanix-prism-amd64
     "kubernetes-rook-1-13-package",
     "kubernetes-fluentbit-3-0-7-package",
     "kubernetes-prometheus-0-12-package",
-    "kubernetes-nginx-ingress-operator-1-10-1-package"
+    "kubernetes-nginx-ingress-operator-1-12-1-package"
   ]
 }
 
