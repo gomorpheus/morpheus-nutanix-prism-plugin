@@ -23,6 +23,7 @@ import com.morpheusdata.core.Plugin
 import com.morpheusdata.model.AccountCredential
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.nutanix.prism.plugin.backup.NutanixPrismBackupProvider
+import com.morpheusdata.nutanix.prism.plugin.flow.NutanixPrismNetworkProvider
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import groovy.util.logging.Slf4j
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Morpheus Data, LLC.
+ * Copyright 2025 Morpheus Data, LLC.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
  *
  */
 
-package com.morpheusdata.nutanix.prism.plugin.sync
+package com.morpheusdata.nutanix.prism.plugin.sync.cloud
 
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.data.DataFilter
@@ -26,7 +26,6 @@ import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Account
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.CloudPool
-import com.morpheusdata.model.ComputeZonePool
 import com.morpheusdata.model.Datastore
 import com.morpheusdata.model.projection.CloudPoolIdentity
 import com.morpheusdata.model.projection.DatastoreIdentity

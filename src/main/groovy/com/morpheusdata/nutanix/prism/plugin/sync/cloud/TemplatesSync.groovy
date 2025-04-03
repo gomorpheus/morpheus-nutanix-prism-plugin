@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Morpheus Data, LLC.
+ * Copyright 2025 Morpheus Data, LLC.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
  *
  */
 
-package com.morpheusdata.nutanix.prism.plugin.sync
+package com.morpheusdata.nutanix.prism.plugin.sync.cloud
 
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.data.DataFilter
@@ -24,29 +24,24 @@ import com.morpheusdata.core.data.DataOrFilter
 import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
-import com.morpheusdata.model.Account
-import com.morpheusdata.model.Cloud
-import com.morpheusdata.model.CloudPool
-import com.morpheusdata.model.Datastore
-import com.morpheusdata.model.ImageType
-import com.morpheusdata.model.VirtualImage
-import com.morpheusdata.model.VirtualImageLocation
+import com.morpheusdata.model.*
 import com.morpheusdata.model.projection.VirtualImageIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageLocationIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import groovy.util.logging.Slf4j
 import io.reactivex.rxjava3.core.Observable
 
 @Slf4j
-class ImagesSync {
+class TemplatesSync {
 
 	private Cloud cloud
 	private MorpheusContext morpheusContext
 	private NutanixPrismPlugin plugin
 	private HttpApiClient apiClient
 
-	public ImagesSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
+	public TemplatesSync(NutanixPrismPlugin nutanixPrismPlugin, Cloud cloud, HttpApiClient apiClient) {
 		this.plugin = nutanixPrismPlugin
 		this.cloud = cloud
 		this.morpheusContext = nutanixPrismPlugin.morpheusContext
@@ -54,23 +49,20 @@ class ImagesSync {
 	}
 
 	def execute() {
-		log.debug "BEGIN: execute ImagesSync: ${cloud.id}"
+		log.debug "BEGIN: execute TemplatesSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def listResults = NutanixPrismComputeUtility.listImages(apiClient, authConfig)
+			def listResults = NutanixPrismComputeUtility.listTemplates(apiClient, authConfig)
 			if (listResults.success) {
-				def masterImages = listResults?.data?.findAll { it.status.resources.image_type != 'ISO_IMAGE' }
-				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
+				def masterTemplates = listResults?.data?.data ?: []
+				Observable<VirtualImageLocationIdentityProjection> domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([
 					new DataFilter("refType", "ComputeZone"),
 					new DataFilter("refId", cloud.id),
-					new DataOrFilter(
-						new DataFilter("virtualImage.externalType","!=", "template"),
-						new DataFilter("virtualImage.externalType", "null")
-					)
+					new DataFilter("virtualImage.externalType", "template")
 				]).withJoins('virtualImage'))
-				SyncTask<VirtualImageLocationIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterImages)
+				SyncTask<VirtualImageLocationIdentityProjection, Map, CloudPool> syncTask = new SyncTask<>(domainRecords, masterTemplates)
 				syncTask.addMatchFunction { VirtualImageLocationIdentityProjection domainObject, Map cloudItem ->
-					domainObject.externalId == cloudItem?.metadata?.uuid
+					domainObject.externalId == cloudItem?.extId
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItems ->
 					Map<Long, SyncTask.UpdateItemDto<VirtualImageLocationIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 					morpheusContext.async.virtualImage.location.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImageLocation virtualImageLocation ->
@@ -85,23 +77,20 @@ class ImagesSync {
 					removeMissingVirtualImageLocations(removeItems)
 				}.start()
 			}
-			//clean up any lingering images without locations
-			removeSyncedImagesWithoutLocations()
 
 		} catch(e) {
-			log.error "Error in execute of ImagesSync: ${e}", e
+			log.error "Error in execute of TemplatesSync: ${e}", e
 		}
-		log.debug "END: execute ImagesSync: ${cloud.id}"
+		log.debug "END: execute TemplatesSync: ${cloud.id}"
 	}
 
 	def addMissingVirtualImageLocations(Collection<Map> objList) {
-		log.debug "addMissingVirtualImageLocations: ${objList?.size()}"
+		log.debug "Templates - addMissingVirtualImageLocations: ${objList?.size()}"
+		
 
-		def names = objList.collect{it.status.name}?.unique()
-		List<VirtualImageIdentityProjection> existingItems = []
+		def names = objList.collect{it.templateName}?.unique()
 		def allowedImageTypes = ['qcow2']
 
-		def uniqueIds = [] as Set
 		Observable domainRecords = morpheusContext.async.virtualImage.listIdentityProjections(new DataQuery().withFilters([
 			new DataFilter<String>("imageType", "in", allowedImageTypes),
 			new DataFilter<Collection<String>>("name", "in", names),
@@ -112,12 +101,12 @@ class ImagesSync {
 					new DataFilter<Long>("owner.id", cloud.owner.id)
 				)
 			)
-		]).withSort('systemImage', DataQuery.SortOrder.desc))
+		]))
 		SyncTask<VirtualImageIdentityProjection, Map, VirtualImage> syncTask = new SyncTask<>(domainRecords, objList)
 		syncTask.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
-			domainObject.externalId && (domainObject.externalId == cloudItem.metadata?.uuid)
+			domainObject.externalId && (domainObject.externalId == cloudItem?.extId)
 		}.addMatchFunction { VirtualImageIdentityProjection domainObject, Map cloudItem ->
-			domainObject.name == cloudItem.status.name
+			domainObject.name == cloudItem.templateName
 		}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItems ->
 			Map<Long, SyncTask.UpdateItemDto<VirtualImageIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it] }
 			morpheusContext.async.virtualImage.listById(updateItems?.collect { it.existingItem.id }).map { VirtualImage virtualImage ->
@@ -129,15 +118,12 @@ class ImagesSync {
 		}.onUpdate { List<SyncTask.UpdateItem<VirtualImage, Map>> updateItems ->
 			// Found the VirtualImage for this location.. just need to create the location
 			addMissingVirtualImageLocationsForImages(updateItems)
-		}.onDelete {
-			//do nothing
 		}.start()
 	}
 
 	private addMissingVirtualImages(Collection<Map> addList) {
-		log.debug "addMissingVirtualImages ${addList?.size()}"
-		Account account = cloud.account
-		def regionCode = cloud.regionCode
+		log.debug "Templates - addMissingVirtualImages ${addList?.size()}"
+
 		def adds = []
 		def addExternalIds = []
 		addList?.each {
@@ -147,22 +133,24 @@ class ImagesSync {
 			VirtualImageLocation location = new VirtualImageLocation(locationConfig)
 			add.imageLocations = [location]
 			addExternalIds << add.externalId
-			adds << add
+			VirtualImage savedImage = morpheusContext.async.virtualImage.create(add, cloud).blockingGet()
+			def savedLocation = savedImage.imageLocations.find {it.externalId == locationConfig.externalId}
+			if (!savedLocation) {
+				log.error "Error in creating template ${add}"
+			} else {
+				performPostSaveSync(savedLocation, it)
+			}
 		}
-
-		// Create em all!
-		log.debug "About to create ${adds.size()} virtualImages"
-		morpheusContext.async.virtualImage.create(adds, cloud).blockingGet()
-
 	}
 
 	private addMissingVirtualImageLocationsForImages(List<SyncTask.UpdateItem<VirtualImage, Map>> addItems) {
-		log.debug "addMissingVirtualImageLocationsForImages ${addItems?.size()}"
+		log.debug "Templates - addMissingVirtualImageLocationsForImages ${addItems?.size()}"
+		
 
 		def locationAdds = []
 		addItems?.each { add ->
 			VirtualImage virtualImage = add.existingItem
-			def uuid = add.masterItem.metadata?.uuid
+			def uuid = add.masterItem.extId
 			def locationConfig = [
 				virtualImage: virtualImage,
 				code        : "nutanix.prism.image.${cloud.id}.${uuid}",
@@ -175,17 +163,24 @@ class ImagesSync {
 				refId       : cloud.id
 			]
 			VirtualImageLocation location = new VirtualImageLocation(locationConfig)
-			locationAdds << location
+			VirtualImageLocation savedLocation = morpheusContext.async.virtualImage.location.create(location, cloud).blockingGet()
+			if (!savedLocation) {
+				log.error "Error in creating template ${location}"
+			} else {
+				performPostSaveSync(savedLocation, add.masterItem)
+			}
 		}
 
 		if(locationAdds) {
 			log.debug "About to create ${locationAdds.size()} locations"
+
 			morpheusContext.async.virtualImage.location.create(locationAdds, cloud).blockingGet()
 		}
 	}
 
 	private updateMatchedVirtualImageLocations(List<SyncTask.UpdateItem<VirtualImageLocation, Map>> updateList) {
-		log.debug "updateMatchedVirtualImages: ${cloud} ${updateList.size()}"
+		log.debug "Templates - updateMatchedVirtualImages: ${cloud} ${updateList.size()}"
+
 		def saveLocationList = []
 		def saveImageList = []
 		def virtualImagesById = morpheusContext.async.virtualImage.listById(updateList.collect { it.existingItem.virtualImage.id }).toMap {it.id}.blockingGet()
@@ -195,6 +190,18 @@ class ImagesSync {
 			def virtualImage = virtualImagesById[existingItem.virtualImage.id]
 			def cloudItem = updateItem.masterItem
 			def virtualImageConfig = buildVirtualImageConfig(cloudItem)
+			def vmSpec = cloudItem.templateVersionSpec.vmSpec
+			def diskList = []
+			try {
+				if(vmSpec) {
+					diskList = vmSpec?.disk_list ?: []
+					diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
+				}
+
+			} catch (e) {
+				log.warn("Error saving template disks ${e}")
+
+			}
 			def save = false
 			def saveImage = false
 			def state = 'Active'
@@ -221,29 +228,20 @@ class ImagesSync {
 				existingItem.imageRegion = cloud.regionCode
 				save = true
 			}
+			if (virtualImage.imageRegion != virtualImageConfig.imageRegion) {
+				virtualImage.imageRegion = virtualImageConfig.imageRegion
+				saveImage = true
+			}
+
 			if(virtualImage.systemImage == null) {
 				virtualImage.systemImage = false
 				saveImage = true
 			}
-			if(!virtualImage.systemImage && !virtualImage.userUploaded) {
-				if (virtualImage.remotePath != virtualImageConfig.remotePath) {
-					virtualImage.remotePath = virtualImageConfig.remotePath
-					saveImage = true
-				}
-				if (virtualImage.imageRegion != virtualImageConfig.imageRegion) {
-					virtualImage.imageRegion = virtualImageConfig.imageRegion
-					saveImage = true
-				}
-				if (virtualImage.minDisk != virtualImageConfig.minDisk) {
-					virtualImage.minDisk = virtualImageConfig.minDisk as Long
-					saveImage = true
-				}
-				if (virtualImage.bucketId != virtualImageConfig.bucketId) {
-					virtualImage.bucketId = virtualImageConfig.bucketId
-					saveImage = true
-				}
-			}
 
+			def syncResults = NutanixPrismSyncUtils.syncVolumes(existingItem, diskList, cloud, morpheusContext)
+			if(syncResults.changed) {
+				save = true
+			}
 
 			if(save) {
 				saveLocationList << existingItem
@@ -267,38 +265,26 @@ class ImagesSync {
 		morpheusContext.async.virtualImage.location.remove(removeList).blockingGet()
 	}
 
-	private removeSyncedImagesWithoutLocations() {
-		def images = morpheusContext.async.virtualImage.list(new DataQuery().withFilters([
-			new DataFilter("category", "nutanix.prism.image.${cloud.id}"),
-			new DataFilter("userUploaded", false),
-			new DataFilter("systemImage", false),
-		])).toList().blockingGet().findAll {it.imageLocations.size() == 0}
-		if(images) {
-			log.debug "Removing ${images.size()} images without locations"
-			morpheusContext.async.virtualImage.remove(images).blockingGet()
-		}
-	}
-
 	private buildVirtualImageConfig(Map cloudItem) {
 		Account account = cloud.account
 		def regionCode = cloud.regionCode
 
+		def uuid = cloudItem.extId
+
 		def imageConfig = [
-				account    : account,
-				category   : "nutanix.prism.image.${cloud.id}",
-				name       : cloudItem.status.name,
-				code       : "nutanix.prism.image.${cloud.id}.${cloudItem.metadata.uuid}",
-				imageType  : ImageType.qcow2,
-				status     : 'Active',
-				minDisk    : cloudItem.status.resources.size_bytes?.toLong(),
-				isPublic   : false,
-				remotePath : cloudItem.status.resources?.retrieval_uri_list?.getAt(0) ?: cloudItem.status.resources?.source_uri,
-				externalId : cloudItem.metadata.uuid,
-				imageRegion: regionCode,
-				internalId : cloudItem.metadata.uuid,
-				uniqueId   : cloudItem.metadata.uuid,
-				bucketId   : cloudItem.status.resources?.current_cluster_reference_list?.getAt(0)?.uuid,
-				systemImage: false
+				account      : account,
+				category     : "nutanix.prism.image.${cloud.id}",
+				name         : cloudItem.templateName,
+				code         : "nutanix.prism.image.${cloud.id}.${uuid}",
+			    imageType    : ImageType.qcow2,
+				status       : 'Active',
+				isPublic     : false,
+				externalId   : uuid,
+				externalType : 'template',
+				imageRegion  : regionCode,
+				internalId   : uuid,
+				uniqueId     : uuid,
+			    systemImage  : false
 		]
 
 		return imageConfig
@@ -327,6 +313,24 @@ class ImagesSync {
 				imageName   : imageLocationProj.name,
 				imageRegion : cloud.regionCode
 		]
+	}
+
+	private performPostSaveSync(location, cloudItem) {
+		def vmSpec = cloudItem.templateVersionSpec.vmSpec
+		def diskList = []
+		try {
+			if(vmSpec) {
+				diskList = vmSpec?.disk_list ?: []
+				diskList = diskList.findAll { it.device_properties.device_type != "CDROM"}
+			}
+
+		} catch (e) {
+			log.warn("Error saving template disks ${e}")
+		}
+		def syncResults = NutanixPrismSyncUtils.syncVolumes(location, diskList, cloud, morpheusContext)
+		if(syncResults.changed) {
+			morpheusContext.async.virtualImage.location.save([location] as List<VirtualImageLocation>, cloud).blockingGet()
+		}
 	}
 
 }

@@ -25,6 +25,10 @@ import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.response.ServiceResponse
+import com.nutanix.dp1.mic.microseg.v4.config.ListAddressGroupsApiResponse
+import com.nutanix.dp1.mic.microseg.v4.config.ListNetworkSecurityPoliciesApiResponse
+import com.nutanix.dp1.mic.microseg.v4.config.ListServiceGroupsApiResponse
+import com.nutanix.dp1.vmm.vmm.v4.ahv.config.ListVmsApiResponse
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import groovy.util.logging.Slf4j
@@ -48,9 +52,16 @@ import org.apache.http.entity.InputStreamEntity
 import org.apache.http.impl.client.BasicCookieStore
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.message.BasicNameValuePair
+import org.springframework.web.client.RestClientException
+
 import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
 import java.security.cert.X509Certificate
+import com.nutanix.mic.java.client.ApiClient
+import com.nutanix.mic.java.client.api.AddressGroupsApi
+import com.nutanix.mic.java.client.api.NetworkSecurityPoliciesApi
+import com.nutanix.mic.java.client.api.ServiceGroupsApi
+import java.net.URL
 
 import com.morpheusdata.retry.*
 import com.morpheusdata.retry.policies.*
@@ -883,6 +894,72 @@ class NutanixPrismComputeUtility {
 		log.debug("listVMs")
 		return callListApi(client, 'vm', 'vms/list', authConfig)
 	}
+
+	//Nutanix Flow methods
+	static ServiceResponse listAddressGroups(ApiClient nutanixClient) {
+		log.debug("listAddressGroups")
+		AddressGroupsApi addressGroupsApi = new AddressGroupsApi(nutanixClient)
+		def page = 0
+		def limit = 100
+		def addressGroups = []
+		def hasNext = true
+		while (hasNext) {
+			try {
+				ListAddressGroupsApiResponse results = addressGroupsApi.listAddressGroups(page, limit, null, null, null)
+				addressGroups.addAll(results.data)
+				hasNext = results.metadata.links.find { it.href == 'next' }
+				page++
+			} catch (RestClientException e) {
+				return ServiceResponse.error("Error listing address groups", null, e)
+			}
+
+		}
+		return ServiceResponse.success(addressGroups)
+	}
+
+	static ServiceResponse listServiceGroups(ApiClient nutanixClient) {
+		log.debug("listServiceGroups")
+		ServiceGroupsApi serviceGroupsApi = new ServiceGroupsApi(nutanixClient)
+		def page = 0
+		def limit = 100
+		def serviceGroups = []
+		def hasNext = true
+		while (hasNext) {
+			try {
+				ListServiceGroupsApiResponse results = serviceGroupsApi.listServiceGroups(page, limit, null, null, null)
+				serviceGroups.addAll(results.data)
+				hasNext = results.metadata.links.find { it.href == 'next' }
+				page++
+			} catch (RestClientException e) {
+				return ServiceResponse.error("Error listing service groups", null, e)
+			}
+
+		}
+		return ServiceResponse.success(serviceGroups)
+	}
+
+	static ServiceResponse listSecurityPolicies(ApiClient nutanixClient) {
+		log.debug("listSecurityPolicies")
+		NetworkSecurityPoliciesApi networkSecurityPoliciesApi = new NetworkSecurityPoliciesApi(nutanixClient)
+		def page = 0
+		def limit = 100
+		def securityPolicies = []
+		def hasNext = true
+		while (hasNext) {
+			try {
+				ListNetworkSecurityPoliciesApiResponse results = networkSecurityPoliciesApi.listNetworkSecurityPolicies(page, limit, null, null, null)
+				securityPolicies.addAll(results.data)
+
+				hasNext = results.metadata.links.find { it.href == 'next' }
+				page++
+			} catch (RestClientException e) {
+				return ServiceResponse.error("Error listing security policies", null, e)
+			}
+
+		}
+		return ServiceResponse.success(securityPolicies)
+	}
+
 
 	static ServiceResponse listHostMetrics(HttpApiClient client, Map authConfig, List<String> hostUUIDs) {
 		log.debug("listHostMetrics")

@@ -47,17 +47,7 @@ import com.morpheusdata.model.projection.ComputeServerIdentityProjection
 import com.morpheusdata.model.projection.MetadataTagIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageIdentityProjection
 import com.morpheusdata.model.projection.VirtualImageLocationIdentityProjection
-import com.morpheusdata.nutanix.prism.plugin.sync.CategoriesSync
-import com.morpheusdata.nutanix.prism.plugin.sync.ClustersSync
-import com.morpheusdata.nutanix.prism.plugin.sync.DatastoresSync
-import com.morpheusdata.nutanix.prism.plugin.sync.HostsSync
-import com.morpheusdata.nutanix.prism.plugin.sync.ImagesSync
-import com.morpheusdata.nutanix.prism.plugin.sync.NetworksSync
-import com.morpheusdata.nutanix.prism.plugin.sync.ProjectsSync
-import com.morpheusdata.nutanix.prism.plugin.sync.SnapshotsSync
-import com.morpheusdata.nutanix.prism.plugin.sync.TemplatesSync
-import com.morpheusdata.nutanix.prism.plugin.sync.VirtualMachinesSync
-import com.morpheusdata.nutanix.prism.plugin.sync.VirtualPrivateCloudSync
+import com.morpheusdata.nutanix.prism.plugin.sync.cloud.TemplatesSync
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
@@ -649,17 +639,17 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					}
 
 					if(allProjects.success) {
-						(new CategoriesSync(this.plugin, cloud, client)).execute()
-						(new ProjectsSync(this.plugin, cloud, client, projects)).execute()
-						(new VirtualPrivateCloudSync(this.plugin, cloud, client, projects)).execute()
-						(new ClustersSync(this.plugin, cloud, client, projects)).execute()
-						(new DatastoresSync(this.plugin, cloud, client, projects)).execute()
-						(new NetworksSync(this.plugin, cloud, client, projects)).execute()
-						(new ImagesSync(this.plugin, cloud, client)).execute()
+//						(new CategoriesSync(this.plugin, cloud, client)).execute()
+//						(new ProjectsSync(this.plugin, cloud, client, projects)).execute()
+//						(new VirtualPrivateCloudSync(this.plugin, cloud, client, projects)).execute()
+//						(new ClustersSync(this.plugin, cloud, client, projects)).execute()
+//						(new DatastoresSync(this.plugin, cloud, client, projects)).execute()
+//						(new NetworksSync(this.plugin, cloud, client, projects)).execute()
+//						(new ImagesSync(this.plugin, cloud, client)).execute()
 						(new TemplatesSync(this.plugin, cloud, client)).execute()
-						(new HostsSync(this.plugin, cloud, client, projects)).execute()
-						(new VirtualMachinesSync(this.plugin, cloud, client, createNew, projects)).execute()
-						(new SnapshotsSync(this.plugin, cloud, client)).execute()
+//						(new HostsSync(this.plugin, cloud, client, projects)).execute()
+//						(new VirtualMachinesSync(this.plugin, cloud, client, createNew, projects)).execute()
+//						(new SnapshotsSync(this.plugin, cloud, client)).execute()
 
 					}
 

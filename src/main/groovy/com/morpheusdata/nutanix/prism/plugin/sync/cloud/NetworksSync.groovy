@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Morpheus Data, LLC.
+ * Copyright 2025 Morpheus Data, LLC.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
  *
  */
 
-package com.morpheusdata.nutanix.prism.plugin.sync
+package com.morpheusdata.nutanix.prism.plugin.sync.cloud
 
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.util.HttpApiClient
@@ -33,7 +33,6 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
-import io.reactivex.rxjava3.core.Observable
 
 @Slf4j
 class NetworksSync {
