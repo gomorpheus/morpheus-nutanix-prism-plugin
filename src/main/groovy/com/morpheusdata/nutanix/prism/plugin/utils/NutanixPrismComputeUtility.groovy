@@ -929,6 +929,7 @@ class NutanixPrismComputeUtility {
 				ListServiceGroupsApiResponse results = serviceGroupsApi.listServiceGroups(page, limit, null, null, null)
 				serviceGroups.addAll(results.data)
 				hasNext = results.metadata.links.find { it.href == 'next' }
+				sleep(100)
 				page++
 			} catch (RestClientException e) {
 				return ServiceResponse.error("Error listing service groups", null, e)
@@ -949,7 +950,6 @@ class NutanixPrismComputeUtility {
 			try {
 				ListNetworkSecurityPoliciesApiResponse results = networkSecurityPoliciesApi.listNetworkSecurityPolicies(page, limit, null, null, null)
 				securityPolicies.addAll(results.data)
-
 				hasNext = results.metadata.links.find { it.href == 'next' }
 				page++
 			} catch (RestClientException e) {

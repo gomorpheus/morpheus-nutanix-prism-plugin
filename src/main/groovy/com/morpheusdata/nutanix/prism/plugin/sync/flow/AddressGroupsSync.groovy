@@ -27,6 +27,7 @@ import com.morpheusdata.model.NetworkServer
 import com.morpheusdata.model.projection.NetworkResourceGroupIdentityProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.nutanix.dp1.mic.microseg.v4.config.AddressGroup
 import com.nutanix.mic.java.client.ApiClient
 import io.reactivex.rxjava3.core.Observable
 import groovy.util.logging.Slf4j
@@ -56,75 +57,78 @@ class AddressGroupsSync {
 		log.debug "BEGIN: execute AddressGroupsSync: ${cloud.id}"
 		try {
 			def masterData = NutanixPrismComputeUtility.listAddressGroups(apiClient)
-			masterData.data = [masterData.data[0]]
-			println "\u001B[33mAC Log - AddressGroupsSync:execute- ${masterData.data}\u001B[0m"
 			if(false && masterData.success) {
 				Observable<NetworkResourceGroupIdentityProjection> domainRecords = morpheusContext.async.networkResourceGroup.list(new DataQuery())
-				SyncTask<NetworkResourceGroupIdentityProjection, Map, NetworkResourceGroup> syncTask = new SyncTask<>(domainRecords, masterData.data as Collection<Object>) as SyncTask<NetworkResourceGroupIdentityProjection, Map, NetworkResourceGroup>
-				syncTask.addMatchFunction { NetworkResourceGroupIdentityProjection domainObject, Map apiItem ->
-					domainObject.externalId == apiItem.metadata.uuid
+				SyncTask<NetworkResourceGroupIdentityProjection, AddressGroup, NetworkResourceGroup> syncTask = new SyncTask<>(domainRecords, masterData.data as Collection<Object>) as SyncTask<NetworkResourceGroupIdentityProjection, AddressGroup, NetworkResourceGroup>
+				syncTask.addMatchFunction { NetworkResourceGroupIdentityProjection domainObject, AddressGroup apiItem ->
+					domainObject.externalId == apiItem.extId
 				}.onDelete { removeItems ->
 					removeMissingAddressGroups(removeItems)
-				}.onUpdate { List<SyncTask.UpdateItem<NetworkResourceGroup, Map>> updateItems ->
+				}.onUpdate { List<SyncTask.UpdateItem<NetworkResourceGroup, AddressGroup>> updateItems ->
 					updateMatchedAddressGroups(updateItems)
 				}.onAdd { itemsToAdd ->
 					addMissingAddressGroups(itemsToAdd)
-				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<NetworkResourceGroupIdentityProjection, Map>> updateItems ->
-					Map<Long, SyncTask.UpdateItemDto<NetworkResourceGroupIdentityProjection, Map>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
-					morpheusContext.async.cloud.pool.listById(updateItems.collect { it.existingItem.id } as List<Long>).map {NetworkResourceGroup cloudPool ->
-						SyncTask.UpdateItemDto<NetworkResourceGroup, Map> matchItem = updateItemMap[cloudPool.id] as SyncTask.UpdateItemDto<NetworkResourceGroup, Map>
-						return new SyncTask.UpdateItem<NetworkResourceGroup,Map>(existingItem:cloudPool, masterItem:matchItem.masterItem)
+				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<NetworkResourceGroupIdentityProjection, AddressGroup>> updateItems ->
+					Map<Long, SyncTask.UpdateItemDto<NetworkResourceGroupIdentityProjection, AddressGroup>> updateItemMap = updateItems.collectEntries { [(it.existingItem.id): it]}
+					morpheusContext.async.networkResourceGroup.list(
+						new DataQuery().withFilter("id", "in", updateItems.collect { it.existingItem.id } as List<Long>)).map { NetworkResourceGroup networkResourceGroup ->
+						SyncTask.UpdateItemDto<NetworkResourceGroup, AddressGroup> matchItem = updateItemMap[networkResourceGroup.id] as SyncTask.UpdateItemDto<NetworkResourceGroup, AddressGroup>
+						return new SyncTask.UpdateItem<NetworkResourceGroup, AddressGroup>(existingItem:networkResourceGroup, masterItem:matchItem.masterItem)
 					}
 				}.start()
 			}
 		} catch(e) {
 			log.error "Error in execute : ${e}", e
 		}
-		log.debug "END: execute ProjectsSync: ${cloud.id}"
+		log.debug "END: execute AddressGroupsSync: ${cloud.id}"
 	}
 
-	def addMissingAddressGroups(Collection<Map> addList) {
-		log.debug "addMissingProjects ${cloud} ${addList.size()}"
+	def addMissingAddressGroups(Collection<AddressGroup> addList) {
+		log.debug "addMissingAddressGroups ${cloud} ${addList.size()}"
 		def adds = []
 
 		for(cloudItem in addList) {
+			def refType = "NetworkServer"
+			def refId = networkServer.id
+			def category = getAddressGroupCategory(networkServer)
+			def account = networkServer.account
 			def addressGroupConfig = [
-				accc     : cloud.owner,
-				type      : 'AddressGroup',
-				name      : cloudItem.data.name,
-				externalId: cloudItem.metadata.extId,
-				uniqueId  : cloudItem.metadata.uuid,
-				internalId: cloudItem.metadata.name,
-				refType   : 'ComputeZone',
-				refId     : cloud.id,
-				cloud     : cloud,
-				category  : getAddressGroupCategory(cloud),
-				code      : "${getAddressGroupCategory(cloud)}.${cloudItem.metadata.uuid}",
-				active    : cloud.defaultPoolSyncActive
+				account: account,
+				owner: account,
+				refType: refType,
+				refId: refId,
+				category: category,
+				name: cloudItem.name,
+				description: cloudItem.description,
+				externalId: cloudItem.extId,
+				rawData: cloudItem.encodeAsJSON().toString(),
 			]
-			if(cloudItem.metadata.default) {
-				poolConfig.defaultPool = true
-			}
 			def add = new NetworkResourceGroup(addressGroupConfig)
 			adds << add
+			//TODO: add members
 		}
 
 		if(adds) {
-			morpheusContext.async.cloud.pool.bulkCreate(adds).blockingGet()
+			morpheusContext.services.networkResourceGroup.bulkCreate(adds)
 		}
 	}
 
 	private updateMatchedAddressGroups(List updateList) {
-		log.debug "updateMatchedProjects: ${cloud} ${updateList.size()}"
+		log.debug "updateMatchedAddressGroups: ${cloud} ${updateList.size()}"
 		def updates = []
 
 		for(update in updateList) {
-			def matchItem = update.masterItem
-			def existing = update.existingItem
+			AddressGroup matchItem = update.masterItem
+			NetworkResourceGroup existing = update.existingItem
 			Boolean save = false
 
-			if(existing.name != matchItem.metadata.name) {
-				existing.name = matchItem.metadata.name
+			if(existing.name != matchItem.name) {
+				existing.name = matchItem.name
+				save = true
+			}
+
+			if(existing.description != matchItem.description) {
+				existing.description = matchItem.description
 				save = true
 			}
 			if(save) {
@@ -132,12 +136,14 @@ class AddressGroupsSync {
 			}
 		}
 		if(updates) {
-			morpheusContext.async.cloud.pool.bulkSave(updates).blockingGet()
+			morpheusContext.services.networkResourceGroup.bulkSave(updates)
 		}
 	}
 
 	private removeMissingAddressGroups(List<NetworkResourceGroupIdentityProjection> removeList) {
-		log.debug "removeMissingProjects: ${removeList?.size()}"
+		log.debug "removeMissingAddressGroups: ${removeList?.size()}"
 		morpheusContext.services.networkResourceGroup.bulkRemove(removeList)
 	}
+
+
 }

@@ -37,7 +37,7 @@ import com.morpheusdata.model.SecurityGroupLocation
 import com.morpheusdata.model.SecurityGroupRule
 import com.morpheusdata.model.SecurityGroupRuleLocation
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
-import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
+import com.morpheusdata.nutanix.prism.plugin.sync.flow.*
 import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.views.Renderer
 import com.nutanix.mic.java.client.ApiClient
@@ -82,16 +82,12 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		nutanixClient.setUsername(authConfig.username as String)
 		nutanixClient.setPassword(authConfig.password as String)
 		nutanixClient.setVerifySsl(false)
-		//def addressGroups = NutanixPrismComputeUtility.listAddressGroups(nutanixClient)
-		//def serviceGroups = NutanixPrismComputeUtility.listServiceGroups(nutanixClient)
-		def securityPolicies = NutanixPrismComputeUtility.listSecurityPolicies(nutanixClient)
-
-
-		println "\u001B[33mAC Log - NutanixPrismNetworkProvider:refresh- ${securityPolicies.data[0].extId}\u001B[0m"
-
 		//sync service groups - ref data
+		//(new ServiceGroupsSync(this.plugin, cloud, networkServer, nutanixClient)).execute()
 
-		//sync address groups - ref data
+		//sync address groups - NetworkResourceGroup
+		(new AddressGroupsSync(this.plugin, cloud, networkServer, nutanixClient)).execute()
+
 
 		//sync security policies - security groups
 
