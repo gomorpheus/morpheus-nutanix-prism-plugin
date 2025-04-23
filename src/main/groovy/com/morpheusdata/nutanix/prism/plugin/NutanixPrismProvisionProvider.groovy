@@ -172,6 +172,21 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	Collection<OptionType> getNodeOptionTypes() {
+		OptionType imageTypeRadio = new OptionType(
+			name: 'virtual image type',
+			code: 'nutanix-prism-node-virtual-image-type',
+			fieldContext: 'config',
+			fieldName: 'virtualImageSelect',
+			fieldCode: null,
+			fieldLabel: null,
+			fieldGroup: null,
+			inputType: OptionType.InputType.RADIO,
+			displayOrder:10,
+			fieldClass:'inline',
+			required: false,
+			editable: true,
+			optionSource: 'virtualImageTypeList'
+		)
 		OptionType osTypeOption = new OptionType([
 			name : 'osType',
 			code : 'nutanix-prism-node-os-type',
@@ -181,7 +196,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			inputType : OptionType.InputType.SELECT,
 			displayOrder : 100,
 			required : false,
-			optionSource : 'osTypes'
+			optionSource : 'osTypes',
+			visibleOnCode: 'config.virtualImageSelect:os'
 		])
 		OptionType imageOption = new OptionType([
 			name : 'image',
@@ -192,7 +208,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			inputType : OptionType.InputType.SELECT,
 			displayOrder : 99,
 			required : false,
-			optionSource : 'nutanixPrismNodeImage'
+			optionSource : 'nutanixPrismNodeImage',
+			visibleOnCode: 'config.virtualImageSelect:vi'
 		])
 		OptionType logFolder = new OptionType([
 			name : 'mountLogs',
@@ -269,7 +286,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			displayOrder : 107,
 			required : false,
 		])
-		return [osTypeOption, imageOption, logFolder, configFolder, deployFolder, checkTypeCode, statTypeCode, showServerLogs, logTypeCode]
+		return [imageTypeRadio, osTypeOption, imageOption, logFolder, configFolder, deployFolder, checkTypeCode, statTypeCode, showServerLogs, logTypeCode]
 	}
 
 	@Override
