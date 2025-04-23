@@ -1160,7 +1160,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, cloudItem)
 
 		return ServiceResponse.success()
-
 	}
 
 	@Override
