@@ -1271,8 +1271,10 @@ class NutanixPrismComputeUtility {
 				]
 			]
 			if(nic["ip_endpoint_list"]) {
-				nicMap["ipv4Config"] = [
-					ipAddress: nic["ip_endpoint_list"][0].ip
+				nicMap["networkInfo"]["ipv4Config"] = [
+					ipAddress: [
+						value: nic["ip_endpoint_list"][0].ip
+					]
 				]
 			}
 			return nicMap
