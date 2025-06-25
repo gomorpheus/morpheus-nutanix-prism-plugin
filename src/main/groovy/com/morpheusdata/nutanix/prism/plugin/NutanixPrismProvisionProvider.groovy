@@ -2308,7 +2308,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								}
 
 
-								if(virtualImage.externalType == "template") {
+								if(runConfig.isTemplate) {
 									//have to sync disk from template
 									NutanixPrismSyncUtils.syncVolumes(server, disks?.findAll { it.device_properties.device_type == 'DISK' }, cloud, morpheusContext)
 								} else {
