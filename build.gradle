@@ -8,10 +8,10 @@ buildscript {
 		maven { url "https://nexus.bertramlabs.com/content/repositories/publicReleases" }
 	}
 	dependencies {
-		classpath "com.github.jengelman.gradle.plugins:shadow:6.0.0"
+		classpath "com.github.johnrengelman:shadow:8.1.1"
 		classpath "io.github.gradle-nexus:publish-plugin:1.0.0"
 		classpath "com.bertramlabs.plugins:asset-pipeline-gradle:$assetPipelineVersion"
-		classpath "com.morpheusdata:morpheus-plugin-gradle:0.14.3"
+		classpath "com.morpheusdata:morpheus-plugin-gradle:1.1.6"
 	}
 }
 
