@@ -2150,7 +2150,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				runConfig.isSysprep = true
 				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
 			}
-			def insertIso = isCloudInitIso(runConfig)
+			//check if data is too large for direct userData injection
+			def userDataLength = cloudConfigUser?.encodeAsBase64()?.size()
+			def insertIso = isCloudInitIso(runConfig) || (userDataLength > 32000)
 			if(cloudConfigUser) {
 				if(!insertIso) {
 					runConfig.cloudInitUserData = cloudConfigUser.encodeAsBase64()
