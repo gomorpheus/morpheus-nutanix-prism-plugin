@@ -2142,13 +2142,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				server.computeServerType = newType
 			}
 
-			def cloudConfigUser
+			def cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
+			def cloudConfigMeta = workloadRequest?.cloudConfigMeta ?: hostRequest?.cloudConfigMeta ?: null
+			def cloudConfigNetwork = workloadRequest?.cloudConfigNetwork ?: hostRequest?.cloudConfigNetwork ?: null
 			//cloud_init && sysprep
-			if(virtualImage?.isCloudInit && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
-				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
-			} else if (virtualImage?.isSysprep && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
+			if (virtualImage?.isSysprep && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
 				runConfig.isSysprep = true
-				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
 			}
 			//check if data is too large for direct userData injection
 			def userDataLength = cloudConfigUser?.encodeAsBase64()?.size()
@@ -2237,12 +2236,25 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					}
 					def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 					if(insertIso) {
+						def byteArray = morpheusContext.services.provision.buildIsoOutputStream(runConfig.isSysprep as Boolean, runConfig.serverOs?.platform, cloudConfigMeta, cloudConfigUser, cloudConfigNetwork)
+						def isoStream = new ByteArrayInputStream(byteArray)
+						def url
+						ServiceResponse<String> copyUrlResponse = morpheusContext.services.fileCopy.generateUrl(
+							UUID.randomUUID().toString(),
+							server.createdBy,
+							isoStream,
+							byteArray.length,
+							120l * 60000l, // 2 hours
+							true,
+							"application/x-cd-image"
+						)
+						if (copyUrlResponse.success) {
+							url = copyUrlResponse.data
+						}
 						//upload cloud-init iso
-						def applianceServerUrl = workloadRequest?.cloudConfigOpts?.applianceUrl ?: hostRequest?.cloudConfigOpts?.applianceUrl ?: null
-						if(applianceServerUrl) {
+						if(url) {
 							def fileName = "morpheus_${server.id}.iso"
-							def fileUrl = applianceServerUrl + (applianceServerUrl.endsWith('/') ? '' : '/') + 'api/cloud-config/' + server.apiKey
-							imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", fileUrl)
+							imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", url)
 							def imageExternalId
 							if (imageResults.success) {
 								imageExternalId = imageResults.data.metadata.uuid
