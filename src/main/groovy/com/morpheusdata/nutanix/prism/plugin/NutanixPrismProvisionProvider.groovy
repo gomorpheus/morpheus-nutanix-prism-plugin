@@ -646,7 +646,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	@Override
 	ServiceResponse<PrepareWorkloadResponse> prepareWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
 		log.debug "prepareWorkload: ${workload} ${workloadRequest} ${opts}"
-
 		ServiceResponse<PrepareWorkloadResponse> resp = new ServiceResponse<>()
 		resp.data = new PrepareWorkloadResponse(workload: workload, options: [sendIp:false], disableCloudInit: false)
 		try {
@@ -675,6 +674,30 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		}
 		if(!resp.success) {
 			log.error "prepareWorkload: error - ${resp.msg}"
+		} else {
+			def platform = workload.server?.serverOs?.platform ?: workload.server?.sourceImage?.osType?.platform
+			def clusterId = opts.config?.clusterName
+			if(platform == PlatformType.windows && clusterId) {
+				def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId).withFilter("type", "Cluster").withFilter("refType","ComputeZone").withFilter("refId",workload.server?.cloud?.id)).blockingGet()
+				def aosVersion = cluster?.getConfigProperty('aosVersion')
+				if (aosVersion) {
+					// Match only if the first segment is 1–3 digits, followed by optional dot-separated subversions
+					// Nutanix has historically been unreliable for version syntax. It has changed over the years therefore try and detect if its an AOS version and only change interfaces if the major version is greater than 7
+					def matcher = (aosVersion =~ /^(\d{1,3})(?=\.|$)(?:[\.\w-]*)$/)
+					if (matcher.matches()) {
+						def major = matcher[0][1] as int
+						if (major >= 7) {
+							log.debug("Modifying Network Config for Windows deployment on AOS 7")
+							// Update networkConfig for AOS 7 and above
+							// Updates by object reference so that the networkConfig is updated before Morpheus Core generates the network userdata. Perhaps in the future a specific method will be defined for this if needed.
+							opts.networkConfig?.primaryInterface?.name = 'Ethernet Instance 0'
+							opts.networkConfig?.extraInterfaces?.eachWithIndex { currentInterface, idx ->
+								currentInterface.name = "Ethernet Instance 0 ${idx + 2}"
+							}
+						}
+					}
+				}
+			}
 		}
 		return resp
 	}
