@@ -62,6 +62,7 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
+import com.morpheusdata.core.providers.*
 
 import java.security.MessageDigest
 
@@ -743,4 +744,10 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		}
 		return datastores
 	}
+
+	@Override
+	CloudClassification getCloudClassification() {
+		return CloudClassification.PRIVATE;
+	}
+
 }
