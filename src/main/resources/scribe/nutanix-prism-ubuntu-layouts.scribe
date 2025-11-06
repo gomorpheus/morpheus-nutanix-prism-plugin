@@ -108,8 +108,8 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
-	enabled = true
-	creatable = true
+	enabled = false
+	creatable = false
 	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-ubuntu-18_04-set
