@@ -187,7 +187,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		hypervisorType.externalDelete = false
 		hypervisorType.hasAutomation = false
 		hypervisorType.agentType = ComputeServerType.AgentType.none
-		hypervisorType.platform = PlatformType.ESXi
+		hypervisorType.platform = PlatformType.esxi
 		hypervisorType.managed = false
 		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		hypervisorType.nodeType = 'nutanix-prism-node'
