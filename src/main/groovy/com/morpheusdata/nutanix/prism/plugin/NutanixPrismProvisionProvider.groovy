@@ -675,20 +675,42 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		if(!resp.success) {
 			log.error "prepareWorkload: error - ${resp.msg}"
 		} else {
-			def platform = workload.server?.serverOs?.platform ?: workload.server?.sourceImage?.osType?.platform
+			def osType = workload.server?.serverOs ?: workload.server?.sourceImage?.osType
+			def platform = osType?.platform
 			def clusterId = opts.config?.clusterName
 			if(platform == PlatformType.windows && clusterId) {
+				//todo:: this is going to be messy to maintain long term. Interface Name Alias's in unattend answer files can always have a chance of mismatching what is deployed in the OS
+				// A few options:
+				// 1) Create a server, sync network interfaces and mac addresses, and use mac addresses in answer file for <Identifier>, build the user data, attach to disk, start vm.
+				//    - problem is this will rely on using a custom ISO image for the answer file, which needs connectivty back to Morpheus, some users may not have that setup. Right now sysprep can be injected into api call.
+				// 2) Remove nic information from <Interfaces> element in answer file, and instead configur nics in SetupCommand.cmd.
+
 				def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId).withFilter("type", "Cluster").withFilter("refType","ComputeZone").withFilter("refId",workload.server?.cloud?.id)).blockingGet()
 				def aosVersion = cluster?.getConfigProperty('aosVersion')
 				if (aosVersion) {
+
+					def osVersion = osType?.osVersion
+					if (osVersion && osVersion?.isNumber() && osVersion?.toInteger() <= 2019) {
+						//interface name issue does not seem to impact 2019 or less
+						return resp
+					}
+
 					// Match only if the first segment is 1–3 digits, followed by optional dot-separated subversions
-					// Nutanix has historically been unreliable for version syntax. It has changed over the years therefore try and detect if its an AOS version and only change interfaces if the major version is greater than 7
+					// Nutanix does not reliably return the AOS version in the correct format for the V2 cluster API. It has changed over the years therefore try and detect if its an AOS version and only change interfaces if the major version equal to 7
 					def matcher = (aosVersion =~ /^(\d{1,3})(?=\.|$)(?:[\.\w-]*)$/)
 					if (matcher.matches()) {
 						def major = matcher[0][1] as int
-						if (major >= 7) {
+						if (major == 7) {
+							def minor = aosVersion.tokenize('.')?.getAt(1)
+							if(minor && minor.isNumber()) {
+								def minorInteger = minor.toInteger()
+								if(minorInteger >= 3 && minorInteger.toString().size() == minor.size()) {
+									//bug has been fixed in Nutanix
+									return resp
+								}
+							}
 							log.debug("Modifying Network Config for Windows deployment on AOS 7")
-							// Update networkConfig for AOS 7 and above
+							// Update networkConfig for AOS 7
 							// Updates by object reference so that the networkConfig is updated before Morpheus Core generates the network userdata. Perhaps in the future a specific method will be defined for this if needed.
 							opts.networkConfig?.primaryInterface?.name = 'Ethernet Instance 0'
 							opts.networkConfig?.extraInterfaces?.eachWithIndex { currentInterface, idx ->
