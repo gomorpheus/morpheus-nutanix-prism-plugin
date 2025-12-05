@@ -2376,10 +2376,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 									updateMetadataTags(server, [cloudTags: tags, cloudVm: serverDetail.virtualMachine])
 								}
 
-
 								if(runConfig.isTemplate) {
 									//have to sync disk from template
 									NutanixPrismSyncUtils.syncVolumes(server, disks?.findAll { it.device_properties.device_type == 'DISK' }, cloud, morpheusContext)
+									//re-fetch server with new volumes
+									server = morpheusContext.services.computeServer.get(server.id)
 								} else {
 
 									//some ugly matching

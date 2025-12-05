@@ -54,6 +54,8 @@ resource "compute-type-layout" "docker-nutanix-prism-ubuntu-18_04-single" {
 		{code = "nutanix-prism-provision-categories"},
 	]
 	provisionType = "nutanix-prism-provision-provider"
+	enabled = false
+	creatable = false
 }
 
 resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
@@ -62,6 +64,65 @@ resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single" {
 	computeVersion = "16.04"
 	enabled = false
 	creatable = false
+}
+
+resource "workload-type" "docker-nutanix-prism-ubuntu-20_04" {
+	code = "docker-nutanix-prism-ubuntu-20.04"
+	shortName = "ubuntu"
+	name = "Docker Ubuntu 20.04"
+	account = null
+	ports = [22]
+	containerVersion = "20.04"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "ubuntu"
+	showServerLogs = true
+	category = "ubuntu"
+	cloneType = "ubuntu"
+	priorityOrder = 0
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	containerPorts = [{code = "ubuntu.22"}]
+	checkTypeCode = "vmCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20250218
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "compute-type-set" "docker-nutanix-prism-ubuntu-20_04-set" {
+	code = "docker-nutanix-prism-ubuntu-20.04-set"
+	name = "docker host"
+	containerType = workload-type.docker-nutanix-prism-ubuntu-20_04
+	computeServerType = compute-server-type.nutanix-prism-linux
+	priorityOrder = 0
+	dynamicCount = true
+	nodeCount = 1
+	nodeType = "worker"
+	canAddNodes = true
+	installContainerRuntime = true
+	installStorageRuntime = true
+}
+
+resource "compute-type-layout" "docker-nutanix-prism-ubuntu-20_04-single" {
+	code = "docker-nutanix-prism-ubuntu-20.04-single"
+	name = "Nutanix Prism Central Docker Ubuntu 20.04"
+	sortOrder = 5
+	computeVersion = "20.04"
+	description = "This will provision a single docker host vm in nutanix prism central."
+	serverCount = 1
+	memoryRequirement = 1024 * 1024 * 1024
+	hasAutoScale = true
+	type = "nutanix-prism-vm"
+	groupType = "docker-cluster"
+	computeServers = ["docker-nutanix-prism-ubuntu-20.04-set"]
+	optionTypes = [
+		{code = "nutanix-prism-provision-vpc"},
+		{code = "nutanix-prism-provision-cluster"},
+		{code = "nutanix-prism-provision-categories"},
+	]
+	provisionType = "nutanix-prism-provision-provider"
+	enabled = true
+	creatable = true
 }
 
 
