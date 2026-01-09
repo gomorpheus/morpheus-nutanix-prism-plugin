@@ -255,6 +255,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		linuxDockerType.supportsConsoleKeymap = true
 		linuxDockerType.platform = PlatformType.linux
 		linuxDockerType.managed = true
+		linuxDockerType.guestVm = true
 		linuxDockerType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		linuxDockerType.agentType = ComputeServerType.AgentType.host
 		linuxDockerType.clusterType = ComputeServerType.ClusterType.docker
@@ -271,6 +272,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeMasterType.supportsConsoleKeymap = true
 		kubeMasterType.platform = PlatformType.linux
 		kubeMasterType.managed = true
+		kubeMasterType.guestVm = true
 		kubeMasterType.hasMaintenanceMode = true
 		kubeMasterType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		kubeMasterType.agentType = ComputeServerType.AgentType.host
@@ -289,6 +291,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeWorkerType.supportsConsoleKeymap = true
 		kubeWorkerType.platform = PlatformType.linux
 		kubeWorkerType.managed = true
+		kubeWorkerType.guestVm = true
 		kubeWorkerType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		kubeWorkerType.agentType = ComputeServerType.AgentType.host
 		kubeWorkerType.clusterType = ComputeServerType.ClusterType.kubernetes
