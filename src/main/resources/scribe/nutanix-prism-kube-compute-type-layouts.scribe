@@ -6,7 +6,7 @@
 
 
 resource "compute-type-layout" "kubernetes-34-ubuntu-24_04-nutanix-prism-amd64-single" {
-  code = "kubernetes-1_33-ubuntu-24_04-nutanix-prism-amd64-single"
+  code = "kubernetes-1_34-ubuntu-24_04-nutanix-prism-amd64-single"
   enabled = true
   name = "MKS Kubernetes 1.34 Cluster on Ubuntu 24.04"
   sortOrder = 0
@@ -43,7 +43,6 @@ resource "compute-type-layout" "kubernetes-34-ubuntu-24_04-nutanix-prism-amd64-s
 }
 
 
-
 /*
   
 ---- Version 33 -----
@@ -55,7 +54,7 @@ resource "compute-type-layout" "kubernetes-33-ubuntu-24_04-nutanix-prism-amd64-s
   code = "kubernetes-1_33-ubuntu-24_04-nutanix-prism-amd64-single"
   enabled = true
   name = "MKS Kubernetes 1.33 Cluster on Ubuntu 24.04"
-  sortOrder = 4
+  sortOrder = 5
   computeVersion = "24.04"
   clusterVersion = "1.33.x"
   description = "provision a kubernetes 1.33 cluster on ubuntu 24.04"
@@ -144,7 +143,7 @@ resource "compute-type-layout" "kubernetes-32-ubuntu-24_04-nutanix-prism-amd64-s
   code = "kubernetes-1_32-ubuntu-24_04-nutanix-prism-amd64-single"
   enabled = true
   name = "MKS Kubernetes 1.32 Cluster on Ubuntu 24.04"
-  sortOrder = 5
+  sortOrder = 10
   computeVersion = "24.04"
   clusterVersion = "1.32.x"
   description = "provision a kubernetes 1.32 cluster on ubuntu 24.04"
@@ -189,7 +188,7 @@ resource "compute-type-layout" "kubernetes-1_31-ubuntu-22_04-nutanix-prism-amd64
   code = "kubernetes-1_31-ubuntu-22_04-nutanix-prism-amd64-single"
   enabled = false
   name = "MKS Kubernetes 1.31 Cluster on Ubuntu 22.04"
-  sortOrder = 5
+  sortOrder = 10
   computeVersion = "22.04"
   clusterVersion = "1.31.x"
   description = "provision a kubernetes 1.31 cluster on ubuntu 22.04"
@@ -232,7 +231,7 @@ resource "compute-type-layout" "kubernetes-1_31-ubuntu-22_04-nutanix-prism-amd64
 
 resource "compute-type-layout" "kubernetes-1_30-ubuntu-22_04-nutanix-prism-amd64-single" {
   code = "kubernetes-1_30-ubuntu-22_04-nutanix-prism-amd64-single"
-  enabled = true
+  enabled = false
   name = "MKS Kubernetes 1.30 Cluster on Ubuntu 22.04"
   sortOrder = 10
   computeVersion = "22.04"
