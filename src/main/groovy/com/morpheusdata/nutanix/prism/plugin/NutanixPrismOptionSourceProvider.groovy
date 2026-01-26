@@ -295,8 +295,11 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			def url = args.serviceUrl ?: args["zone.serviceUrl"]
 			url = decodeUrl(url)
 
-			rtn.serviceUsername =  args.serviceUsername ?: args["zone.serviceUsername"]
-			rtn.servicePassword =   args.servicePassword ?: args["zone.servicePassword"]
+			rtn.serviceUsername = args.serviceUsername ?: args["zone.serviceUsername"]
+			def tempPassword = args.servicePassword ?: args["zone.servicePassword"]
+			if(tempPassword && tempPassword != "************") {
+				rtn.servicePassword = tempPassword
+			}
 			rtn.serviceUrl =  url
 
 			def credentialConfig = [
