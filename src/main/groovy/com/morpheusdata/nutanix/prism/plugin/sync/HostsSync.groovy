@@ -231,16 +231,20 @@ class HostsSync {
 				if(save) {
 					morpheusContext.async.computeServer.bulkSave([currentServer]).blockingGet()
 				}
+
 				def (maxStorage,usedStorage) = syncHostVolumes(currentServer, volumeType, cloudHostDisks)
 
+				//re-fetch to ensure we have volumes
+				currentServer = morpheusContext.services.computeServer.get(currentServer.id)
+
 				updateMachineMetrics(
-						currentServer,
-						matchedServer.num_cpu_cores?.toLong(),
-						maxStorage?.toLong(),
-						usedStorage?.toLong(),
-						matchedServer.memory_capacity_in_bytes?.toLong(),
-						((matchedServer.memory_capacity_in_bytes ?: 0 ) * (matchedServer.stats.hypervisor_memory_usage_ppm?.toLong() / 1000000.0))?.toLong(),
-						(matchedServer.stats.hypervisor_cpu_usage_ppm?.toLong() / 10000.0)
+					currentServer,
+					matchedServer.num_cpu_cores?.toLong(),
+					maxStorage?.toLong(),
+					usedStorage?.toLong(),
+					matchedServer.memory_capacity_in_bytes?.toLong(),
+					((matchedServer.memory_capacity_in_bytes ?: 0 ) * (matchedServer.stats.hypervisor_memory_usage_ppm?.toLong() / 1000000.0))?.toLong(),
+					(matchedServer.stats.hypervisor_cpu_usage_ppm?.toLong() / 10000.0)
 				)
 			}
 		}
@@ -257,7 +261,7 @@ class HostsSync {
 		def totalMaxStorage = 0l
 		def totalUsedStorage = 0l
 		def matchFunction = { existingItem, masterItem ->
-			existingItem.externalId == masterItem.uuid
+			existingItem.externalId == masterItem.id
 		}
 		
 		def masterItems = cloudHostDisks.findAll { it.node_uuid == server.externalId }
