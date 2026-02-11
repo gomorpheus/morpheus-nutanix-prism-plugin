@@ -1,3 +1,12 @@
+// 10
+resource "instance-type-layout" "nutanix-prism-debian-10-single"
+	code = "nutanix-prism-debian-10-single"
+	name = "Nutanix Prism Central VM"
+	description = "This will provision a single vm"
+	enabled = false
+	creatable = false
+}
+
 //11
 resource "os-type-image" "nutanix-prism-image-morpheus-debian-11" {
 	code               = "nutanix.prism.image.morpheus.debian.11"

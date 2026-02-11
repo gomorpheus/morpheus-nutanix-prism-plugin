@@ -1,23 +1,20 @@
+//16
+resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-16_04" {
+	code = "nutanix.prism.image.morpheus.ubuntu.16.04"
+	category = "nutanix.prism.image.morpheus.ubuntu"
+	name = "Morpheus Ubuntu 16.04"
+	enabled = false
+	creatable = false
+}
+
+
 //18
 resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 	code = "nutanix-prism-ubuntu-18.04-single"
 	name = "Nutanix Prism Central VM"
-	account = null
-	sortOrder = 18
-	instanceVersion = "18.04"
 	description = "This will provision a single vm"
-	instanceType {
-		code = "ubuntu"
-	}
-	serverCount = 1
-	hasAutoScale = true
-	portCount = 1
-	serverType = "vm"
 	enabled = false
 	creatable = false
-	supportsConvertToManaged = true
-	actions = [{code = "ubuntu-add-node"}]
-	provisionType = "nutanix-prism-provision-provider"
 }
 
 

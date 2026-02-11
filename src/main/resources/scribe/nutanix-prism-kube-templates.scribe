@@ -16,7 +16,7 @@ resource "workload-type" "kubernetes-ubuntu-22_04-nutanix-prism-amd64" {
   serverType       = "vm"
   providerType     = "nutanix-prism"
   checkTypeCode    = "vmCheck"
-  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20230307
+  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20260203
   containerPorts   = ["ubuntu.22"]
   provisionType    = "nutanix-prism-provision-provider"
   scripts          = [
@@ -44,7 +44,7 @@ resource "workload-type" "kubernetes-ubuntu-22_04-worker-nutanix-prism-amd64" {
   serverType       = "vm"
   providerType     = "nutanix-prism"
   checkTypeCode    = "vmCheck"
-  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20230307
+  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20260203
   containerPorts   = ["ubuntu.22"]
   provisionType    = "nutanix-prism-provision-provider"
   scripts          = [
@@ -107,7 +107,7 @@ resource "workload-type" "kubernetes-ubuntu-24_04-nutanix-prism-amd64" {
   serverType       = "vm"
   providerType     = "nutanix-prism"
   checkTypeCode    = "vmCheck"
-  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20250218
+  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20260203
   containerPorts   = ["ubuntu.22"]
   provisionType    = "nutanix-prism-provision-provider"
   scripts          = [
@@ -135,7 +135,7 @@ resource "workload-type" "kubernetes-ubuntu-24_04-worker-nutanix-prism-amd64" {
   serverType       = "vm"
   providerType     = "nutanix-prism"
   checkTypeCode    = "vmCheck"
-  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20250218
+  virtualImage     = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20260203
   containerPorts   = ["ubuntu.22"]
   provisionType    = "nutanix-prism-provision-provider"
   scripts          = [

@@ -1,21 +1,15 @@
+resource "compute-type-layout" "docker-nutanix-prism-ubuntu-16_04-single"
+	name = "Nutanix Prism Central Docker Ubuntu 16.04"
+	computeVersion = "16.04"
+	enabled = false
+	creatable = false
+}
+
 resource "compute-type-layout" "docker-nutanix-prism-ubuntu-18_04-single" {
 	code = "docker-nutanix-prism-ubuntu-18.04-single"
 	name = "Nutanix Prism Central Docker Ubuntu 18.04"
-	sortOrder = 5
 	computeVersion = "18.04"
 	description = "This will provision a single docker host vm in nutanix prism central."
-	serverCount = 1
-	memoryRequirement = 1024 * 1024 * 1024
-	hasAutoScale = true
-	type = "nutanix-prism-vm"
-	groupType = "docker-cluster"
-	computeServers = ["docker-nutanix-prism-ubuntu-18.04-set"]
-	optionTypes = [
-		{code = "nutanix-prism-provision-vpc"},
-		{code = "nutanix-prism-provision-cluster"},
-		{code = "nutanix-prism-provision-categories"},
-	]
-	provisionType = "nutanix-prism-provision-provider"
 	enabled = false
 	creatable = false
 }
@@ -101,7 +95,7 @@ resource "workload-type" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
@@ -131,7 +125,7 @@ resource "workload-type" "kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
@@ -230,7 +224,7 @@ resource "workload-type" "kubernetes-1_27_7-ubuntu-20_04-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
@@ -260,7 +254,7 @@ resource "workload-type" "kubernetes-1_27_7-ubuntu-20_04-worker-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
@@ -359,7 +353,7 @@ resource "workload-type" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
@@ -392,7 +386,7 @@ resource "workload-type" "kubernetes-1_28_3-ubuntu-20_04-worker-nutanix-prism" {
 	serverType = "vm"
 	providerType = "nutanix-prism"
 	checkTypeCode = "vmCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20240304
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
 	containerPorts = [{code = "ubuntu.22"}]
 	provisionType = "nutanix-prism-provision-provider"
 	scripts = [
