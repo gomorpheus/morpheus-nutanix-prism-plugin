@@ -385,6 +385,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	}
 
 	@Override
+	Boolean canSyncMaxMemoryStats() {
+		return false
+	}
+
+	@Override
 	ServiceResponse cloneToTemplate(Workload workload, Map opts) {
 		def rtn = [success: false, msg: ""]
 		try {

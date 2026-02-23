@@ -52,11 +52,6 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 	}
 
 	@Override
-	boolean isPlugin() {
-		return true
-	}
-
-	@Override
 	String getContainerType() {
 		return 'single'
 	}
