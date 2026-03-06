@@ -433,3 +433,104 @@ resource "scale-action" "nutanix-prism-centos-9-stream-single" {
 		code = "generic-remove-node"
 	}
 }
+
+
+
+
+
+//10-stream
+resource "virtual-image" "nutanix-prism-image-morpheus-centos-10-stream" {
+	code = "nutanix.prism.image.morpheus.centos.10-stream"
+	category = "nutanix.prism.image.morpheus.centos"
+	name = "Morpheus CentOS 10-stream 20260126"
+	imageType = "qcow2"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260126/centos-10-stream/morpheus-centos-10-stream-x86_64-20260126.qcow2"
+	imagePath = "qemu/20260126/centos-10-stream"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "cent.10.64"
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-centos-10-stream" {
+  code               = "nutanix.prism.image.morpheus.centos.10-stream"
+  provisionType      = "nutanix-prism-provision-provider"
+  virtualImage       = virtual-image.nutanix-prism-image-morpheus-centos-10-stream
+  account            = null
+  osType = {
+     code = "cent.10.64"
+     owner = null
+  }
+}
+
+
+resource "workload-type" "nutanix-prism-centos-10-stream" {
+	code = "nutanix-prism-centos-10-stream"
+	shortName = "centos"
+	name = "CentOS 10-stream"
+	account = null
+	containerVersion = "10-stream"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "centos"
+	showServerLogs = true
+	category = "centos"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-centos-10-stream
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-centos-10-stream-set" {
+	code = "nutanix-prism-centos-10-stream-set"
+	containerType = workload-type.nutanix-prism-centos-10-stream
+	priorityOrder = 0
+	dynamicCount = true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-centos-10-stream-single" {
+	code = "nutanix-prism-centos-10-stream-single"
+	name = "Nutanix Prism Central VM"
+	account = null
+	sortOrder = 99
+	instanceVersion = "10-stream"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "centos"
+	}
+	serverCount = 1
+	hasAutoScale = true
+	portCount = 1
+	enabled = true
+	creatable = true
+	supportsConvertToManaged = true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-centos-10-stream-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-centos-10-stream-single" {
+	code = "nutanix-prism-centos-10-stream-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-centos-10-stream-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
