@@ -4,8 +4,8 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-13-20260120" {
 	category = "nutanix.prism.image.morpheus.debian"
 	name = "Morpheus Debian 13 20260120"
 	imageType = "qcow2"
-	remotePath = " https://morpheus-images.s3.amazonaws.com/qemu/20260120/debian-13/morpheus-debian-13-amd64-20260120.qcow2"
-	imagePath = "qemu/20260120/debian-13"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260310/debian-13/morpheus-debian-13-amd64-20260310.qcow2"
+	imagePath = "qemu/20260310/debian-13"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
