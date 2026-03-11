@@ -47,7 +47,7 @@ resource "workload-type" "nutanix-prism-debian-13" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-13-20260120
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-13-20260310
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
