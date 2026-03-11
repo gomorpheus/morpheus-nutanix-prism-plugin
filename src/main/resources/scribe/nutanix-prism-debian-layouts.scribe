@@ -1,8 +1,8 @@
 //13
-resource "virtual-image" "nutanix-prism-image-morpheus-debian-13-20260120" {
-	code = "nutanix.prism.image.morpheus.debian.13.20260120"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-13-20260310" {
+	code = "nutanix.prism.image.morpheus.debian.13.20260310"
 	category = "nutanix.prism.image.morpheus.debian"
-	name = "Morpheus Debian 13 20260120"
+	name = "Morpheus Debian 13 20260310"
 	imageType = "qcow2"
 	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260310/debian-13/morpheus-debian-13-amd64-20260310.qcow2"
 	imagePath = "qemu/20260310/debian-13"
@@ -19,7 +19,7 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-13-20260120" {
 resource "os-type-image" "nutanix-prism-image-morpheus-debian-13" {
 	code               = "nutanix.prism.image.morpheus.debian.13"
 	provisionType      = "nutanix-prism-provision-provider"
-	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-13-20260120
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-13-20260310
 	account            = null
 	osType = {
 		code = "debian.13.64"
