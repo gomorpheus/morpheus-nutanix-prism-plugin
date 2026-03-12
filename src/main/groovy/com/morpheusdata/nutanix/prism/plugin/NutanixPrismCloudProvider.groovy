@@ -172,7 +172,23 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'config'
 		)
 
-		return [apiUrl, credentials, username, password, project, vmmApiVersion, inventoryInstances, enableVnc]
+		OptionType windowsNicConfigMode = new OptionType(
+				name: 'Windows NIC Configuration Method',
+				code: 'nutanix-prism-windows-nic-config-mode',
+				fieldName: 'windowsNicConfigMode',
+				displayOrder: 92,
+				fieldLabel: 'Windows NIC Configuration Method',
+				fieldContext: 'config',
+				required: false,
+				inputType: OptionType.InputType.SELECT,
+				defaultValue: 'unattend',
+				helpText: 'Controls how static IP configuration is applied to Windows VMs during provisioning. ' +
+					'"SetupComplete.cmd" configures NICs post-OOBE by adapter index order and is more reliable ' +
+					'across BIOS/UEFI deployments and AOS versions. "Inline (Unattend.xml)" is the legacy default.',
+				optionSource: 'nutanixPrismWindowsNicConfigModeOptions'
+		)
+
+		return [apiUrl, credentials, username, password, project, vmmApiVersion, inventoryInstances, enableVnc, windowsNicConfigMode]
 	}
 
 	@Override

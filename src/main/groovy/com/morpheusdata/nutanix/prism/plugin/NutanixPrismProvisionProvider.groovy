@@ -684,6 +684,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def platform = osType?.platform
 			def clusterId = opts.config?.clusterName
 			if(platform == PlatformType.windows && clusterId) {
+				def nicConfigMode = workload.server?.cloud?.getConfigProperty('windowsNicConfigMode') ?: 'unattend'
+				opts.nicConfigMode = nicConfigMode
+				if(nicConfigMode == 'setupComplete') {
+					// NIC configuration is handled post-OOBE via configureNic.ps1 in SetupComplete.cmd.
+					// No interface name override is needed in the unattend file.
+					return resp
+				}
+
 				//todo:: this is going to be messy to maintain long term. Interface Name Alias's in unattend answer files can always have a chance of mismatching what is deployed in the OS
 				// A few options:
 				// 1) Create a server, sync network interfaces and mac addresses, and use mac addresses in answer file for <Identifier>, build the user data, attach to disk, start vm.
