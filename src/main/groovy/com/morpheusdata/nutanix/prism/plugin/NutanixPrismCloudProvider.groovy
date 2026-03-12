@@ -184,7 +184,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				defaultValue: 'unattend',
 				helpText: 'Controls how static IP configuration is applied to Windows VMs during provisioning. ' +
 					'"SetupComplete.cmd" configures NICs post-OOBE by adapter index order and is more reliable ' +
-					'across BIOS/UEFI deployments and AOS versions. "Inline (Unattend.xml)" is the legacy default.',
+					'across BIOS/UEFI deployments and AOS versions. "Inline (Unattend.xml)" is the legacy default. ' +
+					'Note: SetupComplete.cmd produces a larger unattend.xml. If it exceeds the 32 KB Nutanix API ' +
+					'limit (common with multiple NICs, agent install, or a proxy configured), Morpheus will ' +
+					'automatically upload it as an ISO image instead. For this fallback to work, the Nutanix ' +
+					'cluster must be able to reach the Morpheus appliance URL.',
 				optionSource: 'nutanixPrismWindowsNicConfigModeOptions'
 		)
 
