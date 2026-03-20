@@ -691,12 +691,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					return resp
 				}
 
-				//todo:: this is going to be messy to maintain long term. Interface Name Alias's in unattend answer files can always have a chance of mismatching what is deployed in the OS
-				// A few options:
-				// 1) Create a server, sync network interfaces and mac addresses, and use mac addresses in answer file for <Identifier>, build the user data, attach to disk, start vm.
-				//    - problem is this will rely on using a custom ISO image for the answer file, which needs connectivty back to Morpheus, some users may not have that setup. Right now sysprep can be injected into api call.
-				// 2) Remove nic information from <Interfaces> element in answer file, and instead configur nics in SetupCommand.cmd.
-
 				def clusterId = opts.config?.clusterName
 				if(clusterId) {
 					def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId).withFilter("type", "Cluster").withFilter("refType","ComputeZone").withFilter("refId",workload.server?.cloud?.id)).blockingGet()
