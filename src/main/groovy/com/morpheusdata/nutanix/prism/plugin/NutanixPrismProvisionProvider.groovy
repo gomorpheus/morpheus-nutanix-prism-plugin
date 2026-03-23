@@ -685,10 +685,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			if(platform == PlatformType.windows) {
 				def nicConfigMode = workload.server?.cloud?.getConfigProperty('windowsNicConfigMode') ?: 'unattend'
 				opts.nicConfigMode = nicConfigMode
-				// Return nicConfigMode via PrepareWorkloadResponse options so Morpheus Core can include it in
-				// cloudConfigOpts before calling buildWindowsSysprepData. Without this the guard in
-				// MorpheusComputeService.buildWindowsSysprepData (opts.nicConfigMode != 'setupComplete') never
-				// fires because cloudConfigOpts is built from a fresh map after prepareWorkload returns.
 				resp.data.options.nicConfigMode = nicConfigMode
 				if(nicConfigMode == 'setupComplete') {
 					// NIC configuration is handled post-OOBE via configureNic.ps1 in SetupComplete.cmd.
