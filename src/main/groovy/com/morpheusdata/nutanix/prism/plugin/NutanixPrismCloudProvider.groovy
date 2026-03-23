@@ -172,7 +172,22 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'config'
 		)
 
-		return [apiUrl, credentials, username, password, project, vmmApiVersion, inventoryInstances, enableVnc]
+		OptionType windowsNicConfigMode = new OptionType(
+				name: 'Static IP Mode (Windows)',
+				code: 'nutanix-prism-windows-nic-config-mode',
+				fieldName: 'windowsNicConfigMode',
+				displayOrder: 92,
+				fieldLabel: 'Static IP Mode (Windows)',
+				fieldContext: 'config',
+				required: false,
+				inputType: OptionType.InputType.SELECT,
+				defaultValue: 'unattend',
+				fieldGroup: 'Advanced',
+				helpText: 'Controls how static IP is configured on Windows VMs. "SetupComplete.cmd" is more reliable but may fall back to ISO upload if the 32 KB API limit is exceeded (requires appliance URL reachability).',
+				optionSource: 'nutanixPrismWindowsNicConfigModeOptions'
+		)
+
+		return [apiUrl, credentials, username, password, project, vmmApiVersion, inventoryInstances, enableVnc, windowsNicConfigMode]
 	}
 
 	@Override
