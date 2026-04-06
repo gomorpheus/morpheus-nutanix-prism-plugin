@@ -2351,8 +2351,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								Map resourcePools = getAllResourcePools(server.cloud)
 								CloudPool resourcePool = resourcePools[serverDetail?.virtualMachine?.status?.cluster_reference?.uuid]
 
-								def privateIp = serverDetail.ipAddress
-								def publicIp = serverDetail.ipAddress
+								// Prefer the static IP configured in the NIC spec (e.g., Morpheus pool allocation)
+								// over the first IP Nutanix reports, which may be a transient DHCP address
+								// during early Windows boot before sysprep applies the static IP.
+								def configuredIp = runConfig.nicList?.getAt(0)?.get('ip_endpoint_list')?.getAt(0)?.get('ip')
+								def privateIp = configuredIp ?: serverDetail.ipAddress
+								def publicIp = configuredIp ?: serverDetail.ipAddress
 								server.internalIp = privateIp
 								server.externalIp = publicIp
 								server.resourcePool = new ComputeZonePool(id: resourcePool.id)
