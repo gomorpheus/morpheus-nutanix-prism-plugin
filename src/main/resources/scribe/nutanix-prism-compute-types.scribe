@@ -169,7 +169,7 @@ resource "compute-type-set" "kubernetes-1_26_1-ubuntu-20_04-worker-nutanix-prism
 
 resource "compute-type-layout" "kubernetes-1_26_1-ubuntu-20_04-nutanix-prism-single" {
 	code = "kubernetes-1.26.1-ubuntu-20.04-nutanix-prism-single"
-	name = "MKS Kubernetes 1.26 Cluster on Ubuntu 20.04"
+	name = "HKS Kubernetes 1.26 Cluster on Ubuntu 20.04"
 	enabled = false
 	sortOrder = 10
 	computeVersion = "20.04"
@@ -298,7 +298,7 @@ resource "compute-type-set" "kubernetes-1_27_7-ubuntu-20_04-worker-nutanix-prism
 
 resource "compute-type-layout" "kubernetes-1_27_7-ubuntu-20_04-nutanix-prism-single" {
 	code = "kubernetes-1.27.7-ubuntu-20.04-nutanix-prism-single"
-	name = "MKS Kubernetes 1.27 Cluster on Ubuntu 20.04"
+	name = "HKS Kubernetes 1.27 Cluster on Ubuntu 20.04"
 	enabled = false
 	sortOrder = 10
 	computeVersion = "20.04"
@@ -430,7 +430,7 @@ resource "compute-type-set" "kubernetes-1_28_3-ubuntu-20_04-worker-nutanix-prism
 
 resource "compute-type-layout" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-single" {
 	code = "kubernetes-1.28.3-ubuntu-20.04-nutanix-prism-single"
-	name = "MKS Kubernetes 1.28 Cluster on Ubuntu 22.04"
+	name = "HKS Kubernetes 1.28 Cluster on Ubuntu 22.04"
 	enabled = true
 	sortOrder = 10
 	computeVersion = "22.04"
