@@ -73,14 +73,28 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
 		def regionCode = tmpCloud.regionCode
 
-		// Grab the projections.. doing a filter pass first
-		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
-		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false }.map{it.id}.toList().blockingGet()
+		// Find images that have a location for this cloud
+		def locationQuery = new DataQuery().withFilters([
+			new DataFilter('refType', 'ComputeZone'),
+			new DataFilter('refId', cloudId),
+		])
+		if (regionCode) {
+			locationQuery.withFilters(new DataFilter('imageRegion', regionCode))
+		}
+		def imageIdsWithLocation = morpheusContext.async.virtualImage.location.listIdentityProjections(locationQuery)
+			.map { it.virtualImage?.id }
+			.filter { it != null }
+			.toList().blockingGet().unique()
 
+		// Build a query for images belonging to this cloud or user-uploaded
+		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
+		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes)
+			.filter { it.deleted == false }
+			.map { it.id }
+			.toList().blockingGet()
 
 		List options = []
-		if(virtualImageIds.size() > 0) {
-
+		if (virtualImageIds.size() > 0) {
 			def query = new DataQuery().withFilters([
 				new DataFilter('active', true),
 				new DataFilter('id', 'in', virtualImageIds),
@@ -88,36 +102,27 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 					new DataFilter('owner.id', accountId),
 					new DataFilter('owner.id', null),
 					new DataFilter('visibility', 'public')
-				)
-			]).withJoins('locations', 'owner')
-			def additionalFilters = new DataOrFilter([
-				new DataFilter('category', "nutanix.prism.image.${cloudId}"),
-				new DataAndFilter(
-					new DataFilter("refType", "ComputeZone"),
-					new DataFilter("refId", cloudId)
 				),
-				new DataAndFilter(
-					new DataFilter("locations.refType", "ComputeZone"),
-					new DataFilter("locations.refId", cloudId)
+				new DataOrFilter(
+					new DataFilter('category', "nutanix.prism.image.${cloudId}"),
+					new DataAndFilter(
+						new DataFilter("refType", "ComputeZone"),
+						new DataFilter("refId", cloudId)
+					),
+					new DataFilter('id', 'in', imageIdsWithLocation ?: [0L]),
+					new DataAndFilter(
+						new DataFilter('userUploaded', true),
+						regionCode ? new DataFilter('imageRegion', regionCode) : new DataFilter('active', true)
+					)
 				)
-			])
-			if (regionCode) {
-				additionalFilters.withFilters([
-					new DataFilter('userUploaded', true),
-					new DataFilter('imageRegion', regionCode),
-					new DataFilter('locations.imageRegion', regionCode)
-				])
-			}
-			query.withFilters(additionalFilters)
-			options = morpheusContext.async.virtualImage.list(query).map { [name: it.name, value: it.id, locations: it.imageLocations, userUploaded: it.userUploaded] }.toList().blockingGet()
-		}
-
-		if(options.size() > 0) {
-			options = options.findAll{it.userUploaded || it.locations.size() == 0 || (it.locations.find {loc -> loc.refType == "ComputeZone" && loc.refId == cloudId})}.collect {[name: it.name, value: it.value]}.sort { it.name }
+			]).withJoins('owner')
+			options = morpheusContext.async.virtualImage.list(query)
+				.map { [name: it.name, value: it.id] }
+				.toList().blockingGet()
+				.sort { it.name }
 		}
 
 		options
-
 	}
 
 	def nutanixPrismNodeImage(args) {
