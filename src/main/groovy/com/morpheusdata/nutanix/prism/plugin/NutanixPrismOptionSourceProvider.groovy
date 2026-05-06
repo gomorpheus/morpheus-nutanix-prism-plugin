@@ -63,7 +63,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	@Override
 	List<String> getMethodNames() {
-		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage', 'nutanixPrismProjects', 'nutanixPrismVPC', 'supportedVmmApiVersions'])
+		return new ArrayList<String>(['nutanixPrismProvisionImage', 'nutanixPrismCategories', 'nutanixPrismCluster', 'nutanixPrismNodeImage', 'nutanixPrismProjects', 'nutanixPrismVPC', 'supportedVmmApiVersions', 'nutanixPrismWindowsNicConfigModeOptions'])
 	}
 
 	def nutanixPrismProvisionImage(args) {
@@ -113,7 +113,7 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		}
 
 		if(options.size() > 0) {
-			options = options.findAll{it.userUploaded || it.locations.size == 0 || (it.locations.find {loc -> loc.refType == "ComputeZone" && loc.refId == cloudId})}.collect {[name: it.name, value: it.value]}.sort { it.name }
+			options = options.findAll{it.userUploaded || it.locations.size() == 0 || (it.locations.find {loc -> loc.refType == "ComputeZone" && loc.refId == cloudId})}.collect {[name: it.name, value: it.value]}.sort { it.name }
 		}
 
 		options
@@ -186,6 +186,13 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 	def supportedVmmApiVersions(args) {
 		return NutanixPrismComputeUtility.VMM_API_VERSION.values()?.collect{[name: it.getDescription(), value: it.getCode()]}?.sort({it.name}) ?: []
+	}
+
+	def nutanixPrismWindowsNicConfigModeOptions(args) {
+		return [
+			[name: 'Inline (Unattend.xml)', value: 'unattend'],
+			[name: 'SetupComplete.cmd (Recommended)', value: 'setupComplete']
+		]
 	}
 
 	def nutanixPrismVPC(args){
@@ -307,8 +314,11 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			def url = args.serviceUrl ?: args["zone.serviceUrl"]
 			url = decodeUrl(url)
 
-			rtn.serviceUsername =  args.serviceUsername ?: args["zone.serviceUsername"]
-			rtn.servicePassword =   args.servicePassword ?: args["zone.servicePassword"]
+			rtn.serviceUsername = args.serviceUsername ?: args["zone.serviceUsername"]
+			def tempPassword = args.servicePassword ?: args["zone.servicePassword"]
+			if(tempPassword && tempPassword != "************") {
+				rtn.servicePassword = tempPassword
+			}
 			rtn.serviceUrl =  url
 
 			def credentialConfig = [

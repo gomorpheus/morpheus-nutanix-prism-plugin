@@ -20,6 +20,7 @@ package com.morpheusdata.nutanix.prism.plugin
 
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.Plugin
+import com.morpheusdata.core.data.DataFilter
 import com.morpheusdata.core.data.DataQuery
 import com.morpheusdata.core.providers.IacResourceMappingProvider
 import com.morpheusdata.core.util.ComputeUtility
@@ -33,6 +34,7 @@ import com.morpheusdata.model.OsType
 import com.morpheusdata.model.VirtualImage
 import com.morpheusdata.model.Workload
 import com.morpheusdata.model.WorkloadType
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.response.WorkloadResourceMappingResponse
 import com.morpheusdata.response.InstanceResourceMappingResponse
@@ -138,7 +140,20 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 						server.computeServerType = new ComputeServerType(code: csTypeCode)
 					}
 				}
-				morpheusContext.async.computeServer.save(server).blockingGet()
+				def tags = getAllTags(server.cloud)
+				def vmTags = resourceResult?.values?.categories?.collect {"${it.name}:${it.value}"}
+				def existingTags = server.metadata
+				def matchFunction = {existingTag, masterTag -> {
+					masterTag == existingTag.externalId
+				}}
+				def tagSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingTags, vmTags, matchFunction)
+				//only need to add non-existing tags
+				tagSyncLists.addList?.each {
+					if (tags[it]) {
+						server.metadata += tags[it]
+					}
+				}
+				morpheusContext.async.computeServer.bulkSave([server]).blockingGet()
 				morpheusContext.async.instance.save([instance]).blockingGet()
 			}
 			return ServiceResponse.success(response)
@@ -196,7 +211,20 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 						server.computeServerType = new ComputeServerType(code: csTypeCode)
 					}
 				}
-				morpheusContext.async.computeServer.save(server).blockingGet()
+				def tags = getAllTags(server.cloud)
+				def vmTags = resourceResult?.values?.categories?.collect {"${it.name}:${it.value}"}
+				def existingTags = server.metadata
+				def matchFunction = {existingTag, masterTag -> {
+					masterTag == existingTag.externalId
+				}}
+				def tagSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingTags, vmTags, matchFunction)
+				//only need to add non-existing tags
+				tagSyncLists.addList?.each {
+					if (tags[it]) {
+						server.metadata += tags[it]
+					}
+				}
+				morpheusContext.async.computeServer.bulkSave([server]).blockingGet()
 				morpheusContext.async.workload.save(workload).blockingGet()
 			}
 			return ServiceResponse.success(response)
@@ -204,6 +232,14 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 			return ServiceResponse.error("IaC Provider ${iacProvider} not supported")
 		}
 
+	}
+
+	private Map getAllTags(cloud) {
+		def tags = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+			new DataFilter("refType", "ComputeZone"),
+			new DataFilter("refId", cloud.id),
+		])).toMap {it.externalId}.blockingGet()
+		tags
 	}
 
 }

@@ -1000,13 +1000,18 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse cloudInitViaCD(HttpApiClient client, Map authConfig, String vmUuid, String imageUuid, Map vmBody) {
 		log.debug("cloudInitViaCD")
 		def cdromDisk = vmBody?.spec?.resources?.disk_list?.find { it.device_properties?.device_type == 'CDROM' }
+		def nextSataIndex = (vmBody?.spec?.resources?.disk_list.findAll { it.device_properties?.disk_address?.adapter_type == 'SATA' }?.collect { it.device_properties?.disk_address?.device_index ?: 0 }?.max() ?: 0) + 1
 
 		if(cdromDisk) {
 			cdromDisk.data_source_reference = [kind: 'image', uuid: imageUuid]
 		} else {
 			vmBody?.spec?.resources?.disk_list?.add([
 					device_properties: [
-							device_type: 'CDROM'
+						device_type: 'CDROM',
+						disk_address: [
+							"device_index": nextSataIndex,
+							"adapter_type": "SATA"
+						],
 					],
 					data_source_reference: [kind: 'image', uuid: imageUuid]
 			])
@@ -1348,8 +1353,10 @@ class NutanixPrismComputeUtility {
 				]
 			]
 			if(nic["ip_endpoint_list"]) {
-				nicMap["ipv4Config"] = [
-					ipAddress: nic["ip_endpoint_list"][0].ip
+				nicMap["networkInfo"]["ipv4Config"] = [
+					ipAddress: [
+						value: nic["ip_endpoint_list"][0].ip
+					]
 				]
 			}
 			return nicMap

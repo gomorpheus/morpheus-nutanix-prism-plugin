@@ -206,9 +206,15 @@ class DatastoresSync {
 						if(cluster?.id) {
 							zonePools += new CloudPool(id: cluster.id)
 						}
-						def zonePoolSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingItem.assignedZonePools, zonePools, {e, m ->  {e.id == m.id}})
+						def zonePoolSyncLists = NutanixPrismSyncUtils.buildSyncLists(existingItem.assignedZonePools, zonePools, {e, m -> e.id == m.id})
 						if(zonePoolSyncLists.addList.size() > 0) {
 							existingItem.assignedZonePools += zonePoolSyncLists.addList.collect { new CloudPool(id: it.id)}
+							save = true
+						}
+						if(zonePoolSyncLists.removeList.size() > 0) {
+							existingItem.assignedZonePools = existingItem.assignedZonePools.findAll { existing ->
+								!zonePoolSyncLists.removeList.any { it.id == existing.id }
+							}
 							save = true
 						}
 						if(save) {

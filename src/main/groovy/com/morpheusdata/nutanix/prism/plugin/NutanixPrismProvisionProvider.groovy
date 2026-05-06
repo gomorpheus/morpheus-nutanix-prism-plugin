@@ -145,7 +145,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			name : 'cluster',
 			code : 'nutanix-prism-provision-cluster',
 			fieldName : 'clusterName',
-			noBlank: true,
+			noBlank: false,
 			fieldContext : 'config',
 			fieldLabel : 'Cluster',
 			required : true,
@@ -172,6 +172,21 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	@Override
 	Collection<OptionType> getNodeOptionTypes() {
+		OptionType imageTypeRadio = new OptionType(
+			name: 'virtual image type',
+			code: 'nutanix-prism-node-virtual-image-type',
+			fieldContext: 'config',
+			fieldName: 'virtualImageSelect',
+			fieldCode: null,
+			fieldLabel: null,
+			fieldGroup: null,
+			inputType: OptionType.InputType.RADIO,
+			displayOrder:10,
+			fieldClass:'inline',
+			required: false,
+			editable: true,
+			optionSource: 'virtualImageTypeList'
+		)
 		OptionType osTypeOption = new OptionType([
 			name : 'osType',
 			code : 'nutanix-prism-node-os-type',
@@ -181,7 +196,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			inputType : OptionType.InputType.SELECT,
 			displayOrder : 100,
 			required : false,
-			optionSource : 'osTypes'
+			optionSource : 'osTypes',
+			visibleOnCode: 'config.virtualImageSelect:os'
 		])
 		OptionType imageOption = new OptionType([
 			name : 'image',
@@ -192,7 +208,8 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			inputType : OptionType.InputType.SELECT,
 			displayOrder : 99,
 			required : false,
-			optionSource : 'nutanixPrismNodeImage'
+			optionSource : 'nutanixPrismNodeImage',
+			visibleOnCode: 'config.virtualImageSelect:vi'
 		])
 		OptionType logFolder = new OptionType([
 			name : 'mountLogs',
@@ -269,7 +286,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			displayOrder : 107,
 			required : false,
 		])
-		return [osTypeOption, imageOption, logFolder, configFolder, deployFolder, checkTypeCode, statTypeCode, showServerLogs, logTypeCode]
+		return [imageTypeRadio, osTypeOption, imageOption, logFolder, configFolder, deployFolder, checkTypeCode, statTypeCode, showServerLogs, logTypeCode]
 	}
 
 	@Override
@@ -365,6 +382,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	@Override
 	Boolean hasCloneTemplate() {
 		return true
+	}
+
+	@Override
+	Boolean canSyncMaxMemoryStats() {
+		return false
 	}
 
 	@Override
@@ -629,7 +651,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 	@Override
 	ServiceResponse<PrepareWorkloadResponse> prepareWorkload(Workload workload, WorkloadRequest workloadRequest, Map opts) {
 		log.debug "prepareWorkload: ${workload} ${workloadRequest} ${opts}"
-
 		ServiceResponse<PrepareWorkloadResponse> resp = new ServiceResponse<>()
 		resp.data = new PrepareWorkloadResponse(workload: workload, options: [sendIp:false], disableCloudInit: false)
 		try {
@@ -658,6 +679,57 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		}
 		if(!resp.success) {
 			log.error "prepareWorkload: error - ${resp.msg}"
+		} else {
+			def osType = workload.server?.serverOs ?: workload.server?.sourceImage?.osType
+			def platform = osType?.platform
+			if(platform == PlatformType.windows) {
+				def nicConfigMode = workload.server?.cloud?.getConfigProperty('windowsNicConfigMode') ?: 'unattend'
+				opts.nicConfigMode = nicConfigMode
+				resp.data.options.nicConfigMode = nicConfigMode
+				if(nicConfigMode == 'setupComplete') {
+					// NIC configuration is handled post-OOBE via configureNic.ps1 in SetupComplete.cmd.
+					// No interface name override is needed in the unattend file.
+					return resp
+				}
+
+				def clusterId = opts.config?.clusterName
+				if(clusterId) {
+					def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId).withFilter("type", "Cluster").withFilter("refType","ComputeZone").withFilter("refId",workload.server?.cloud?.id)).blockingGet()
+					def aosVersion = cluster?.getConfigProperty('aosVersion')
+					if (aosVersion) {
+
+						def osVersion = osType?.osVersion
+						if (osVersion && osVersion?.isNumber() && osVersion?.toInteger() <= 2019) {
+							//interface name issue does not seem to impact 2019 or less
+							return resp
+						}
+
+						// Match only if the first segment is 1–3 digits, followed by optional dot-separated subversions
+						// Nutanix does not reliably return the AOS version in the correct format for the V2 cluster API. It has changed over the years therefore try and detect if its an AOS version and only change interfaces if the major version equal to 7
+						def matcher = (aosVersion =~ /^(\d{1,3})(?=\.|$)(?:[\.\w-]*)$/)
+						if (matcher.matches()) {
+							def major = matcher[0][1] as int
+							if (major == 7) {
+								def minor = aosVersion.tokenize('.')?.getAt(1)
+								if(minor && minor.isNumber()) {
+									def minorInteger = minor.toInteger()
+									if(minorInteger >= 3 && minorInteger.toString().size() == minor.size()) {
+										//bug has been fixed in Nutanix
+										return resp
+									}
+								}
+								log.debug("Modifying Network Config for Windows deployment on AOS 7")
+								// Update networkConfig for AOS 7
+								// Updates by object reference so that the networkConfig is updated before Morpheus Core generates the network userdata. Perhaps in the future a specific method will be defined for this if needed.
+								opts.networkConfig?.primaryInterface?.name = 'Ethernet Instance 0'
+								opts.networkConfig?.extraInterfaces?.eachWithIndex { currentInterface, idx ->
+									currentInterface.name = "Ethernet Instance 0 ${idx + 2}"
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 		return resp
 	}
@@ -1143,7 +1215,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, cloudItem)
 
 		return ServiceResponse.success()
-
 	}
 
 	@Override
@@ -1197,124 +1268,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, updateResourcesResult.data?.status?.execution_context?.task_uuid)
 			}
 
-			//disks
-			//skip controllers for now
-			//remove disks to delete
-			def volumesToDelete = resizeRequest.volumesDelete?.collect {it.externalId}
-			if(volumesToDelete.size() > 0) {
-				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-				vmBody = serverDetails?.data
-				def newDiskList = vmBody.spec?.resources?.disk_list?.findAll { !volumesToDelete.contains(it.uuid) }
-				vmBody.spec?.resources?.disk_list = newDiskList
-				def deleteResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-				if(deleteResults.success == true) {
-					if(deleteResults.data?.status?.execution_context?.task_uuid) {
-						def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, deleteResults.data?.status?.execution_context?.task_uuid)
-					}
-					log.info("resize volume delete complete: ${deleteResults.success}")
-					resizeRequest.volumesDelete?.each { StorageVolume volume ->
-						morpheusContext.async.storageVolume.remove([volume], server, true).blockingGet()
-					}
-				}
-			}
-
-			//update existing disks
-			resizeRequest.volumesUpdate?.each { UpdateModel<StorageVolume> volumeUpdate ->
-				StorageVolume existing = volumeUpdate.existingModel
-				Map updateProps = volumeUpdate.updateProps
-				log.info("resizing vm storage: {}", volumeUpdate)
-				if (updateProps.maxStorage > existing.maxStorage) {
-					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-					vmBody = serverDetails?.data
-					def newDiskList = vmBody.spec?.resources?.disk_list
-					def diskMap = newDiskList.find{it.uuid == existing.externalId}
-					diskMap.disk_size_bytes = updateProps.maxStorage
-					diskMap.remove("disk_size_mib")
-					def result = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-					if (result.success) {
-						if(result.data?.status?.execution_context?.task_uuid) {
-							def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, result.data?.status?.execution_context?.task_uuid)
-						}
-						existing.maxStorage = updateProps.maxStorage
-						morpheusContext.async.storageVolume.save([existing]).blockingGet()
-					} else {
-						rtn.setError(result.msg ?: "Failed to expand Disk: ${existing.name}")
-						log.warn("error resizing disk: ${result.msg}")
-					}
-				}
-			}
-
-			//add new disks
-			def datastoreIds = []
-			def storageVolumeTypes = [:]
-			resizeRequest.volumesAdd?.each { Map volumeAdd ->
-				datastoreIds << volumeAdd.datastoreId.toLong()
-				def storageVolumeTypeId = volumeAdd.storageType.toLong()
-				if(!storageVolumeTypes[storageVolumeTypeId]) {
-					storageVolumeTypes[storageVolumeTypeId] = morpheusContext.async.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
-				}
-
-			}
-			datastoreIds = datastoreIds.unique()
-			def datastores = morpheusContext.async.cloud.datastore.listById(datastoreIds).toMap {it.id.toLong()}.blockingGet()
-			resizeRequest.volumesAdd?.each { Map volumeAdd ->
-				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-				vmBody = serverDetails?.data
-				log.info("resizing vm adding storage: {}", volumeAdd)
-				if (!volumeAdd.maxStorage) {
-					volumeAdd.maxStorage = volumeAdd.size ? (volumeAdd.size.toDouble() * ComputeUtility.ONE_GIGABYTE).toLong() : 0
-				}
-				def storageVolumeType = storageVolumeTypes[volumeAdd.storageType.toLong()]
-				def datastore = datastores[volumeAdd.datastoreId.toLong()]
-				def targetIndex = vmBody.spec?.resources?.disk_list?.size()
-				if(targetIndex != null) {
-					//account for ide.0
-					targetIndex--
-				} else {
-					targetIndex = 0
-				}
-				def newDiskList = vmBody.spec?.resources?.disk_list
-
-				def diskConfig = [
-					device_properties: [
-						device_type: "DISK",
-						disk_address: [
-							adapter_type: storageVolumeType.name.toUpperCase(),
-							device_index: targetIndex
-						],
-					],
-					disk_size_bytes: volumeAdd.maxStorage,
-					storage_config: [
-						storage_container_reference: [
-							uuid: datastore.externalId,
-							name: datastore.name,
-							kind: "storage_container",
-						]
-					]
-				]
-				newDiskList << diskConfig
-				vmBody.spec.resources.disk_list = newDiskList
-				def addDiskResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-				if(addDiskResults.success) {
-					//wait for operation to complete
-					if(addDiskResults.data?.status?.execution_context?.task_uuid) {
-						def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, addDiskResults.data?.status?.execution_context?.task_uuid)
-					}
-					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-					vmBody = serverDetails?.data
-					def newDisk = vmBody.spec.resources.disk_list.find {it.device_properties.disk_address.adapter_type == storageVolumeType.name.toUpperCase() && it.device_properties.disk_address.device_index == targetIndex}
-					def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
-					newVolume.externalId = newDisk.uuid
-					newVolume.type = new StorageVolumeType(id: volumeAdd.storageType.toLong())
-					morpheusContext.async.storageVolume.create([newVolume], server).blockingGet()
-					// Need to refetch the server
-					server = morpheusContext.async.computeServer.get(server.id).blockingGet()
-				} else {
-					//do stuff here to bubble up results
-					rtn.setError("error adding disk: ${addDiskResults?.msg}")
-					log.warn("error adding disk: ${addDiskResults}")
-				}
-			}
+			internalResizeDisks(resizeRequest, client, authConfig, vmId, server, rtn, serverDetails, vmBody)
 
 
 			//networks
@@ -1405,6 +1359,127 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			rtn.setError("Error resizing workload: ${e}")
 		}
 		return rtn
+	}
+
+	private void internalResizeDisks(ResizeRequest resizeRequest, HttpApiClient client, authConfig, vmId, ComputeServer server, rtn, serverDetails, vmBody) {
+		//disks
+		//skip controllers for now
+		//remove disks to delete
+		def volumesToDelete = resizeRequest.volumesDelete?.collect { it.externalId }
+		if (volumesToDelete.size() > 0) {
+			serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
+			vmBody = serverDetails?.data
+			def newDiskList = vmBody.spec?.resources?.disk_list?.findAll { !volumesToDelete.contains(it.uuid) }
+			vmBody.spec?.resources?.disk_list = newDiskList
+			def deleteResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
+			if (deleteResults.success == true) {
+				if (deleteResults.data?.status?.execution_context?.task_uuid) {
+					def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, deleteResults.data?.status?.execution_context?.task_uuid)
+				}
+				log.info("resize volume delete complete: ${deleteResults.success}")
+				resizeRequest.volumesDelete?.each { StorageVolume volume ->
+					morpheusContext.async.storageVolume.remove([volume], server, true).blockingGet()
+				}
+			}
+		}
+
+		//update existing disks
+		resizeRequest.volumesUpdate?.each { UpdateModel<StorageVolume> volumeUpdate ->
+			StorageVolume existing = volumeUpdate.existingModel
+			Map updateProps = volumeUpdate.updateProps
+			log.info("resizing vm storage: {}", volumeUpdate)
+			if (updateProps.maxStorage > existing.maxStorage) {
+				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
+				vmBody = serverDetails?.data
+				def newDiskList = vmBody.spec?.resources?.disk_list
+				def diskMap = newDiskList.find { it.uuid == existing.externalId }
+				diskMap.disk_size_bytes = updateProps.maxStorage
+				diskMap.remove("disk_size_mib")
+				def result = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
+				if (result.success) {
+					if (result.data?.status?.execution_context?.task_uuid) {
+						def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, result.data?.status?.execution_context?.task_uuid)
+					}
+					existing.maxStorage = updateProps.maxStorage
+					morpheusContext.async.storageVolume.save([existing]).blockingGet()
+				} else {
+					rtn.setError(result.msg ?: "Failed to expand Disk: ${existing.name}")
+					log.warn("error resizing disk: ${result.msg}")
+				}
+			}
+		}
+
+		//add new disks
+		def datastoreIds = []
+		def storageVolumeTypes = [:]
+		resizeRequest.volumesAdd?.each { Map volumeAdd ->
+			datastoreIds << volumeAdd.datastoreId.toLong()
+			def storageVolumeTypeId = volumeAdd.storageType.toLong()
+			if (!storageVolumeTypes[storageVolumeTypeId]) {
+				storageVolumeTypes[storageVolumeTypeId] = morpheusContext.async.storageVolume.storageVolumeType.get(storageVolumeTypeId).blockingGet()
+			}
+
+		}
+		datastoreIds = datastoreIds.unique()
+		def datastores = morpheusContext.async.cloud.datastore.listById(datastoreIds).toMap { it.id.toLong() }.blockingGet()
+		resizeRequest.volumesAdd?.each { Map volumeAdd ->
+			serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
+			vmBody = serverDetails?.data
+			log.info("resizing vm adding storage: {}", volumeAdd)
+			if (!volumeAdd.maxStorage) {
+				volumeAdd.maxStorage = volumeAdd.size ? (volumeAdd.size.toDouble() * ComputeUtility.ONE_GIGABYTE).toLong() : 0
+			}
+			def storageVolumeType = storageVolumeTypes[volumeAdd.storageType.toLong()]
+			def datastore = datastores[volumeAdd.datastoreId.toLong()]
+			def targetIndex = vmBody.spec?.resources?.disk_list?.size()
+			if (targetIndex != null) {
+				//account for ide.0
+				targetIndex--
+			} else {
+				targetIndex = 0
+			}
+			def newDiskList = vmBody.spec?.resources?.disk_list
+
+			def diskConfig = [
+				device_properties: [
+					device_type : "DISK",
+					disk_address: [
+						adapter_type: storageVolumeType.name.toUpperCase(),
+						device_index: targetIndex
+					],
+				],
+				disk_size_bytes  : volumeAdd.maxStorage,
+				storage_config   : [
+					storage_container_reference: [
+						uuid: datastore.externalId,
+						name: datastore.name,
+						kind: "storage_container",
+					]
+				]
+			]
+			newDiskList << diskConfig
+			vmBody.spec.resources.disk_list = newDiskList
+			def addDiskResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
+			if (addDiskResults.success) {
+				//wait for operation to complete
+				if (addDiskResults.data?.status?.execution_context?.task_uuid) {
+					def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, addDiskResults.data?.status?.execution_context?.task_uuid)
+				}
+				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
+				vmBody = serverDetails?.data
+				def newDisk = vmBody.spec.resources.disk_list.find { it.device_properties.disk_address.adapter_type == storageVolumeType.name.toUpperCase() && it.device_properties.disk_address.device_index == targetIndex }
+				def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
+				newVolume.externalId = newDisk.uuid
+				newVolume.type = new StorageVolumeType(id: volumeAdd.storageType.toLong())
+				morpheusContext.async.storageVolume.create([newVolume], server).blockingGet()
+				// Need to refetch the server
+				server = morpheusContext.async.computeServer.get(server.id).blockingGet()
+			} else {
+				//do stuff here to bubble up results
+				rtn.setError("error adding disk: ${addDiskResults?.msg}")
+				log.warn("error adding disk: ${addDiskResults}")
+			}
+		}
 	}
 
 	@Override
@@ -2089,8 +2164,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			Process process = workloadRequest?.process ?: hostRequest?.process ?: null
 			morpheusContext.async.process.startProcessStep(process , new ProcessEvent(type: ProcessEvent.ProcessType.provisionConfig), 'configuring')
 
-
-
 			ComputeServer server = morpheusContext.async.computeServer.get(runConfig.serverId as Long).blockingGet()
 			Workload sourceWorkload
 			VirtualImage virtualImage
@@ -2124,15 +2197,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				server.computeServerType = newType
 			}
 
-			def cloudConfigUser
+			def cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
+			def cloudConfigMeta = workloadRequest?.cloudConfigMeta ?: hostRequest?.cloudConfigMeta ?: null
+			def cloudConfigNetwork = workloadRequest?.cloudConfigNetwork ?: hostRequest?.cloudConfigNetwork ?: null
 			//cloud_init && sysprep
-			if(virtualImage?.isCloudInit && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
-				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
-			} else if (virtualImage?.isSysprep && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
+			if (virtualImage?.isSysprep && (workloadRequest?.cloudConfigUser || hostRequest?.cloudConfigUser)) {
 				runConfig.isSysprep = true
-				cloudConfigUser = workloadRequest?.cloudConfigUser ?: hostRequest?.cloudConfigUser ?: null
 			}
-			def insertIso = isCloudInitIso(runConfig)
+			//check if data is too large for direct userData injection
+			def userDataLength = cloudConfigUser?.encodeAsBase64()?.size()
+			def insertIso = isCloudInitIso(runConfig) || (userDataLength > 32000)
 			if(cloudConfigUser) {
 				if(!insertIso) {
 					runConfig.cloudInitUserData = cloudConfigUser.encodeAsBase64()
@@ -2217,12 +2291,25 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					}
 					def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 					if(insertIso) {
+						def byteArray = morpheusContext.services.provision.buildIsoOutputStream(runConfig.isSysprep as Boolean, runConfig.serverOs?.platform, cloudConfigMeta, cloudConfigUser, cloudConfigNetwork)
+						def isoStream = new ByteArrayInputStream(byteArray)
+						def url
+						ServiceResponse<String> copyUrlResponse = morpheusContext.services.fileCopy.generateUrl(
+							UUID.randomUUID().toString(),
+							server.createdBy,
+							isoStream,
+							byteArray.length,
+							120l * 60000l, // 2 hours
+							true,
+							"application/x-cd-image"
+						)
+						if (copyUrlResponse.success) {
+							url = copyUrlResponse.data
+						}
 						//upload cloud-init iso
-						def applianceServerUrl = workloadRequest?.cloudConfigOpts?.applianceUrl ?: hostRequest?.cloudConfigOpts?.applianceUrl ?: null
-						if(applianceServerUrl) {
+						if(url) {
 							def fileName = "morpheus_${server.id}.iso"
-							def fileUrl = applianceServerUrl + (applianceServerUrl.endsWith('/') ? '' : '/') + 'api/cloud-config/' + server.apiKey
-							imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", fileUrl)
+							imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", url)
 							def imageExternalId
 							if (imageResults.success) {
 								imageExternalId = imageResults.data.metadata.uuid
@@ -2240,7 +2327,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							log.debug "Error configuring cloud-init - no appliance url"
 						}
 					}
-					def startResults
+					def startResults, reconfigureResults
 					//hack for inability to set project on cloned snapshot
 					if(runConfig.snapshotId && runConfig.projectReference) {
 						vmResource.data
@@ -2249,7 +2336,15 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							vmResource.data.metadata.project_reference = runConfig.projectReference
 						}
 						startResults = NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, vmResource.data)
-					} else {
+					} else if (runConfig.isTemplate) {
+						def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)
+
+						applyDiskUpdateOnTemplateCreate(serverDetail, runConfig)
+						serverDetail.data.spec.resources.power_state = 'ON'
+						startResults = NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, serverDetail.data)
+
+					}
+					else {
 						startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
 					}
 					log.debug("start: ${startResults.success}")
@@ -2266,8 +2361,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 								Map resourcePools = getAllResourcePools(server.cloud)
 								CloudPool resourcePool = resourcePools[serverDetail?.virtualMachine?.status?.cluster_reference?.uuid]
 
-								def privateIp = serverDetail.ipAddress
-								def publicIp = serverDetail.ipAddress
+								// Prefer the static IP configured in the NIC spec (e.g., Morpheus pool allocation)
+								// over the first IP Nutanix reports, which may be a transient DHCP address
+								// during early Windows boot before sysprep applies the static IP.
+								def configuredIp = runConfig.nicList?.getAt(0)?.get('ip_endpoint_list')?.getAt(0)?.get('ip')
+								def privateIp = configuredIp ?: serverDetail.ipAddress
+								def publicIp = configuredIp ?: serverDetail.ipAddress
 								server.internalIp = privateIp
 								server.externalIp = publicIp
 								server.resourcePool = new ComputeZonePool(id: resourcePool.id)
@@ -2291,10 +2390,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 									updateMetadataTags(server, [cloudTags: tags, cloudVm: serverDetail.virtualMachine])
 								}
 
-
-								if(virtualImage.externalType == "template") {
+								if(runConfig.isTemplate) {
 									//have to sync disk from template
 									NutanixPrismSyncUtils.syncVolumes(server, disks?.findAll { it.device_properties.device_type == 'DISK' }, cloud, morpheusContext)
+									//re-fetch server with new volumes
+									server = morpheusContext.services.computeServer.get(server.id)
 								} else {
 
 									//some ugly matching
@@ -2367,6 +2467,49 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			}
 		}
 
+	}
+
+	private applyDiskUpdateOnTemplateCreate(ServiceResponse serverDetail, Map runConfig) {
+		// Build a map of desired disks from runConfig, keyed by device_index and device_type
+		def rc_deviceIndex = runConfig.diskList.collectEntries { [ [ device_index : it.device_properties.disk_address.device_index,
+																	device_type : it.device_properties.device_type ]: it] }
+		// Build a map of current disks from serverDetail, only including those with device_type 'DISK'
+
+		def sd_deviceIndex = serverDetail.data.spec.resources.disk_list
+			.findAll { it.device_properties.device_type == 'DISK' }
+			.collectEntries {
+				[[ device_index : it.device_properties.disk_address.device_index,
+				   device_type : it.device_properties.device_type ]: it] }
+
+		// Update existing disks or add new ones from runConfig to serverDetail
+		rc_deviceIndex.each { rc_key, rc_diskListValue ->
+			def sd_disk = sd_deviceIndex[rc_key]
+			if (sd_disk && sd_disk.device_properties.device_type == 'DISK')
+			{	log.debug("Updating existing disk in serverDetail: ${sd_disk} - ${rc_diskListValue}")
+				// Update properties except for 'device_properties' and 'data_source_reference'
+				rc_diskListValue.each { key, value ->
+					if (!key.equalsIgnoreCase('device_properties') && !key.equalsIgnoreCase('data_source_reference')) {
+						sd_disk[key] = value
+					}
+				}
+
+				//Its likely the sd_disk came back with a disk_size_mib, so we should update that too.
+				sd_disk.disk_size_mib = rc_diskListValue.disk_size_mib ? rc_diskListValue.disk_size_mib : (rc_diskListValue.disk_size_bytes / (1024L * 1024L))
+				log.debug("finalizing disk update in serverDetail: ${sd_disk}")
+			} else {
+				// Add new disk to serverDetail
+				log.debug("Adding new disk to serverDetail: ${rc_key} - ${rc_diskListValue}")
+				sd_deviceIndex[rc_key] = rc_diskListValue
+				serverDetail.data.spec.resources.disk_list << rc_diskListValue
+			}
+		}
+		// Remove any disks from serverDetail that are not present in runConfig
+		sd_deviceIndex.eachWithIndex { Map.Entry entry, int index ->
+			if (!rc_deviceIndex[entry.key]) {
+				log.debug("Removing disk from serverDetail: ${entry.key} - ${entry.value}")
+				serverDetail.data.spec.resources.disk_list.remove(entry.value)
+			}
+		}
 	}
 
 	def finalizeVm(Map runConfig, ProvisionResponse provisionResponse) {

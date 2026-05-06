@@ -53,6 +53,7 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.request.ValidateCloudRequest
 import com.morpheusdata.response.ServiceResponse
 import groovy.util.logging.Slf4j
+import com.morpheusdata.core.providers.*
 
 import java.security.MessageDigest
 
@@ -162,7 +163,22 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				fieldContext: 'config'
 		)
 
-		return [apiUrl, credentials, username, password, project, vmmApiVersion, inventoryInstances, enableVnc]
+		OptionType windowsNicConfigMode = new OptionType(
+				name: 'Static IP Mode (Windows)',
+				code: 'nutanix-prism-windows-nic-config-mode',
+				fieldName: 'windowsNicConfigMode',
+				displayOrder: 92,
+				fieldLabel: 'Static IP Mode (Windows)',
+				fieldContext: 'config',
+				required: false,
+				inputType: OptionType.InputType.SELECT,
+				defaultValue: 'unattend',
+				fieldGroup: 'Advanced',
+				helpText: 'Controls how static IP is configured on Windows VMs. "SetupComplete.cmd" is more reliable but may fall back to ISO upload if the 32 KB API limit is exceeded (requires appliance URL reachability).',
+				optionSource: 'nutanixPrismWindowsNicConfigModeOptions'
+		)
+
+		return [apiUrl, credentials, username, password, project, vmmApiVersion, inventoryInstances, enableVnc, windowsNicConfigMode]
 	}
 
 	@Override
@@ -177,7 +193,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		hypervisorType.externalDelete = false
 		hypervisorType.hasAutomation = false
 		hypervisorType.agentType = ComputeServerType.AgentType.none
-		hypervisorType.platform = PlatformType.esxi
+		hypervisorType.platform = PlatformType.ESXi
 		hypervisorType.managed = false
 		hypervisorType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		hypervisorType.nodeType = 'nutanix-prism-node'
@@ -245,6 +261,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		linuxDockerType.supportsConsoleKeymap = true
 		linuxDockerType.platform = PlatformType.linux
 		linuxDockerType.managed = true
+		linuxDockerType.guestVm = true
 		linuxDockerType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		linuxDockerType.agentType = ComputeServerType.AgentType.host
 		linuxDockerType.clusterType = ComputeServerType.ClusterType.docker
@@ -261,6 +278,8 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeMasterType.supportsConsoleKeymap = true
 		kubeMasterType.platform = PlatformType.linux
 		kubeMasterType.managed = true
+		kubeMasterType.guestVm = true
+		kubeMasterType.hasMaintenanceMode = true
 		kubeMasterType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		kubeMasterType.agentType = ComputeServerType.AgentType.host
 		kubeMasterType.clusterType = ComputeServerType.ClusterType.kubernetes
@@ -274,9 +293,11 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		kubeWorkerType.containerHypervisor = true
 		kubeWorkerType.reconfigureSupported = true
 		kubeWorkerType.hasAutomation = true
+		kubeWorkerType.hasMaintenanceMode = true
 		kubeWorkerType.supportsConsoleKeymap = true
 		kubeWorkerType.platform = PlatformType.linux
 		kubeWorkerType.managed = true
+		kubeWorkerType.guestVm = true
 		kubeWorkerType.provisionTypeCode = 'nutanix-prism-provision-provider'
 		kubeWorkerType.agentType = ComputeServerType.AgentType.host
 		kubeWorkerType.clusterType = ComputeServerType.ClusterType.kubernetes
@@ -702,4 +723,10 @@ class NutanixPrismCloudProvider implements CloudProvider {
 		}
 		return datastores
 	}
+
+	@Override
+	CloudClassification getCloudClassification() {
+		return CloudClassification.PRIVATE;
+	}
+
 }

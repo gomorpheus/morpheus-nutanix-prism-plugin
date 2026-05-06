@@ -1,3 +1,100 @@
+//10
+resource "virtual-image" "nutanix-prism-image-morpheus-almalinux-10" {
+	code = "nutanix.prism.image.morpheus.almalinux.10.20260120"
+	category = "nutanix.prism.image.morpheus.almalinux"
+	name = "Morpheus AlmaLinux 10 20260120"
+	imageType = "qcow2"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260120/almalinux-10/morpheus-almalinux-10-x86_64-20260120.qcow2"
+	imagePath = "qemu/20260120/almalinux-10"
+	isCloudInit = true
+	systemImage = true
+	installAgent = true
+	osType {
+		code = "almalinux.10.64"
+		owner = null
+	}
+	zoneType = "nutanix-prism-cloud"
+}
+
+resource "os-type-image" "nutanix-prism-image-morpheus-almalinux-10" {
+	code               = "nutanix.prism.image.morpheus.almalinux.10"
+	provisionType      = "nutanix-prism-provision-provider"
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-almalinux-10
+	account            = null
+	osType = {
+		code = "almalinux.10.64"
+		owner = null
+	}
+}
+
+resource "workload-type" "nutanix-prism-almalinux-10" {
+	code = "nutanix-prism-almalinux-10"
+	shortName = "almalinux"
+	name = "AlmaLinux 10"
+	account = null
+	containerVersion = "10"
+	entryPoint = ""
+	mountLogs = "/var/log"
+	statTypeCode = "vm"
+	logTypeCode = "vm"
+	showServerLogs = true
+	category = "almalinux"
+	serverType = "vm"
+	providerType = "nutanix-prism"
+	actions = [{code = "generic-remove-node"}]
+	checkTypeCode = "containerCheck"
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-almalinux-10
+	provisionType = "nutanix-prism-provision-provider"
+	backupType = "nutanixPrismSnapshot"
+	commEnabled = true
+	commType = "SSH"
+	commPort = 22
+}
+
+resource "workload-type-set" "nutanix-prism-almalinux-10-set" {
+	code = "nutanix-prism-almalinux-10-set"
+	containerType = workload-type.nutanix-prism-almalinux-10
+	priorityOrder = 0
+	dynamicCount = true
+	containerCount = 1
+}
+
+resource "instance-type-layout" "nutanix-prism-almalinux-10-single" {
+	code = "nutanix-prism-almalinux-10-single"
+	name = "Nutanix Prism Central VM"
+	account = null
+	sortOrder = 99
+	instanceVersion = "10"
+	description = "This will provision a single vm"
+	instanceType {
+		code = "almalinux"
+	}
+	serverCount = 1
+	hasAutoScale = true
+	portCount = 1
+	enabled = true
+	creatable = true
+	supportsConvertToManaged = true
+	serverType = "vm"
+	containers = [
+		workload-type-set.nutanix-prism-almalinux-10-set
+	]
+	actions = [{code = "generic-add-node"}]
+	provisionType = "nutanix-prism-provision-provider"
+}
+
+resource "scale-action" "nutanix-prism-almalinux-10-single" {
+	code = "nutanix-prism-almalinux-10-single"
+	scaleType = "action"
+	layout = instance-type-layout.nutanix-prism-almalinux-10-single
+	upAction {
+		code = "generic-add-node"
+	}
+	downAction {
+		code = "generic-remove-node"
+	}
+}
+
 //9
 resource "virtual-image" "nutanix-prism-image-morpheus-almalinux-9" {
 	code = "nutanix.prism.image.morpheus.almalinux.9.20250218"

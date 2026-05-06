@@ -118,6 +118,8 @@ class TemplatesSync {
 		}.onUpdate { List<SyncTask.UpdateItem<VirtualImage, Map>> updateItems ->
 			// Found the VirtualImage for this location.. just need to create the location
 			addMissingVirtualImageLocationsForImages(updateItems)
+		}.onDelete { removeItems ->
+			morpheusContext.async.virtualImage.remove(removeItems).blockingGet()
 		}.start()
 	}
 

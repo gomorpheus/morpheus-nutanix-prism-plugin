@@ -142,6 +142,11 @@ class ClustersSync {
 			if(projectIds) {
 				add.setConfigProperty('associatedProjectIds', projectIds)
 			}
+			def aosVersion = getClusterAosVersion(cloudItem)
+			if (aosVersion) {
+				log.debug("Adding aosVersion {} to cluster {}", aosVersion, clusterData.name)
+				add.setConfigProperty('aosVersion', aosVersion)
+			}
 			adds << add
 		}
 
@@ -172,6 +177,12 @@ class ClustersSync {
 			}
 			if(projectIds && existing.getConfigProperty('associatedProjectIds') != projectIds){
 				existing.setConfigProperty('associatedProjectIds', projectIds)
+				save = true
+			}
+			def aosVersion = getClusterAosVersion(matchItem)
+			if (aosVersion && existing.getConfigProperty('aosVersion') != aosVersion) {
+				log.debug("Updating aosVersion {} for cluster {}", aosVersion, matchItem.status.name)
+				existing.setConfigProperty('aosVersion', aosVersion)
 				save = true
 			}
 			if(save) {
@@ -210,4 +221,20 @@ class ClustersSync {
 		}
 		rtn
 	}
+
+	static private getClusterAosVersion(cloudItem) {
+		def softwareMap = cloudItem?.status?.resources?.config?.software_map
+		def version = null
+		if (softwareMap instanceof Map) {
+			//marketing changed NOS to AOS and Nutanix is not consistent in how it returns the version for AOS
+			//If both NOS and AOS then let AOS overwrite NOS
+			['NOS', 'AOS'].each { key ->
+				if (softwareMap.containsKey(key)) {
+					version = softwareMap[key]?.version
+				}
+			}
+		}
+		return version
+	}
+
 }
