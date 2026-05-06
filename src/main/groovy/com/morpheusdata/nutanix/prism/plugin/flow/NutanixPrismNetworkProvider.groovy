@@ -21,7 +21,6 @@ package com.morpheusdata.nutanix.prism.plugin.flow
 import com.morpheusdata.core.MorpheusContext
 import com.morpheusdata.core.providers.NetworkProvider
 import com.morpheusdata.core.providers.CloudInitializationProvider
-import com.morpheusdata.core.providers.SecurityGroupProvider
 import com.morpheusdata.model.AccountIntegration
 import com.morpheusdata.model.AccountIntegrationType
 import com.morpheusdata.model.Cloud
@@ -34,12 +33,16 @@ import com.morpheusdata.model.NetworkType
 import com.morpheusdata.model.OptionType
 import com.morpheusdata.model.SecurityGroup
 import com.morpheusdata.model.SecurityGroupLocation
-import com.morpheusdata.model.SecurityGroupRule
-import com.morpheusdata.model.SecurityGroupRuleLocation
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
 import com.morpheusdata.nutanix.prism.plugin.sync.flow.*
+import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.views.Renderer
+import com.nutanix.dp1.mic.microseg.v4.config.NetworkSecurityPolicy
+import com.nutanix.dp1.mic.microseg.v4.config.SecurityPolicyState
+import com.nutanix.dp1.mic.microseg.v4.config.SecurityPolicyType
+import com.nutanix.dp1.net.networking.v4.config.Subnet
+import com.nutanix.dp1.net.networking.v4.config.SubnetType
 import com.nutanix.mic.java.client.ApiClient
 import groovy.util.logging.Slf4j
 
@@ -48,7 +51,6 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 
 	NutanixPrismPlugin plugin
 	MorpheusContext morpheusContext
-	SecurityGroupProvider securityGroupProvider
 
 	final String code = 'nutanix-prism-network-provider'
 	final String name = 'Nutanix Flow'
@@ -82,14 +84,14 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 		nutanixClient.setUsername(authConfig.username as String)
 		nutanixClient.setPassword(authConfig.password as String)
 		nutanixClient.setVerifySsl(false)
-		//sync service groups - ref data
-		//(new ServiceGroupsSync(this.plugin, cloud, networkServer, nutanixClient)).execute()
+		//sync service groups - NetworkResourceGroup
+		(new ServiceGroupsSync(this.plugin, cloud, networkServer, nutanixClient)).execute()
 
 		//sync address groups - NetworkResourceGroup
 		(new AddressGroupsSync(this.plugin, cloud, networkServer, nutanixClient)).execute()
 
-
-		//sync security policies - security groups
+		//sync security policies - SecurityGroup+SecurityGroupLocation
+		(new SecurityPoliciesSync(this.plugin, cloud, networkServer, nutanixClient)).execute()
 
 		return ServiceResponse.success()
 	}
@@ -203,28 +205,6 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 				displayOrder: 10,
 				optionSource: 'clouds'
 			)
-			//	optionType(meta:[key:'code'], code:'networkServerType.global.serviceUrl', type:'text', name:'serviceUrl',
-			//		category:'networkServerType.global', fieldName:'serviceUrl', fieldCode: 'gomorpheus.optiontype.ApiHost', fieldLabel:'API Host', fieldContext:'domain', required:true, enabled:true,
-			//		editable:true, global:false, placeHolder:null, helpBlock:'gomorpheus.help.serviceUrl', defaultValue:null, custom:false, displayOrder:9, fieldClass:null,
-			//		wrapperClass:null, systemOption: true)
-			//
-			//	optionType(meta:[key:'code'], code:'networkServerType.global.credential', type:'credential', name:'credentials', optionSource:'credentials', fieldName:'type',
-			//		category:'networkServerType.global', fieldCode: 'gomorpheus.label.credential', fieldContext:'credential',
-			//		required:false, enabled:true, editable:true, global:false, placeHolder:null, helpBlock:'', defaultValue:'local', custom:false,
-			//		displayOrder:12, fieldClass:null, wrapperClass:null, config: JsonOutput.toJson(credentialTypes:['username-password']).toString(), systemOption: true
-			//	)
-			//	optionType(meta:[key:'code'], code:'networkServerType.global.serviceUsername', type:'text', name:'serviceUsername',
-			//		category:'networkServerType.global', fieldName:'serviceUsername', fieldCode: 'gomorpheus.optiontype.Username', fieldLabel:'Username', fieldContext:'domain', required:true, enabled:true,
-			//		editable:true, global:false, placeHolder:null, helpBlock:'', defaultValue:null, custom:false, displayOrder:15, fieldClass:null,
-			//		wrapperClass:null, localCredential:true, systemOption: true)
-			//	optionType(meta:[key:'code'], code:'networkServerType.global.servicePassword', type:'password', name:'servicePassword',
-			//		category:'networkServerType.global', fieldName:'servicePassword', fieldCode: 'gomorpheus.optiontype.Password', fieldLabel:'Password', fieldContext:'domain', required:true, enabled:true,
-			//		editable:true, global:false, placeHolder:null, helpBlock:'', defaultValue:null, custom:false, displayOrder:20, fieldClass:null,
-			//		wrapperClass:null, localCredential:true, systemOption: true)
-			//optionType(meta:[key:'code'], code:'networkServerType.nsxt.vmwareCloud', type:'select', name:'zoneId', optionSourceType:'nsxt', optionSource:'clouds',
-			//		category:'networkServerType.nsx', fieldName:'zoneId', fieldLabel:'Vmware Cloud', fieldContext:'domain', required:true, enabled:true,
-			//		editable:true, global:false, placeHolder:null, helpBlock:'', defaultValue:null, custom:false, displayOrder:60, fieldClass:'nsx-cloud',
-			//		wrapperClass:null, fieldCode:'gomorpheus.label.cloud')
 		]
 	}
 
@@ -249,7 +229,7 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 			)
 			ServiceResponse<AccountIntegration> accountIntegrationResponse = morpheusContext.services.integration.registerCloudIntegration(cloud.id, accountIntegration) as ServiceResponse<AccountIntegration>
 			AccountIntegration savedIntegration = accountIntegrationResponse.data
-			println "\u001B[33mAC Log - NutanixPrismNetworkProvider:initializeProvider- ${savedIntegration}\u001B[0m"
+			log.debug("initializeProvider savedIntegration: {}", savedIntegration)
 			NetworkServer networkServer = new NetworkServer(
 				name: cloud.name,
 				type: new NetworkServerType(code:getNetworkServerTypeCode()),
@@ -292,157 +272,252 @@ class NutanixPrismNetworkProvider implements NetworkProvider, CloudInitializatio
 
 	@Override
 	ServiceResponse validateNetwork(Network network, Map opts) {
-		println "\u001B[33mAC Log - NutanixPrismNetworkProvider:validateNetwork- ${opts}\u001B[0m"
-		return ServiceResponse.success()
+		def errors = [:]
+		if (!network.name) {
+			errors.name = 'Network name is required'
+		}
+		if (network.type?.code == 'nutanix-prism-vlan-network' && network.vlanId == null) {
+			errors.vlanId = 'VLAN ID is required for managed VLAN networks'
+		}
+		if (network.type?.code == 'nutanix-prism-overlay-network' && !network.cloudPool?.externalId) {
+			errors.cloudPool = 'A VPC is required for overlay networks'
+		}
+		return errors ? ServiceResponse.error('Validation failed', null, errors) : ServiceResponse.success()
 	}
 
 	@Override
 	ServiceResponse createNetwork(Network network, Map opts) {
-		def rtn = ServiceResponse.prepare()
+		log.debug("createNetwork: {}", network.name)
 		try {
-			if(network.networkServer) {
-				Cloud cloud = network.cloud
-				println "\u001B[33mAC Log - NutanixPrismNetworkProvider:createNetwork- ${network.dump()} ${opts}\u001B[0m"
-				return rtn
-				//CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
-				//AmazonEC2Client amazonClient = plugin.getAmazonClient(cloud, false, resourcePool?.regionCode)
-				def networkConfig = [:]
-				networkConfig.name = network.name
-				networkConfig.vpcId = resourcePool?.externalId
-				networkConfig.availabilityZone = network.availabilityZone
-				networkConfig.active = network.active
-				networkConfig.assignPublicIp = network.assignPublicIp
-				networkConfig.type = network.type?.externalType
-				networkConfig.cidr = network.cidr
-				log.debug("sending network config: {}", networkConfig)
-				def apiResults = AmazonComputeUtility.createSubnet(opts + [amazonClient: amazonClient, config: networkConfig])
-				log.debug("network apiResults: {}", apiResults)
-				//create it
-				if(apiResults?.success && apiResults?.error != true) {
-					rtn.success = true
-					network.externalId = apiResults.externalId
-					network.uniqueId = apiResults.externalId
-					network.regionCode = resourcePool?.regionCode
-				}
-				rtn.data = network
-				rtn.msg = apiResults.msg
-				log.debug("results: {}", rtn.results)
+			Cloud cloud = morpheusContext.services.cloud.get(network.zoneId)
+			def authConfig = plugin.getAuthConfig(cloud)
+			def netClient = buildNetApiClient(authConfig)
+			def prismClient = buildPrismApiClient(authConfig)
+
+			Subnet subnet = buildSubnet(network)
+			ServiceResponse createResponse = NutanixPrismComputeUtility.createSubnet(netClient, subnet)
+			if (!createResponse.success) {
+				return createResponse
 			}
-		} catch(e) {
-			log.error("createNetwork error: ${e}", e)
+			ServiceResponse taskResponse = NutanixPrismComputeUtility.waitForTask(prismClient, createResponse.data as String)
+			if (!taskResponse.success) {
+				return taskResponse
+			}
+			network.externalId = taskResponse.data as String
+			return ServiceResponse.success(network)
+		} catch (Exception e) {
+			log.error("createNetwork error: ${e.message}", e)
+			return ServiceResponse.error("Error creating network: ${e.message}")
 		}
-		return rtn
 	}
 
-	/**
-	 * Updates the Network submitted
-	 * @param network Network information
-	 * @param opts additional configuration options
-	 * @return ServiceResponse
-	 */
 	@Override
 	ServiceResponse<Network> updateNetwork(Network network, Map opts) {
-		return ServiceResponse.success(network)
+		log.debug("updateNetwork: {}", network.externalId)
+		try {
+			Cloud cloud = morpheusContext.services.cloud.get(network.zoneId)
+			def authConfig = plugin.getAuthConfig(cloud)
+			def netClient = buildNetApiClient(authConfig)
+			def prismClient = buildPrismApiClient(authConfig)
+
+			Subnet subnet = buildSubnet(network)
+			ServiceResponse updateResponse = NutanixPrismComputeUtility.updateSubnet(netClient, network.externalId, subnet)
+			if (!updateResponse.success) {
+				return updateResponse
+			}
+			ServiceResponse taskResponse = NutanixPrismComputeUtility.waitForTask(prismClient, updateResponse.data as String)
+			if (!taskResponse.success) {
+				return taskResponse
+			}
+			return ServiceResponse.success(network)
+		} catch (Exception e) {
+			log.error("updateNetwork error: ${e.message}", e)
+			return ServiceResponse.error("Error updating network: ${e.message}")
+		}
 	}
 
-	/**
-	 * Deletes the Network submitted
-	 * @param network Network information
-	 * @return ServiceResponse
-	 */
 	@Override
 	ServiceResponse deleteNetwork(Network network, Map opts) {
-		log.debug("delete network: {}", network.externalId)
-		def rtn = ServiceResponse.prepare()
-		//remove the network
-		if(network.externalId) {
-//			CloudPool resourcePool = network.cloudPool?.id ? morpheus.cloud.pool.listById([network.cloudPool?.id]).toList().blockingGet()?.getAt(0) : null
-//			AmazonEC2Client amazonClient = plugin.getAmazonClient(network.cloud, false, resourcePool?.regionCode)
-//			def deleteResults = AmazonComputeUtility.deleteSubnet([amazonClient: amazonClient, network: network])
-//			log.debug("deleteResults: {}", deleteResults)
-//			if(deleteResults.success == true) {
-//				rtn.success = true
-//			} else if(deleteResults.errorCode == 404) {
-//				//not found - success
-//				log.warn("not found")
-//				rtn.success = true
-//			} else {
-//				rtn.msg = deleteResults.msg
-//			}
-		} else {
-			rtn.success = true
+		log.debug("deleteNetwork: {}", network.externalId)
+		if (!network.externalId) {
+			return ServiceResponse.success()
 		}
-		return rtn
+		try {
+			Cloud cloud = morpheusContext.services.cloud.get(network.zoneId)
+			def authConfig = plugin.getAuthConfig(cloud)
+			def netClient = buildNetApiClient(authConfig)
+			def prismClient = buildPrismApiClient(authConfig)
+
+			ServiceResponse deleteResponse = NutanixPrismComputeUtility.deleteSubnet(netClient, network.externalId)
+			if (!deleteResponse.success) {
+				return deleteResponse
+			}
+			return NutanixPrismComputeUtility.waitForTask(prismClient, deleteResponse.data as String)
+		} catch (Exception e) {
+			log.error("deleteNetwork error: ${e.message}", e)
+			return ServiceResponse.error("Error deleting network: ${e.message}")
+		}
+	}
+
+	private Subnet buildSubnet(Network network) {
+		Subnet subnet = new Subnet()
+		subnet.name = network.name
+		subnet.description = network.description
+
+		switch (network.type?.externalType) {
+			case 'OVERLAY':
+				subnet.subnetType = SubnetType.OVERLAY
+				if (network.cloudPool?.externalId) {
+					subnet.vpcReference = network.cloudPool.externalId
+				}
+				break
+			default: // VLAN and unmanaged-VLAN both map to VLAN
+				subnet.subnetType = SubnetType.VLAN
+				if (network.vlanId != null) {
+					subnet.networkId = network.vlanId
+				}
+				if (network.zonePoolId) {
+					subnet.clusterReference = network.zonePoolId as String
+				}
+		}
+		subnet
+	}
+
+	private com.nutanix.net.java.client.ApiClient buildNetApiClient(Map authConfig) {
+		URL url = new URL(authConfig.apiUrl as String)
+		new com.nutanix.net.java.client.ApiClient()
+			.setHost(url.host)
+			.setPort(url.port)
+			.setUsername(authConfig.username as String)
+			.setPassword(authConfig.password as String)
+			.setVerifySsl(false)
+	}
+
+	private com.nutanix.pri.java.client.ApiClient buildPrismApiClient(Map authConfig) {
+		URL url = new URL(authConfig.apiUrl as String)
+		new com.nutanix.pri.java.client.ApiClient()
+			.setHost(url.host)
+			.setPort(url.port)
+			.setUsername(authConfig.username as String)
+			.setPassword(authConfig.password as String)
+			.setVerifySsl(false)
+	}
+
+	private ApiClient buildMicApiClient(Map authConfig) {
+		URL url = new URL(authConfig.apiUrl as String)
+		new ApiClient()
+			.setHost(url.host)
+			.setPort(url.port)
+			.setUsername(authConfig.username as String)
+			.setPassword(authConfig.password as String)
+			.setVerifySsl(false)
+	}
+
+	@Override
+	ServiceResponse<SecurityGroupLocation> createSecurityGroup(SecurityGroup sg, Map opts) {
+		log.debug("createSecurityGroup: {}", sg.name)
+		try {
+			NetworkServer ns = morpheusContext.services.network.server.get(sg.networkServerId)
+			Cloud cloud = morpheusContext.services.cloud.get(ns.zoneId)
+			def authConfig = plugin.getAuthConfig(cloud)
+			def micClient = buildMicApiClient(authConfig)
+			def prismClient = buildPrismApiClient(authConfig)
+
+			NetworkSecurityPolicy policy = buildSecurityPolicy(sg)
+			ServiceResponse createResp = NutanixPrismComputeUtility.createSecurityPolicy(micClient, policy)
+			if (!createResp.success) return createResp
+
+			ServiceResponse taskResp = NutanixPrismComputeUtility.waitForTask(prismClient, createResp.data as String)
+			if (!taskResp.success) return taskResp
+
+			SecurityGroupLocation location = new SecurityGroupLocation(
+				securityGroup: sg,
+				externalId: taskResp.data as String,
+				externalType: 'SecurityPolicy'
+			)
+			return ServiceResponse.success(location)
+		} catch (Exception e) {
+			log.error("createSecurityGroup error: ${e.message}", e)
+			return ServiceResponse.error("Error creating security policy: ${e.message}")
+		}
+	}
+
+	@Override
+	ServiceResponse<SecurityGroup> updateSecurityGroup(SecurityGroup sg, Map opts) {
+		log.debug("updateSecurityGroup: {}", sg.externalId)
+		if (!sg.externalId) return ServiceResponse.error("SecurityGroup has no externalId")
+		try {
+			NetworkServer ns = morpheusContext.services.network.server.get(sg.networkServerId)
+			Cloud cloud = morpheusContext.services.cloud.get(ns.zoneId)
+			def authConfig = plugin.getAuthConfig(cloud)
+			def micClient = buildMicApiClient(authConfig)
+			def prismClient = buildPrismApiClient(authConfig)
+
+			NetworkSecurityPolicy policy = buildSecurityPolicy(sg)
+			ServiceResponse updateResp = NutanixPrismComputeUtility.updateSecurityPolicy(micClient, sg.externalId, policy)
+			if (!updateResp.success) return updateResp
+
+			ServiceResponse taskResp = NutanixPrismComputeUtility.waitForTask(prismClient, updateResp.data as String)
+			if (!taskResp.success) return taskResp
+
+			return ServiceResponse.success(sg)
+		} catch (Exception e) {
+			log.error("updateSecurityGroup error: ${e.message}", e)
+			return ServiceResponse.error("Error updating security policy: ${e.message}")
+		}
+	}
+
+	@Override
+	ServiceResponse deleteSecurityGroup(SecurityGroup sg) {
+		log.debug("deleteSecurityGroup: {}", sg.externalId)
+		if (!sg.externalId) return ServiceResponse.success()
+		try {
+			NetworkServer ns = morpheusContext.services.network.server.get(sg.networkServerId)
+			Cloud cloud = morpheusContext.services.cloud.get(ns.zoneId)
+			def authConfig = plugin.getAuthConfig(cloud)
+			def micClient = buildMicApiClient(authConfig)
+			def prismClient = buildPrismApiClient(authConfig)
+
+			ServiceResponse deleteResp = NutanixPrismComputeUtility.deleteSecurityPolicy(micClient, sg.externalId)
+			if (!deleteResp.success) return deleteResp
+
+			return NutanixPrismComputeUtility.waitForTask(prismClient, deleteResp.data as String)
+		} catch (Exception e) {
+			log.error("deleteSecurityGroup error: ${e.message}", e)
+			return ServiceResponse.error("Error deleting security policy: ${e.message}")
+		}
+	}
+
+	private NetworkSecurityPolicy buildSecurityPolicy(SecurityGroup sg) {
+		NetworkSecurityPolicy policy = new NetworkSecurityPolicy()
+		policy.name = sg.name
+		policy.description = sg.description
+		if (sg.groupLayer) {
+			try {
+				policy.type = SecurityPolicyType.valueOf(sg.groupLayer.toUpperCase())
+			} catch (IllegalArgumentException ignored) {
+				policy.type = SecurityPolicyType.APPLICATION
+			}
+		} else {
+			policy.type = SecurityPolicyType.APPLICATION
+		}
+		policy.state = SecurityPolicyState.SAVE
+		policy
 	}
 
 	@Override
 	ServiceResponse<NetworkSubnet> createSubnet(NetworkSubnet networkSubnet, Network network, Map map) {
-		return null
+		return ServiceResponse.success(networkSubnet)
 	}
 
 	@Override
 	ServiceResponse<NetworkSubnet> updateSubnet(NetworkSubnet networkSubnet, Network network, Map map) {
-		return null
+		return ServiceResponse.success(networkSubnet)
 	}
 
 	@Override
 	ServiceResponse deleteSubnet(NetworkSubnet networkSubnet, Network network, Map map) {
-		return null
-	}
-
-	@Override
-	ServiceResponse<SecurityGroup> prepareSecurityGroup(SecurityGroup securityGroup, Map opts) {
-		return super.prepareSecurityGroup(securityGroup, opts)
-	}
-
-	@Override
-	ServiceResponse<SecurityGroupRule> validateSecurityGroupRule(SecurityGroupRule securityGroupRule) {
-		return super.validateSecurityGroupRule(securityGroupRule)
-	}
-
-	@Override
-	ServiceResponse<SecurityGroupRule> prepareSecurityGroupRule(SecurityGroupRule securityGroupRule, Map opts) {
-		return super.prepareSecurityGroupRule(securityGroupRule, opts)
-	}
-
-	@Override
-	ServiceResponse deleteSecurityGroupLocation(SecurityGroupLocation securityGroupLocation) {
-		return super.deleteSecurityGroupLocation(securityGroupLocation)
-	}
-
-	@Override
-	ServiceResponse deleteSecurityGroup(SecurityGroup securityGroup) {
-		return super.deleteSecurityGroup(securityGroup)
-	}
-
-	@Override
-	ServiceResponse<SecurityGroup> updateSecurityGroup(SecurityGroup securityGroup, Map opts) {
-		return super.updateSecurityGroup(securityGroup, opts)
-	}
-
-	@Override
-	ServiceResponse<SecurityGroupLocation> createSecurityGroup(SecurityGroup securityGroup, Map opts) {
-		return super.createSecurityGroup(securityGroup, opts)
-	}
-
-	@Override
-	ServiceResponse validateSecurityGroup(SecurityGroup securityGroup, Map opts) {
-		return super.validateSecurityGroup(securityGroup, opts)
-	}
-
-	@Override
-	ServiceResponse<SecurityGroupRuleLocation> createSecurityGroupRule(SecurityGroupLocation securityGroupLocation, SecurityGroupRule securityGroupRule) {
-		return super.createSecurityGroupRule(securityGroupLocation, securityGroupRule)
-	}
-
-	@Override
-	ServiceResponse<SecurityGroupRule> updateSecurityGroupRule(SecurityGroupLocation securityGroupLocation, SecurityGroupRule originalRule, SecurityGroupRule updatedRule) {
-		return super.updateSecurityGroupRule(securityGroupLocation, originalRule, updatedRule)
-	}
-
-	@Override
-	ServiceResponse deleteSecurityGroupRule(SecurityGroupLocation securityGroupLocation, SecurityGroupRule rule) {
-		return super.deleteSecurityGroupRule(securityGroupLocation, rule)
+		return ServiceResponse.success()
 	}
 
 	@Override

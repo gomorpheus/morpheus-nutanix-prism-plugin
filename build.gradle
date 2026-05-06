@@ -69,9 +69,10 @@ dependencies {
 	testImplementation 'cglib:cglib-nodep:3.2.12'
 
 	//nutanix v4 libs!
-	implementation("com.nutanix.api:microseg-java-client:4.0.1")
-	implementation("com.nutanix.api:vmm-java-client:4.0.1")
-	implementation("com.nutanix.api:networking-java-client:4.0.1")
+	implementation("com.nutanix.api:microseg-java-client:4.1.1")
+	implementation("com.nutanix.api:vmm-java-client:4.1.1")
+	implementation("com.nutanix.api:networking-java-client:4.1.1")
+	implementation("com.nutanix.api:prism-java-client:4.1.1")
 
 }
 

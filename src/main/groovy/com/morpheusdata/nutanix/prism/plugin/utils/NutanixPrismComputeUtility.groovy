@@ -28,6 +28,7 @@ import com.morpheusdata.response.ServiceResponse
 import com.nutanix.dp1.mic.microseg.v4.config.ListAddressGroupsApiResponse
 import com.nutanix.dp1.mic.microseg.v4.config.ListNetworkSecurityPoliciesApiResponse
 import com.nutanix.dp1.mic.microseg.v4.config.ListServiceGroupsApiResponse
+import com.nutanix.dp1.mic.microseg.v4.config.NetworkSecurityPolicy
 import com.nutanix.dp1.vmm.vmm.v4.ahv.config.ListVmsApiResponse
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
@@ -57,10 +58,16 @@ import org.springframework.web.client.RestClientException
 import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
 import java.security.cert.X509Certificate
+import com.nutanix.dp1.net.networking.v4.config.Subnet
+import com.nutanix.dp1.net.networking.v4.config.TaskReferenceApiResponse as NetTaskReferenceApiResponse
+import com.nutanix.dp1.pri.prism.v4.config.Task
+import com.nutanix.dp1.pri.prism.v4.config.TaskStatus
 import com.nutanix.mic.java.client.ApiClient
 import com.nutanix.mic.java.client.api.AddressGroupsApi
 import com.nutanix.mic.java.client.api.NetworkSecurityPoliciesApi
 import com.nutanix.mic.java.client.api.ServiceGroupsApi
+import com.nutanix.net.java.client.api.SubnetsApi
+import com.nutanix.pri.java.client.api.TasksApi
 import java.net.URL
 
 import com.morpheusdata.retry.*
@@ -960,6 +967,133 @@ class NutanixPrismComputeUtility {
 		return ServiceResponse.success(securityPolicies)
 	}
 
+
+	// ---- v4 Subnet CRUD ----
+
+	static ServiceResponse createSubnet(com.nutanix.net.java.client.ApiClient netApiClient, Subnet subnet) {
+		log.debug("createSubnet: {}", subnet.name)
+		try {
+			NetTaskReferenceApiResponse response = new SubnetsApi(netApiClient).createSubnet(subnet)
+			def taskRef = response.data?.value
+			if (taskRef) {
+				return ServiceResponse.success(taskRef.extId)
+			}
+			return ServiceResponse.error("createSubnet returned no task reference")
+		} catch (RestClientException e) {
+			log.error("createSubnet error: ${e.message}", e)
+			return ServiceResponse.error("Error creating subnet: ${e.message}")
+		}
+	}
+
+	static ServiceResponse updateSubnet(com.nutanix.net.java.client.ApiClient netApiClient, String extId, Subnet subnet) {
+		log.debug("updateSubnet: {}", extId)
+		try {
+			NetTaskReferenceApiResponse response = new SubnetsApi(netApiClient).updateSubnetById(extId, subnet)
+			def taskRef = response.data?.value
+			if (taskRef) {
+				return ServiceResponse.success(taskRef.extId)
+			}
+			return ServiceResponse.error("updateSubnet returned no task reference")
+		} catch (RestClientException e) {
+			log.error("updateSubnet error: ${e.message}", e)
+			return ServiceResponse.error("Error updating subnet ${extId}: ${e.message}")
+		}
+	}
+
+	static ServiceResponse deleteSubnet(com.nutanix.net.java.client.ApiClient netApiClient, String extId) {
+		log.debug("deleteSubnet: {}", extId)
+		try {
+			NetTaskReferenceApiResponse response = new SubnetsApi(netApiClient).deleteSubnetById(extId)
+			def taskRef = response.data?.value
+			if (taskRef) {
+				return ServiceResponse.success(taskRef.extId)
+			}
+			return ServiceResponse.error("deleteSubnet returned no task reference")
+		} catch (RestClientException e) {
+			log.error("deleteSubnet error: ${e.message}", e)
+			return ServiceResponse.error("Error deleting subnet ${extId}: ${e.message}")
+		}
+	}
+
+	// ---- v4 Security Policy CRUD ----
+
+	static ServiceResponse createSecurityPolicy(ApiClient micApiClient, NetworkSecurityPolicy policy) {
+		log.debug("createSecurityPolicy: {}", policy.name)
+		try {
+			def response = new NetworkSecurityPoliciesApi(micApiClient).createNetworkSecurityPolicy(policy)
+			def taskRef = response.data?.value
+			if (taskRef) {
+				return ServiceResponse.success(taskRef.extId)
+			}
+			return ServiceResponse.error("createSecurityPolicy returned no task reference")
+		} catch (RestClientException e) {
+			log.error("createSecurityPolicy error: ${e.message}", e)
+			return ServiceResponse.error("Error creating security policy: ${e.message}")
+		}
+	}
+
+	static ServiceResponse updateSecurityPolicy(ApiClient micApiClient, String extId, NetworkSecurityPolicy policy) {
+		log.debug("updateSecurityPolicy: {}", extId)
+		try {
+			def response = new NetworkSecurityPoliciesApi(micApiClient).updateNetworkSecurityPolicyById(extId, policy)
+			def taskRef = response.data?.value
+			if (taskRef) {
+				return ServiceResponse.success(taskRef.extId)
+			}
+			return ServiceResponse.error("updateSecurityPolicy returned no task reference")
+		} catch (RestClientException e) {
+			log.error("updateSecurityPolicy error: ${e.message}", e)
+			return ServiceResponse.error("Error updating security policy ${extId}: ${e.message}")
+		}
+	}
+
+	static ServiceResponse deleteSecurityPolicy(ApiClient micApiClient, String extId) {
+		log.debug("deleteSecurityPolicy: {}", extId)
+		try {
+			def response = new NetworkSecurityPoliciesApi(micApiClient).deleteNetworkSecurityPolicyById(extId)
+			def taskRef = response.data?.value
+			if (taskRef) {
+				return ServiceResponse.success(taskRef.extId)
+			}
+			return ServiceResponse.error("deleteSecurityPolicy returned no task reference")
+		} catch (RestClientException e) {
+			log.error("deleteSecurityPolicy error: ${e.message}", e)
+			return ServiceResponse.error("Error deleting security policy ${extId}: ${e.message}")
+		}
+	}
+
+	/**
+	 * Polls a Prism v4 task until it succeeds or fails.
+	 * Returns ServiceResponse.success with the first affected entity extId on SUCCEEDED,
+	 * or ServiceResponse.error on FAILED / timeout.
+	 */
+	static ServiceResponse waitForTask(com.nutanix.pri.java.client.ApiClient prismApiClient, String taskExtId, int maxAttempts = 60, long pollIntervalMs = 5000L) {
+		log.debug("waitForTask: {}", taskExtId)
+		TasksApi tasksApi = new TasksApi(prismApiClient)
+		try {
+			int attempts = 0
+			while (attempts < maxAttempts) {
+				sleep(pollIntervalMs)
+				def response = tasksApi.getTaskById(taskExtId, null)
+				Task task = response.data?.value as Task
+				if (task) {
+					TaskStatus status = task.status
+					if (status == TaskStatus.SUCCEEDED) {
+						String entityExtId = task.entitiesAffected?.find()?.extId
+						return ServiceResponse.success(entityExtId)
+					} else if (status == TaskStatus.FAILED || status == TaskStatus.CANCELED) {
+						String msg = task.errorMessages?.collect { it.message }?.join('; ') ?: "Task ${taskExtId} ${status.name()}"
+						return ServiceResponse.error(msg)
+					}
+				}
+				attempts++
+			}
+			return ServiceResponse.error("Timed out waiting for task ${taskExtId}")
+		} catch (RestClientException e) {
+			log.error("waitForTask error: ${e.message}", e)
+			return ServiceResponse.error("Error polling task ${taskExtId}: ${e.message}")
+		}
+	}
 
 	static ServiceResponse listHostMetrics(HttpApiClient client, Map authConfig, List<String> hostUUIDs) {
 		log.debug("listHostMetrics")

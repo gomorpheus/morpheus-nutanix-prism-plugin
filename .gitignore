@@ -1,4 +1,5 @@
 build/
+bin/
 .asscache
 .gradle/
 .idea
