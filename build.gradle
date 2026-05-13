@@ -99,7 +99,7 @@ task(console, dependsOn: 'classes', type: JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 }
 
-tasks.withType(Test).configureEach {
+test {
 	testLogging {
 		exceptionFormat = 'full'
 		showStandardStreams = true

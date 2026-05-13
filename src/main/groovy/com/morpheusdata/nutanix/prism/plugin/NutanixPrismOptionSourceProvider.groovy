@@ -73,81 +73,72 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
 		def regionCode = tmpCloud.regionCode
 
-		// Find images that have a location for this cloud
-		def locationQuery = new DataQuery().withFilters([
-			new DataFilter('refType', 'ComputeZone'),
-			new DataFilter('refId', cloudId),
-		])
-		if (regionCode) {
-			locationQuery.withFilters(new DataFilter('imageRegion', regionCode))
-		}
-		def imageIdsWithLocation = morpheusContext.async.virtualImage.location.listIdentityProjections(locationQuery)
-			.map { it.virtualImage?.id }
-			.filter { it != null }
-			.toList().blockingGet().unique()
-
+		// Grab the projections.. doing a filter pass first
 		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
-		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes)
-			.filter { it.deleted == false }
-			.map { it.id }
-			.toList().blockingGet()
+		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false }.map{it.id}.toList().blockingGet()
+
 
 		List options = []
-		if (virtualImageIds.size() > 0) {
-			options = morpheusContext.async.virtualImage.listIdentityProjections(
-				new DataQuery().withFilters([
-					new DataFilter('active', true),
-					new DataFilter('id', 'in', virtualImageIds),
-					new DataOrFilter(
-						new DataFilter('owner.id', accountId),
-						new DataFilter('owner.id', null),
-						new DataFilter('visibility', 'public')
-					),
-					new DataOrFilter(
-						new DataFilter('category', "nutanix.prism.image.${cloudId}"),
-						new DataAndFilter(
-							new DataFilter("refType", "ComputeZone"),
-							new DataFilter("refId", cloudId)
-						),
-						new DataFilter('id', 'in', imageIdsWithLocation ?: [0L]),
-						new DataAndFilter(
-							new DataFilter('userUploaded', true),
-							regionCode ? new DataFilter('imageRegion', regionCode) : new DataFilter('active', true)
-						)
-					)
+		if(virtualImageIds.size() > 0) {
+
+			def query = new DataQuery().withFilters([
+				new DataFilter('active', true),
+				new DataFilter('id', 'in', virtualImageIds),
+				new DataOrFilter(
+					new DataFilter('owner.id', accountId),
+					new DataFilter('owner.id', null),
+					new DataFilter('visibility', 'public')
+				)
+			]).withJoins('locations', 'owner')
+			def additionalFilters = new DataOrFilter([
+				new DataFilter('category', "nutanix.prism.image.${cloudId}"),
+				new DataAndFilter(
+					new DataFilter("refType", "ComputeZone"),
+					new DataFilter("refId", cloudId)
+				),
+				new DataAndFilter(
+					new DataFilter("locations.refType", "ComputeZone"),
+					new DataFilter("locations.refId", cloudId)
+				)
+			])
+			if (regionCode) {
+				additionalFilters.withFilters([
+					new DataFilter('userUploaded', true),
+					new DataFilter('imageRegion', regionCode),
+					new DataFilter('locations.imageRegion', regionCode)
 				])
-			).map { [name: it.name, value: it.id] }
-				.toList().blockingGet()
-				.sort { it.name }
+			}
+			query.withFilters(additionalFilters)
+			options = morpheusContext.async.virtualImage.list(query).map { [name: it.name, value: it.id, locations: it.imageLocations, userUploaded: it.userUploaded] }.toList().blockingGet()
+		}
+
+		if(options.size() > 0) {
+			options = options.findAll{it.userUploaded || it.locations.size() == 0 || (it.locations.find {loc -> loc.refType == "ComputeZone" && loc.refId == cloudId})}.collect {[name: it.name, value: it.value]}.sort { it.name }
 		}
 
 		options
+
 	}
 
 	def nutanixPrismNodeImage(args) {
 		log.debug "nutanixPrismNodeImage: ${args}"
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 
+		// Grab the projections.. doing a filter pass first
 		ImageType[] imageTypes = [ImageType.qcow2]
-		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes)
-			.filter { it.deleted == false }
-			.map { it.id }
-			.toList().blockingGet()
+		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false}.map{it.id}.toList().blockingGet()
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
-			// Use identity projections to avoid hydrating full VirtualImage GORM objects (87 columns)
-			options = morpheusContext.async.virtualImage.listIdentityProjections(
-				new DataQuery().withFilters([
-					new DataFilter('active', true),
-					new DataFilter('id', 'in', virtualImageIds),
-					new DataOrFilter(
-						new DataFilter('owner.id', accountId),
-						new DataFilter('owner.id', null),
-						new DataFilter('visibility', 'public')
-					)
-				])
-			).map { [name: it.name, value: it.id] }.toList().blockingGet()
+			options = morpheusContext.async.virtualImage.list(new DataQuery().withFilters([
+				new DataFilter('active', true),
+				new DataFilter('id', 'in', virtualImageIds),
+				new DataOrFilter(
+					new DataFilter('owner.id', accountId),
+					new DataFilter('owner.id', null),
+					new DataFilter('visibility', 'public')
+				)
+			]).withJoins('owner')).map {[name: it.name, value: it.id]}.toList().blockingGet()
 		}
 		if(options.size() > 0) {
 			options = options.sort { it.name.toLowerCase() }
