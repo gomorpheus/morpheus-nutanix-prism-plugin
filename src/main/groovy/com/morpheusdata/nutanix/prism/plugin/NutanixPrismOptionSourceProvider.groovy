@@ -86,7 +86,6 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 			.filter { it != null }
 			.toList().blockingGet().unique()
 
-		// Build a query for images belonging to this cloud or user-uploaded
 		ImageType[] imageTypes = [ImageType.qcow2, ImageType.ova]
 		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes)
 			.filter { it.deleted == false }
@@ -95,29 +94,29 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 
 		List options = []
 		if (virtualImageIds.size() > 0) {
-			def query = new DataQuery().withFilters([
-				new DataFilter('active', true),
-				new DataFilter('id', 'in', virtualImageIds),
-				new DataOrFilter(
-					new DataFilter('owner.id', accountId),
-					new DataFilter('owner.id', null),
-					new DataFilter('visibility', 'public')
-				),
-				new DataOrFilter(
-					new DataFilter('category', "nutanix.prism.image.${cloudId}"),
-					new DataAndFilter(
-						new DataFilter("refType", "ComputeZone"),
-						new DataFilter("refId", cloudId)
+			options = morpheusContext.async.virtualImage.listIdentityProjections(
+				new DataQuery().withFilters([
+					new DataFilter('active', true),
+					new DataFilter('id', 'in', virtualImageIds),
+					new DataOrFilter(
+						new DataFilter('owner.id', accountId),
+						new DataFilter('owner.id', null),
+						new DataFilter('visibility', 'public')
 					),
-					new DataFilter('id', 'in', imageIdsWithLocation ?: [0L]),
-					new DataAndFilter(
-						new DataFilter('userUploaded', true),
-						regionCode ? new DataFilter('imageRegion', regionCode) : new DataFilter('active', true)
+					new DataOrFilter(
+						new DataFilter('category', "nutanix.prism.image.${cloudId}"),
+						new DataAndFilter(
+							new DataFilter("refType", "ComputeZone"),
+							new DataFilter("refId", cloudId)
+						),
+						new DataFilter('id', 'in', imageIdsWithLocation ?: [0L]),
+						new DataAndFilter(
+							new DataFilter('userUploaded', true),
+							regionCode ? new DataFilter('imageRegion', regionCode) : new DataFilter('active', true)
+						)
 					)
-				)
-			]).withJoins('owner')
-			options = morpheusContext.async.virtualImage.list(query)
-				.map { [name: it.name, value: it.id] }
+				])
+			).map { [name: it.name, value: it.id] }
 				.toList().blockingGet()
 				.sort { it.name }
 		}
@@ -129,21 +128,26 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		log.debug "nutanixPrismNodeImage: ${args}"
 		def accountId = args?.size() > 0 ? args.getAt(0).accountId.toLong() : null
 
-		// Grab the projections.. doing a filter pass first
 		ImageType[] imageTypes = [ImageType.qcow2]
-		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes).filter { it.deleted == false}.map{it.id}.toList().blockingGet()
+		def virtualImageIds = morpheusContext.async.virtualImage.listIdentityProjections(accountId, imageTypes)
+			.filter { it.deleted == false }
+			.map { it.id }
+			.toList().blockingGet()
 
 		List options = []
 		if(virtualImageIds.size() > 0) {
-			options = morpheusContext.async.virtualImage.list(new DataQuery().withFilters([
-				new DataFilter('active', true),
-				new DataFilter('id', 'in', virtualImageIds),
-				new DataOrFilter(
-					new DataFilter('owner.id', accountId),
-					new DataFilter('owner.id', null),
-					new DataFilter('visibility', 'public')
-				)
-			]).withJoins('owner')).map {[name: it.name, value: it.id]}.toList().blockingGet()
+			// Use identity projections to avoid hydrating full VirtualImage GORM objects (87 columns)
+			options = morpheusContext.async.virtualImage.listIdentityProjections(
+				new DataQuery().withFilters([
+					new DataFilter('active', true),
+					new DataFilter('id', 'in', virtualImageIds),
+					new DataOrFilter(
+						new DataFilter('owner.id', accountId),
+						new DataFilter('owner.id', null),
+						new DataFilter('visibility', 'public')
+					)
+				])
+			).map { [name: it.name, value: it.id] }.toList().blockingGet()
 		}
 		if(options.size() > 0) {
 			options = options.sort { it.name.toLowerCase() }
