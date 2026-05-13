@@ -98,13 +98,21 @@ class ImagesSync {
 		log.debug "addMissingVirtualImageLocations: ${objList?.size()}"
 
 		def names = objList.collect{it.status.name}?.unique()
+		def externalIds = objList.collect{it.metadata?.uuid}?.findAll{it}?.unique()
 		List<VirtualImageIdentityProjection> existingItems = []
 		def allowedImageTypes = ['qcow2']
 
 		def uniqueIds = [] as Set
 		Observable domainRecords = morpheusContext.async.virtualImage.listIdentityProjections(new DataQuery().withFilters([
 			new DataFilter<String>("imageType", "in", allowedImageTypes),
-			new DataFilter<Collection<String>>("name", "in", names),
+			new DataOrFilter(
+				new DataFilter("externalType", "null"),
+				new DataFilter("externalType", "!=", "template")
+			),
+			new DataOrFilter(
+				new DataFilter<Collection<String>>("externalId", "in", externalIds),
+				new DataFilter<Collection<String>>("name", "in", names)
+			),
 			new DataOrFilter(
 				new DataFilter<Boolean>("systemImage", true),
 				new DataOrFilter(
