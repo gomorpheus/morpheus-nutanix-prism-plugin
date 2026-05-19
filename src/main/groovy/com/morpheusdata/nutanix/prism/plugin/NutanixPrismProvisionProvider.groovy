@@ -1131,6 +1131,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				} else {
 					return ServiceResponse.error(removeResults.msg ?: 'Failed to remove vm')
 				}
+			} else if(removeResults.data?.code == 404 || opts?.force) {
+				// VM already deleted (404) or force flag set — treat as success
+				return ServiceResponse.success()
 			} else {
 				return ServiceResponse.error('Failed to remove vm')
 			}
