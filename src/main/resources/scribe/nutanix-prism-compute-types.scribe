@@ -337,6 +337,7 @@ resource "compute-type-layout" "kubernetes-1_27_7-ubuntu-20_04-nutanix-prism-sin
 resource "workload-type" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism" {
 	code = "kubernetes-1.28.3-ubuntu-20.04-nutanix-prism"
 	shortName = "kubernetes-ubuntu"
+	enabled = false
 	name = "Kubernetes 1.28 Cluster on Ubuntu 20.04"
 	account = null
 	containerVersion = "1.28.3"
@@ -454,7 +455,7 @@ resource "compute-type-layout" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-sin
 		{code = "nutanix-prism-provision-categories"},
 		{code = "kubernetes.master.podCidr"},
 		{code = "kubernetes.master.serviceCidr"}
-	]   
+	]
     packages = [
         "kubernetes-calico-3-26-0-package",
         "kubernetes-rook-1-13-package",
@@ -463,4 +464,3 @@ resource "compute-type-layout" "kubernetes-1_28_3-ubuntu-20_04-nutanix-prism-sin
         "kubernetes-nginx-ingress-operator-1-10-1-package"
     ]
 }
-
