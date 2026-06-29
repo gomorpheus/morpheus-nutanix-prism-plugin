@@ -73,6 +73,7 @@ import com.morpheusdata.model.provisioning.NetworkConfiguration
 import com.morpheusdata.model.provisioning.WorkloadRequest
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismComputeUtility
 import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
+import com.morpheusdata.request.FileCopyRequest
 import com.morpheusdata.request.ResizeRequest
 import com.morpheusdata.request.UpdateModel
 import com.morpheusdata.response.PrepareInstanceResponse
@@ -2297,15 +2298,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						def byteArray = morpheusContext.services.provision.buildIsoOutputStream(runConfig.isSysprep as Boolean, runConfig.serverOs?.platform, cloudConfigMeta, cloudConfigUser, cloudConfigNetwork)
 						def isoStream = new ByteArrayInputStream(byteArray)
 						def url
-						ServiceResponse<String> copyUrlResponse = morpheusContext.services.fileCopy.generateUrl(
-							UUID.randomUUID().toString(),
-							server.createdBy,
-							isoStream,
-							byteArray.length,
-							120l * 60000l, // 2 hours
-							true,
-							"application/x-cd-image"
-						)
+						def fileCopyRequest = new FileCopyRequest(UUID.randomUUID().toString(), server.createdBy, isoStream, (Long) byteArray.length)
+						fileCopyRequest.timeout = 120l * 60000l // 2 hours
+						fileCopyRequest.autoExpand = true
+						fileCopyRequest.contentType = "application/x-cd-image"
+						fileCopyRequest.cloud = server.cloud
+						ServiceResponse<String> copyUrlResponse = morpheusContext.services.fileCopy.generateUrl(fileCopyRequest)
 						if (copyUrlResponse.success) {
 							url = copyUrlResponse.data
 						}
