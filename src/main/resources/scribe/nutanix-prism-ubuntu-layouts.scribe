@@ -19,13 +19,13 @@ resource "instance-type-layout" "nutanix-prism-ubuntu-18_04-single" {
 
 
 //20
-resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20260203" {
-	code = "nutanix.prism.image.morpheus.ubuntu.20.04.20260203.ubuntu.20.04"
+resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-20_04-20260824" {
+	code = "nutanix.prism.image.morpheus.ubuntu.20.04.20260824.ubuntu.20.04"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name = "Morpheus Ubuntu 20.04 20260203"
+	name = "Morpheus Ubuntu 20.04 20260824"
 	imageType = "qcow2"
-	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260203/ubuntu-20/morpheus-ubuntu-20_04-amd64-20260203.qcow2"
-	imagePath = "qemu/20260203/ubuntu-20"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260824/ubuntu-20/morpheus-ubuntu-20_04-amd64-20260824.qcow2"
+	imagePath = "qemu/20260824/ubuntu-20"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -44,7 +44,7 @@ resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-20_04-disabled" {
 resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-20_04" {
 	code               = "nutanix.prism.image.morpheus.ubuntu.20.04"
 	provisionType      = "nutanix-prism-provision-provider"
-	virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260824
 	account            = null
 	osType = {
 		code = "ubuntu.20.04.64"
@@ -72,7 +72,7 @@ resource "workload-type" "nutanix-prism-ubuntu-20_04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260203
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-20_04-20260824
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -122,13 +122,13 @@ resource "scale-action" "nutanix-prism-ubuntu-20_04-single" {
 }
 
 //22
-resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20260203" {
-	code = "nutanix.prism.image.morpheus.ubuntu.22.04.20260203"
+resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20260824" {
+	code = "nutanix.prism.image.morpheus.ubuntu.22.04.20260824"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name = "Morpheus Ubuntu 22.04 20260203"
+	name = "Morpheus Ubuntu 22.04 20260824"
 	imageType = "qcow2"
-	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260203/ubuntu-22/morpheus-ubuntu-22_04-amd64-20260203.qcow2"
-	imagePath = "qemu/20260203/ubuntu-22"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260824/ubuntu-22/morpheus-ubuntu-22_04-amd64-20260824.qcow2"
+	imagePath = "qemu/20260824/ubuntu-22"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -142,7 +142,7 @@ resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-22_04-20260203" {
 resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-22_04" {
 	code               = "nutanix.prism.image.morpheus.ubuntu.22.04"
 	provisionType      = "nutanix-prism-provision-provider"
-	virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20260203
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20260824
 	account            = null
 	osType = {
 		code = "ubuntu.22.04.64"
@@ -170,7 +170,7 @@ resource "workload-type" "nutanix-prism-ubuntu-22_04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20260203
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-22_04-20260824
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -221,13 +221,13 @@ resource "scale-action" "nutanix-prism-ubuntu-22_04-single" {
 
 
 //24
-resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-24_04-20260203" {
-	code = "nutanix.prism.image.morpheus.ubuntu.24.04.20260203"
+resource "virtual-image" "nutanix-prism-image-morpheus-ubuntu-24_04-20260820" {
+	code = "nutanix.prism.image.morpheus.ubuntu.24.04.20260820"
 	category = "nutanix.prism.image.morpheus.ubuntu"
-	name = "Morpheus Ubuntu 24.04 20260203"
+	name = "Morpheus Ubuntu 24.04 20260820"
 	imageType = "qcow2"
-	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260203/ubuntu-24/morpheus-ubuntu-24_04-amd64-20260203.qcow2"
-	imagePath = "qemu/20260203/ubuntu-24"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260820/ubuntu-24/morpheus-ubuntu-24_04-amd64-20260820.qcow2"
+	imagePath = "qemu/20260820/ubuntu-24"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -246,7 +246,7 @@ resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-24_04-disabled" {
 resource "os-type-image" "nutanix-prism-image-morpheus-ubuntu-24_04" {
 	code               = "nutanix.prism.image.morpheus.ubuntu.24.04"
 	provisionType      = "nutanix-prism-provision-provider"
-	virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20260203
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20260820
 	account            = null
 	osType = {
 		code = "ubuntu.24.04.64"
@@ -274,7 +274,7 @@ resource "workload-type" "nutanix-prism-ubuntu-24_04" {
 	containerPorts = [{code = "ubuntu.22"}]
 	actions = [{code = "ubuntu-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20260203
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-ubuntu-24_04-20260820
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
