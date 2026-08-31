@@ -1,11 +1,11 @@
 //8
 resource "virtual-image" "nutanix-prism-image-morpheus-rocky-8" {
-	code = "nutanix.prism.image.morpheus.rocky.8.20250218"
+	code = "nutanix.prism.image.morpheus.rocky.8.20260824"
 	category = "nutanix.prism.image.morpheus.rocky.8"
-	name = "Morpheus Rocky 8 20250218"
+	name = "Morpheus Rocky 8 20260824"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20250218/rocky-8/morpheus-rocky-8-x86_64-20250218.qcow2"
-	imagePath = "qemu/20250218/rocky-8"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260824/rocky-8/morpheus-rocky-8-x86_64-20260824.qcow2"
+	imagePath = "qemu/20260824/rocky-8"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -103,12 +103,12 @@ resource "scale-action" "nutanix-prism-rocky-8-single" {
 
 //9
 resource "virtual-image" "nutanix-prism-image-morpheus-rocky-9" {
-	code = "nutanix.prism.image.morpheus.rocky.9.20250218"
+	code = "nutanix.prism.image.morpheus.rocky.9.20260824"
 	category = "nutanix.prism.image.morpheus.rocky.9"
-	name = "Morpheus Rocky 9 20250218"
+	name = "Morpheus Rocky 9 20260824"
 	imageType = "qcow2"
-	remotePath = "https://s3-us-west-1.amazonaws.com/morpheus-images/qemu/20250218/rocky-9/morpheus-rocky-9-x86_64-20250218.qcow2"
-	imagePath = "qemu/20250218/rocky-9"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260824/rocky-9/morpheus-rocky-9-x86_64-20260824.qcow2"
+	imagePath = "qemu/20260824/rocky-9"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -212,12 +212,12 @@ resource "scale-action" "nutanix-prism-rocky-9-single" {
 
 //10
 resource "virtual-image" "nutanix-prism-image-morpheus-rocky-10" {
-	code = "nutanix.prism.image.morpheus.rocky.10.20260126"
+	code = "nutanix.prism.image.morpheus.rocky.10.20260821"
 	category = "nutanix.prism.image.morpheus.rocky.10"
-	name = "Morpheus Rocky 10 20260126"
+	name = "Morpheus Rocky 10 20260821"
 	imageType = "qcow2"
-	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260126/rocky-10/morpheus-rocky-10-x86_64-20260126.qcow2"
-	imagePath = "qemu/20260126/rocky-10"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260821/rocky-10/morpheus-rocky-10-x86_64-20260821.qcow2"
+	imagePath = "qemu/20260821/rocky-10"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true

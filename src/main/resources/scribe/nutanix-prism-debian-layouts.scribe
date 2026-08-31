@@ -1,11 +1,11 @@
 //13
-resource "virtual-image" "nutanix-prism-image-morpheus-debian-13-20260310" {
-	code = "nutanix.prism.image.morpheus.debian.13.20260310"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-13-20260821" {
+	code = "nutanix.prism.image.morpheus.debian.13.20260821"
 	category = "nutanix.prism.image.morpheus.debian"
-	name = "Morpheus Debian 13 20260310"
+	name = "Morpheus Debian 13 20260821"
 	imageType = "qcow2"
-	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260310/debian-13/morpheus-debian-13-amd64-20260310.qcow2"
-	imagePath = "qemu/20260310/debian-13"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260821/debian-13/morpheus-debian-13-amd64-20260821.qcow2"
+	imagePath = "qemu/20260821/debian-13"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -19,7 +19,7 @@ resource "virtual-image" "nutanix-prism-image-morpheus-debian-13-20260310" {
 resource "os-type-image" "nutanix-prism-image-morpheus-debian-13" {
 	code               = "nutanix.prism.image.morpheus.debian.13"
 	provisionType      = "nutanix-prism-provision-provider"
-	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-13-20260310
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-13-20260821
 	account            = null
 	osType = {
 		code = "debian.13.64"
@@ -47,7 +47,7 @@ resource "workload-type" "nutanix-prism-debian-13" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-13-20260310
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-13-20260821
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
@@ -185,8 +185,8 @@ resource "instance-type-layout" "nutanix-prism-debian-11-single" {
 	hasAutoScale = true
 	portCount = 1
 	serverType = "vm"
-	enabled = true
-	creatable = true
+	enabled = false
+	creatable = false
 	supportsConvertToManaged = true
 	containers = [
 		workload-type-set.nutanix-prism-debian-11-set
@@ -209,13 +209,13 @@ resource "scale-action" "nutanix-prism-debian-11-single" {
 
 
 //12
-resource "virtual-image" "nutanix-prism-image-morpheus-debian-12-20260203" {
-	code = "nutanix.prism.image.morpheus.debian.12.20260203"
+resource "virtual-image" "nutanix-prism-image-morpheus-debian-12-20260821" {
+	code = "nutanix.prism.image.morpheus.debian.12.20260821"
 	category = "nutanix.prism.image.morpheus.debian"
-	name = "Morpheus Debian 12 20260203"
+	name = "Morpheus Debian 12 20260821"
 	imageType = "qcow2"
-	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260203/debian-12/morpheus-debian-12-amd64-20260203.qcow2"
-	imagePath = "qemu/20260203/debian-12"
+	remotePath = "https://morpheus-images.s3.amazonaws.com/qemu/20260821/debian-12/morpheus-debian-12-amd64-20260821.qcow2"
+	imagePath = "qemu/20260821/debian-12"
 	isCloudInit = true
 	systemImage = true
 	installAgent = true
@@ -234,7 +234,7 @@ resource "os-type-image" "nutanix-prism-image-morpheus-debian-12-disabled" {
 resource "os-type-image" "nutanix-prism-image-morpheus-debian-12" {
 	code               = "nutanix.prism.image.morpheus.debian.12"
 	provisionType      = "nutanix-prism-provision-provider"
-	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-12-20260203
+	virtualImage       = virtual-image.nutanix-prism-image-morpheus-debian-12-20260821
 	account            = null
 	osType = {
 		code = "debian.12.64"
@@ -262,7 +262,7 @@ resource "workload-type" "nutanix-prism-debian-12" {
 	containerPorts = [{code = "debian.22"}]
 	actions = [{code = "generic-remove-node"}]
 	checkTypeCode = "containerCheck"
-	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-12-20260203
+	virtualImage = virtual-image.nutanix-prism-image-morpheus-debian-12-20260821
 	provisionType = "nutanix-prism-provision-provider"
 	backupType = "nutanixPrismSnapshot"
 }
