@@ -203,7 +203,7 @@ class ClustersSync {
 		log.debug "getClusters"
 		def rtn = [success: true, data: []]
 		try {
-			ServiceResponse listResult = NutanixPrismComputeUtility.listClusters(apiClient, authConfig)
+			ServiceResponse listResult = NutanixPrismComputeUtility.listClustersV4(apiClient, authConfig)
 			if (listResult.success) {
 				def clusters = listResult.data
 				if(clusterList?.size() > 0) {

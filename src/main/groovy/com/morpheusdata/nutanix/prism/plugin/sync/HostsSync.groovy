@@ -396,7 +396,7 @@ class HostsSync {
 		log.debug "getHosts"
 		def rtn = [success: true, data: []]
 		try {
-			ServiceResponse listResult = NutanixPrismComputeUtility.listHostsV2(apiClient, authConfig)  // Need this one for the stats
+			ServiceResponse listResult = NutanixPrismComputeUtility.listHostsV4(apiClient, authConfig)
 			if (listResult.success) {
 				def hosts = listResult.data
 				if(clusterList?.size() > 0) {

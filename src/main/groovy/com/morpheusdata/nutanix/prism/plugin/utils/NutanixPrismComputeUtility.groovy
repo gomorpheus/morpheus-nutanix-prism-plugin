@@ -859,9 +859,62 @@ class NutanixPrismComputeUtility {
 		return callListApi(client, 'category', "categories/${categoryName}/list", authConfig)
 	}
 
+	/**
+	 * Lists categories via the Prism Central V4 REST API. Unlike the V3 API (separate "list keys" and
+	 * "list values for key" calls), V4 categories are a flat resource where each entry already combines
+	 * the key and value (e.g. {@code [extId: ..., key: 'Environment', value: 'Production', type: 'USER']}).
+	 * Callers should read {@code key}/{@code value} directly instead of making a follow-up call per key.
+	 */
+	static ServiceResponse listCategoriesV4(HttpApiClient client, Map authConfig) {
+		log.debug("listCategoriesV4")
+		return NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildPrismV4Path('categories'), authConfig)
+	}
+
 	static ServiceResponse listClusters(HttpApiClient client, Map authConfig) {
 		log.debug("listClusters")
 		return callListApi(client, 'cluster', 'clusters/list', authConfig)
+	}
+
+	/**
+	 * Lists clusters via the Prism Central V4 REST API (clustermgmt namespace - confirmed against
+	 * Nutanix's published clustermgmt v4.0.b1 OpenAPI spec). Normalizes each V4 Cluster entity into
+	 * the same shape the V3 {@code listClusters}/{@code ClustersSync} consumers already expect
+	 * (metadata.uuid, status.name, status.resources.config.service_list, status.resources.config.software_map)
+	 * so callers do not need to change:
+	 * <ul>
+	 *   <li>V4 {@code extId} -&gt; V3 {@code metadata.uuid}</li>
+	 *   <li>V4 {@code name} -&gt; V3 {@code status.name}</li>
+	 *   <li>V4 {@code config.clusterFunction} (array of strings, e.g. "AOS") -&gt; V3 {@code status.resources.config.service_list}</li>
+	 *   <li>V4 {@code config.clusterSoftwareMap} (array of {@code {softwareType, version}}) -&gt; V3 {@code status.resources.config.software_map} (map keyed by softwareType, e.g. "NOS")</li>
+	 * </ul>
+	 * Note: V4 has no "AOS" software type - the equivalent key is "NOS" (confirmed via the
+	 * clustermgmt SoftwareTypeRef enum: NOS, NCC, PRISM_CENTRAL).
+	 */
+	static ServiceResponse listClustersV4(HttpApiClient client, Map authConfig) {
+		log.debug("listClustersV4")
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildClusterMgmtV4Path('clusters'), authConfig)
+		if (listResult.success) {
+			listResult.data = listResult.data?.collect { cluster -> normalizeClusterV4(cluster) }
+		}
+		return listResult
+	}
+
+	private static Map normalizeClusterV4(Map cluster) {
+		def softwareMap = (cluster.config?.clusterSoftwareMap ?: []).collectEntries { sw ->
+			[(sw.softwareType): [version: sw.version]]
+		}
+		return [
+				metadata: [uuid: cluster.extId],
+				status  : [
+						name     : cluster.name,
+						resources: [
+								config: [
+										service_list: cluster.config?.clusterFunction ?: [],
+										software_map: softwareMap
+								]
+						]
+				]
+		]
 	}
 
 	static ServiceResponse listVPCs(HttpApiClient client, Map authConfig) {
@@ -877,6 +930,73 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse listHostsV2(HttpApiClient client, Map authConfig) {
 		log.debug("listHostsV2")
 		return callListApiV2(client, 'hosts', authConfig)
+	}
+
+	/**
+	 * Lists hosts via the Prism Central V4 REST API (clustermgmt namespace - confirmed against
+	 * Nutanix's published clustermgmt v4.0.b1 OpenAPI spec) and normalizes each entity into the
+	 * same flat shape the V2 {@code listHostsV2}/{@code HostsSync} consumers already expect
+	 * (uuid, cluster_uuid, hypervisor_type, name, hypervisor_address, num_cpu_cores,
+	 * memory_capacity_in_bytes, stats.hypervisor_cpu_usage_ppm, stats.hypervisor_memory_usage_ppm):
+	 * <ul>
+	 *   <li>V4 {@code extId} -&gt; V2 {@code uuid}</li>
+	 *   <li>V4 {@code cluster.uuid} -&gt; V2 {@code cluster_uuid}</li>
+	 *   <li>V4 {@code hypervisor.type} enum (AHV/ESX/HYPERV/XEN) -&gt; V2 {@code hypervisor_type} string
+	 *       ("kKvm"/"kVCenter") so existing switch-on-string logic in HostsSync keeps working</li>
+	 *   <li>V4 {@code hostName} -&gt; V2 {@code name}</li>
+	 *   <li>V4 {@code hypervisor.externalAddress} (ipv4/ipv6 object) -&gt; V2 {@code hypervisor_address} (string)</li>
+	 *   <li>V4 {@code numberOfCpuCores} -&gt; V2 {@code num_cpu_cores}</li>
+	 *   <li>V4 {@code memorySizeBytes} -&gt; V2 {@code memory_capacity_in_bytes}</li>
+	 * </ul>
+	 * V4 has no stats fields on the host config resource itself - CPU/memory usage requires a
+	 * separate per-host call to the "stats" sub-namespace (see {@link #getHostStatsV4}), fetched
+	 * here with {@code $statType=LAST} to get the current point-in-time value (matching V2's
+	 * "current stats" semantics).
+	 */
+	static ServiceResponse listHostsV4(HttpApiClient client, Map authConfig) {
+		log.debug("listHostsV4")
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildClusterMgmtV4Path('hosts'), authConfig)
+		if (listResult.success) {
+			listResult.data = listResult.data?.collect { host -> normalizeHostV4(client, authConfig, host) }
+		}
+		return listResult
+	}
+
+	private static final Map<String, String> HYPERVISOR_TYPE_V4_TO_V2 = [AHV: 'kKvm', ESX: 'kVCenter']
+
+	private static Map normalizeHostV4(HttpApiClient client, Map authConfig, Map host) {
+		def clusterUuid = host.cluster?.uuid
+		def hostExtId = host.extId
+		def hypervisorTypeV4 = host.hypervisor?.type?.toString()
+		def stats = [:]
+		if(clusterUuid && hostExtId) {
+			ServiceResponse statsResult = getHostStatsV4(client, authConfig, clusterUuid, hostExtId)
+			if(statsResult.success) {
+				stats.hypervisor_cpu_usage_ppm = latestStatValue(statsResult.data?.hypervisorCpuUsagePpm)
+				stats.hypervisor_memory_usage_ppm = latestStatValue(statsResult.data?.aggregateHypervisorMemoryUsagePpm)
+			} else {
+				log.warn "Error getting host stats for ${hostExtId}: ${statsResult.msg}"
+			}
+		}
+		return [
+				uuid                    : hostExtId,
+				cluster_uuid            : clusterUuid,
+				hypervisor_type         : HYPERVISOR_TYPE_V4_TO_V2[hypervisorTypeV4] ?: hypervisorTypeV4,
+				name                    : host.hostName,
+				hypervisor_address      : host.hypervisor?.externalAddress?.ipv4?.value ?: host.hypervisor?.externalAddress?.ipv6?.value,
+				num_cpu_cores           : host.numberOfCpuCores,
+				memory_capacity_in_bytes: host.memorySizeBytes,
+				stats                   : stats
+		]
+	}
+
+	private static Long latestStatValue(List timeValuePairs) {
+		return timeValuePairs ? (timeValuePairs.last().value as Long) : null
+	}
+
+	static ServiceResponse getHostStatsV4(HttpApiClient client, Map authConfig, String clusterExtId, String hostExtId) {
+		log.debug("getHostStatsV4: cluster=${clusterExtId} host=${hostExtId}")
+		return NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildClusterMgmtStatsV4Path("clusters/${clusterExtId}/hosts/${hostExtId}"), authConfig, ['$statType': 'LAST'])
 	}
 
 	static ServiceResponse listVMs(HttpApiClient client, Map authConfig) {

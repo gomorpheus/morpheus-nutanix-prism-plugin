@@ -114,19 +114,10 @@ class CategoriesSync {
 		log.debug "getCategoriesAndValues"
 		def rtn = [success: true, data: []]
 		try {
-			ServiceResponse listResult = NutanixPrismComputeUtility.listCategories(apiClient, authConfig)
+			ServiceResponse listResult = NutanixPrismComputeUtility.listCategoriesV4(apiClient, authConfig)
 			if (listResult.success) {
-				def categoryNames = listResult.data?.collect { it.name }
-				for(categoryName in categoryNames) {
-					log.debug "Getting values for ${categoryName}"
-					ServiceResponse valueResponse = NutanixPrismComputeUtility.listCategoryValues(apiClient, authConfig, categoryName)
-					if(valueResponse.success) {
-						valueResponse.data?.each { payload -> 
-							rtn.data << [name: categoryName, value: payload.value, display: "${categoryName}:${payload.value}"]
-						}
-					} else {
-						log.warn "Error getting category values for: ${categoryName}"
-					}
+				listResult.data?.each { category ->
+					rtn.data << [name: category.key, value: category.value, display: "${category.key}:${category.value}"]
 				}
 			} else {
 				rtn.success = false
