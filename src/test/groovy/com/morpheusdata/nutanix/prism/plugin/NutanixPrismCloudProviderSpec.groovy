@@ -37,7 +37,11 @@ class NutanixPrismCloudProviderSpec extends Specification {
 		def optionTypes = service.getOptionTypes()
 
 		then:
-		optionTypes.size() == 0
+		optionTypes.size() == 9
+		optionTypes*.code as Set == ['nutanix-prism-api-url', 'nutanix-prism-credential', 'nutanix-prism-username',
+									  'nutanix-prism-password', 'nutanix-prism-project', 'nutanix-prism-vmm-api-version',
+									  'nutanix-prism-import-existing', 'nutanix-prism-enableVnc',
+									  'nutanix-prism-windows-nic-config-mode'] as Set
 	}
 
 	void "getComputeServerTypes"() {
@@ -45,6 +49,9 @@ class NutanixPrismCloudProviderSpec extends Specification {
 		def serverTypes = service.getComputeServerTypes()
 
 		then:
-		serverTypes.size() == 0
+		serverTypes.size() == 8
+		serverTypes*.code as Set == ['nutanix-prism-hypervisor', 'nutanix-prism-server', 'nutanix-prism-vm',
+									 'nutanix-prism-windows-vm', 'nutanix-prism-unmanaged', 'nutanix-prism-linux',
+									 'nutanix-prism-kube-master', 'nutanix-prism-kube-worker'] as Set
 	}
 }
