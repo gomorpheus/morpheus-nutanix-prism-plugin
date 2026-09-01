@@ -65,7 +65,9 @@ dependencies {
 	testImplementation "org.codehaus.groovy:groovy-all:$groovyVersion"
 	testImplementation 'net.bytebuddy:byte-buddy:1.9.3'
 	testImplementation 'org.objenesis:objenesis:2.6'
-	testImplementation "org.spockframework:spock-core:$spockVersion"
+	testImplementation platform("org.spockframework:spock-bom:$spockVersion")
+	testImplementation "org.spockframework:spock-core"
+	testImplementation "org.spockframework:spock-junit4"
 	testImplementation 'cglib:cglib-nodep:3.2.12'
 }
 
@@ -100,6 +102,7 @@ task(console, dependsOn: 'classes', type: JavaExec) {
 }
 
 tasks.withType(Test).configureEach {
+	useJUnitPlatform()
 	testLogging {
 		exceptionFormat = 'full'
 		showStandardStreams = true
