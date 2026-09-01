@@ -100,4 +100,57 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		host.stats.hypervisor_cpu_usage_ppm == 250000
 		host.stats.hypervisor_memory_usage_ppm == 500000
 	}
+
+	void "listVMsV4 calls the VMM V4 vms endpoint and normalizes to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listVMsV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/config/vms', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[
+						extId            : 'vm-1',
+						name             : 'VM One',
+						cluster          : [extId: 'cluster-1'],
+						powerState       : 'ON',
+						memorySizeBytes  : 4294967296,
+						numSockets       : 2,
+						numCoresPerSocket: 4,
+						nics             : [[
+								extId      : 'nic-1',
+								backingInfo: [macAddress: 'AA:BB:CC:DD:EE:FF'],
+								networkInfo: [nicType: 'NORMAL_NIC', subnet: [extId: 'subnet-1'], ipv4Config: [ipAddress: [value: '10.0.0.10']]]
+						]],
+						disks            : [[
+								extId      : 'disk-1',
+								diskAddress: [index: 0],
+								backingInfo: [diskSizeBytes: 107374182400]
+						]]
+				]],
+				metadata: [totalAvailableResults: 1]
+		])
+		result.success
+		result.data.size() == 1
+		def vm = result.data[0]
+		vm.metadata.uuid == 'vm-1'
+		vm.status.name == 'VM One'
+		vm.status.cluster_reference.uuid == 'cluster-1'
+		vm.status.resources.power_state == 'ON'
+		vm.status.resources.memory_size_mib == 4096
+		vm.status.resources.num_sockets == 2
+		vm.status.resources.num_vcpus_per_socket == 4
+		vm.status.resources.nic_list.size() == 1
+		vm.status.resources.nic_list[0].uuid == 'nic-1'
+		vm.status.resources.nic_list[0].mac_address == 'AA:BB:CC:DD:EE:FF'
+		vm.status.resources.nic_list[0].nic_type == 'NORMAL_NIC'
+		vm.status.resources.nic_list[0].subnet_reference.uuid == 'subnet-1'
+		vm.status.resources.nic_list[0].ip_endpoint_list[0].ip == '10.0.0.10'
+		vm.status.resources.disk_list.size() == 1
+		vm.status.resources.disk_list[0].uuid == 'disk-1'
+		vm.status.resources.disk_list[0].disk_size_bytes == 107374182400
+		vm.status.resources.disk_list[0].device_properties.device_type == 'DISK'
+		vm.status.resources.disk_list[0].device_properties.disk_address.device_index == 0
+	}
 }

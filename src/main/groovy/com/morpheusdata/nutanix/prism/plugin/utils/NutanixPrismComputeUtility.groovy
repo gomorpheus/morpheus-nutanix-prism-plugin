@@ -1004,6 +1004,82 @@ class NutanixPrismComputeUtility {
 		return callListApi(client, 'vm', 'vms/list', authConfig)
 	}
 
+	/**
+	 * Lists VMs via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.0.b1 OpenAPI spec -
+	 * Vm, Nic, Disk, Ipv4Config, DiskAddress, VmDisk schemas) and normalizes each entity into the same
+	 * shape the V3 {@code listVMs}/{@code VirtualMachinesSync} consumers already expect:
+	 * <ul>
+	 *   <li>V4 {@code extId} -&gt; V3 {@code metadata.uuid}</li>
+	 *   <li>V4 {@code name} -&gt; V3 {@code status.name}</li>
+	 *   <li>V4 {@code cluster.extId} -&gt; V3 {@code status.cluster_reference.uuid}</li>
+	 *   <li>V4 {@code powerState} ("ON"/"OFF") -&gt; V3 {@code status.resources.power_state} (values already match)</li>
+	 *   <li>V4 {@code memorySizeBytes} -&gt; V3 {@code status.resources.memory_size_mib} (bytes -&gt; MiB)</li>
+	 *   <li>V4 {@code numCoresPerSocket}/{@code numSockets} -&gt; V3 {@code status.resources.num_vcpus_per_socket}/{@code num_sockets}</li>
+	 *   <li>V4 {@code nics[]} (extId, backingInfo.macAddress, networkInfo.nicType, networkInfo.subnet.extId,
+	 *       networkInfo.ipv4Config.ipAddress.value) -&gt; V3 {@code status.resources.nic_list[]} (uuid, mac_address,
+	 *       nic_type, subnet_reference.uuid, ip_endpoint_list[0].ip)</li>
+	 *   <li>V4 {@code disks[]} (extId, diskAddress.index, backingInfo.diskSizeBytes) -&gt; V3
+	 *       {@code status.resources.disk_list[]} (uuid, device_properties.disk_address.device_index,
+	 *       disk_size_bytes, device_properties.device_type hardcoded to "DISK" since V4 already separates
+	 *       cdRoms into their own array)</li>
+	 * </ul>
+	 * <b>Known gap:</b> V4 {@code categories} is a list of category *references* (just {@code extId}), not
+	 * {@code {key, value}} pairs like V3 {@code metadata.categories}. Resolving extId -&gt; key/value requires
+	 * a lookup against {@link #listCategoriesV4} output that the caller does not currently provide, so
+	 * {@code metadata.categories} is normalized to an empty list for now - VM tag sync will not pick up
+	 * category tags until this is wired up (tracked as a follow-up, not silently "working").
+	 */
+	static ServiceResponse listVMsV4(HttpApiClient client, Map authConfig) {
+		log.debug("listVMsV4")
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildVmmV4Path(authConfig, 'vms'), authConfig)
+		if (listResult.success) {
+			listResult.data = listResult.data?.collect { vm -> normalizeVmV4(vm) }
+		}
+		return listResult
+	}
+
+	private static Map normalizeVmV4(Map vm) {
+		def nicList = (vm.nics ?: []).collect { nic ->
+			def ip = nic.networkInfo?.ipv4Config?.ipAddress?.value
+			[
+					uuid            : nic.extId,
+					subnet_reference: [uuid: nic.networkInfo?.subnet?.extId],
+					ip_endpoint_list: ip ? [[ip: ip]] : [],
+					mac_address     : nic.backingInfo?.macAddress,
+					nic_type        : nic.networkInfo?.nicType
+			]
+		}
+		def diskList = (vm.disks ?: []).collect { disk ->
+			[
+					uuid              : disk.extId,
+					disk_size_bytes   : disk.backingInfo?.diskSizeBytes,
+					device_properties: [
+							device_type : 'DISK',
+							disk_address: [device_index: disk.diskAddress?.index]
+					]
+			]
+		}
+		return [
+				metadata: [
+						uuid              : vm.extId,
+						categories        : [], // see listVMsV4 doc - extId->key/value resolution not yet wired up
+						project_reference : null
+				],
+				status  : [
+						name     : vm.name,
+						cluster_reference: [uuid: vm.cluster?.extId],
+						resources: [
+								power_state          : vm.powerState,
+								memory_size_mib      : vm.memorySizeBytes != null ? (vm.memorySizeBytes / (1024 * 1024)) as Long : null,
+								num_vcpus_per_socket : vm.numCoresPerSocket,
+								num_sockets          : vm.numSockets,
+								nic_list             : nicList,
+								disk_list            : diskList
+						]
+				]
+		]
+	}
+
 	static ServiceResponse listHostMetrics(HttpApiClient client, Map authConfig, List<String> hostUUIDs) {
 		log.debug("listHostMetrics")
 		def groupMemberAttributes = ['hypervisor_memory_usage_ppm', 'hypervisor_cpu_usage_ppm']
