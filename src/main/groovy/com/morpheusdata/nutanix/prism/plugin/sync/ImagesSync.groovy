@@ -57,7 +57,7 @@ class ImagesSync {
 		log.debug "BEGIN: execute ImagesSync: ${cloud.id}"
 		try {
 			def authConfig = plugin.getAuthConfig(cloud)
-			def listResults = NutanixPrismComputeUtility.listImages(apiClient, authConfig)
+			def listResults = NutanixPrismComputeUtility.listImagesV4(apiClient, authConfig)
 			if (listResults.success) {
 				def masterImages = listResults?.data?.findAll { it.status.resources.image_type != 'ISO_IMAGE' }
 				Observable domainRecords = morpheusContext.async.virtualImage.location.listIdentityProjections(new DataQuery().withFilters([

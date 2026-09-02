@@ -60,6 +60,16 @@ class NutanixPrismV4Client {
 		return "api/vmm/${apiVersion.getCode()}/ahv/config/${resourcePath}"
 	}
 
+	/**
+	 * Images live under the VMM "content" module (e.g. {@code /vmm/v4.0.b1/content/images}), not the
+	 * "ahv/config" module used by VMs/templates - confirmed against Nutanix's published vmm v4.0.b1
+	 * OpenAPI spec.
+	 */
+	static String buildVmmContentV4Path(Map authConfig, String resourcePath) {
+		NutanixPrismComputeUtility.VMM_API_VERSION apiVersion = authConfig?.vmmApiVersion ?: NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
+		return "api/vmm/${apiVersion.getCode()}/content/${resourcePath}"
+	}
+
 	static String buildNetworkingV4Path(String resourcePath) {
 		return "${NETWORKING_V4_BASE_PATH}/${resourcePath}"
 	}
@@ -154,12 +164,15 @@ class NutanixPrismV4Client {
 	}
 
 	/**
-	 * Performs a GET against a V4 REST single-resource endpoint (e.g. a stats endpoint for one
-	 * cluster/host, which is not a paginated list) and unwraps the {@code {metadata, data}} envelope
-	 * so {@code ServiceResponse.data} is the resource itself.
+	 * Performs a request against a V4 REST single-resource endpoint (e.g. a stats endpoint for one
+	 * cluster/host, or a create/get/delete on a single entity) and unwraps the {@code {metadata, data}}
+	 * envelope so {@code ServiceResponse.data} is the resource itself. Defaults to GET with no body for
+	 * backwards compatibility with existing single-resource GET callers; pass {@code method}/{@code body}
+	 * for POST/DELETE calls (e.g. V4's async create/delete endpoints, which return a
+	 * {@code prism.config.TaskReference} in {@code data} rather than the entity itself).
 	 */
-	static ServiceResponse callApiV4(HttpApiClient client, String path, Map authConfig, Map queryParams = [:]) {
-		log.debug("callApiV4: path: ${path}")
+	static ServiceResponse callApiV4(HttpApiClient client, String path, Map authConfig, Map queryParams = [:], String method = 'GET', Object body = null) {
+		log.debug("callApiV4: path: ${path} method: ${method}")
 		def rtn = new ServiceResponse(success: false)
 		try {
 			def results = client.callJsonApi(authConfig.apiUrl, path, authConfig.username, authConfig.password,
@@ -167,9 +180,10 @@ class NutanixPrismV4Client {
 							headers: buildV4Headers(),
 							queryParams: queryParams,
 							contentType: ContentType.APPLICATION_JSON,
+							body: body,
 							ignoreSSL: true,
 							timeout: authConfig.timeout
-					), 'GET')
+					), method)
 			log.debug("callApiV4 results: ${results.toMap()}")
 			if(results?.success && !results?.hasErrors()) {
 				rtn.success = true

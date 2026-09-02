@@ -201,4 +201,120 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.data[0].spec.name == 'VPC One'
 		result.data[0].metadata.uuid == 'vpc-1'
 	}
+
+	void "getTaskV4 calls the prism V4 tasks endpoint and normalizes status/entities to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.getTaskV4(client, authConfig, 'task-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/prism/v4.0/config/tasks/task-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [
+						status          : 'SUCCEEDED',
+						entitiesAffected: [[extId: 'image-1', rel: 'vmm:content:image']]
+				]
+		])
+		result.success
+		result.data.status == 'SUCCEEDED'
+		result.data.entity_reference_list.size() == 1
+		result.data.entity_reference_list[0].kind == 'image'
+		result.data.entity_reference_list[0].uuid == 'image-1'
+	}
+
+	void "listImagesV4 calls the vmm V4 content images endpoint and normalizes to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listImagesV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/images', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[
+						extId                 : 'image-1',
+						name                  : 'CentOS Image',
+						type                  : 'DISK_IMAGE',
+						sizeBytes             : 1073741824,
+						source                : [url: 'https://files.example.com/centos.qcow2'],
+						clusterLocationExtIds : ['cluster-1']
+				]],
+				metadata: [totalAvailableResults: 1]
+		])
+		result.success
+		result.data.size() == 1
+		def image = result.data[0]
+		image.metadata.uuid == 'image-1'
+		image.status.name == 'CentOS Image'
+		image.status.resources.image_type == 'DISK_IMAGE'
+		image.status.resources.size_bytes == 1073741824
+		image.status.resources.retrieval_uri_list == ['https://files.example.com/centos.qcow2']
+		image.status.resources.source_uri == 'https://files.example.com/centos.qcow2'
+		image.status.resources.current_cluster_reference_list[0].uuid == 'cluster-1'
+	}
+
+	void "getImageV4 calls the vmm V4 content images endpoint for a single image and normalizes to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.getImageV4(client, authConfig, 'image-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/images/image-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [extId: 'image-1', name: 'CentOS Image', type: 'DISK_IMAGE', sizeBytes: 1073741824]
+		])
+		result.success
+		result.data.metadata.uuid == 'image-1'
+		result.data.status.name == 'CentOS Image'
+		result.data.status.resources.image_type == 'DISK_IMAGE'
+	}
+
+	void "createImageV4 posts a UrlSource body when given a sourceUri and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.createImageV4(client, authConfig, 'CentOS Image', 'DISK_IMAGE', 'https://files.example.com/centos.qcow2')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/images', authConfig.username, authConfig.password, {
+			it.body.name == 'CentOS Image' &&
+			it.body.type == 'DISK_IMAGE' &&
+			it.body.source['$objectType'] == 'vmm.v4.content.UrlSource' &&
+			it.body.source.url == 'https://files.example.com/centos.qcow2'
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.status.execution_context.task_uuid == 'task-1'
+	}
+
+	void "createImageV4 posts a VmDiskSource body when given a diskUuid"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.createImageV4(client, authConfig, 'Clone Image', 'DISK_IMAGE', null, 'disk-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/images', authConfig.username, authConfig.password, {
+			it.body.source['$objectType'] == 'vmm.v4.content.VmDiskSource' &&
+			it.body.source.extId == 'disk-1'
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-2']])
+		result.success
+		result.data.status.execution_context.task_uuid == 'task-2'
+	}
+
+	void "deleteImageV4 calls DELETE on the vmm V4 content images endpoint and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.deleteImageV4(client, authConfig, 'image-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/images/image-1', authConfig.username, authConfig.password, _, 'DELETE') >> ServiceResponse.success([data: [extId: 'task-3']])
+		result.success
+		result.data.status.execution_context.task_uuid == 'task-3'
+	}
 }

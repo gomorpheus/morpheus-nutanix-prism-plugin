@@ -100,6 +100,26 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	/**
+	 * Gets an image via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.0.b1
+	 * OpenAPI spec - Image, ImageType, UrlSource schemas). Normalizes into the same shape
+	 * {@code ImagesSync}/{@code NutanixPrismProvisionProvider} already expect from V3's {@code getImage}
+	 * (see {@link #normalizeImageV4}).
+	 * <b>Note:</b> unlike V3 (which has an image {@code status.state} of "RUNNING"/"COMPLETE" tracking
+	 * download progress), V4's {@code Image} schema has no such state field at all - image
+	 * creation/download completion is tracked entirely via the Task returned by {@link #createImageV4},
+	 * not by re-polling the image resource. Callers should use {@link #checkTaskReadyV4} instead of the
+	 * V3 {@code waitForImageComplete} pattern of polling {@code getImage} for "COMPLETE".
+	 */
+	static ServiceResponse getImageV4(HttpApiClient client, Map authConfig, String imageId) {
+		log.debug("getImageV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, "images/${imageId}"), authConfig)
+		if (result.success) {
+			result.data = normalizeImageV4(result.data)
+		}
+		return result
+	}
+
 	static ServiceResponse deleteImage(HttpApiClient client, Map authConfig, String imageId) {
 		log.debug("deleteImage")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,
@@ -109,6 +129,21 @@ class NutanixPrismComputeUtility {
 		} else {
 			return ServiceResponse.error()
 		}
+	}
+
+	/**
+	 * Deletes an image via the VMM V4 REST API. Like {@link #createImageV4}, this is asynchronous -
+	 * the response is a {@code prism.config.TaskReference}, normalized into the same
+	 * {@code status.execution_context.task_uuid} shape V3's task-based flows already expect so callers
+	 * can pass the result straight to {@link #checkTaskReadyV4}.
+	 */
+	static ServiceResponse deleteImageV4(HttpApiClient client, Map authConfig, String imageId) {
+		log.debug("deleteImageV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, "images/${imageId}"), authConfig, [:], 'DELETE')
+		if (result.success) {
+			result.data = [status: [execution_context: [task_uuid: result.data?.extId]]]
+		}
+		return result
 	}
 
 	static ServiceResponse createImage(HttpApiClient client, Map authConfig, String imageName, String imageType, String sourceUri = null, String diskUuid = null) {
@@ -142,6 +177,75 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	/**
+	 * Creates an image via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.0.b1
+	 * OpenAPI spec). Only URL-based image creation ({@code UrlSource}) and VM-disk-clone creation
+	 * ({@code VmDiskSource}) are supported - this matches the only two ways {@code createImage} is
+	 * actually called in this codebase today (a Morpheus-hosted file-stream URL, or a
+	 * {@code diskUuid} to clone). {@code $objectType} discriminator values follow Nutanix's documented
+	 * v4 convention of {@code "{namespace}.v4.{module}.{TypeName}"} (confirmed via the schema's example
+	 * value), not the internal {@code "{namespace}.v4.r0.b1.{module}.{TypeName}"} schema name.
+	 * <p>
+	 * <b>Critical structural difference from V3:</b> V3's {@code createImage} returns the new image's
+	 * {@code metadata.uuid} synchronously, with only the *download* tracked async via
+	 * {@code status.state}. V4's create is fully async - the POST only returns a
+	 * {@code prism.config.TaskReference}; the new image's extId is not known until the task completes
+	 * (delivered in the task's {@code entitiesAffected} list). This response is normalized into V3's
+	 * {@code status.execution_context.task_uuid} shape so callers can reuse the existing
+	 * "get task_uuid, then poll" pattern, but callers must switch from
+	 * {@code imageResults.data.metadata.uuid} + {@code waitForImageComplete} to
+	 * {@code checkTaskReadyV4(...).data.entity_reference_list.find { it.kind == 'image' }?.uuid} - there
+	 * is no separate "wait for image complete" step needed since the task itself does not complete
+	 * until the image is fully created (this is inferred from the API's 202/Task design and the total
+	 * absence of a download-progress field on the Image resource; not independently confirmed against a
+	 * live long-running image download).
+	 */
+	static ServiceResponse createImageV4(HttpApiClient client, Map authConfig, String imageName, String imageType, String sourceUri = null, String diskUuid = null) {
+		log.debug("createImageV4")
+		def body = [
+				name: imageName,
+				type: imageType
+		]
+		if (sourceUri) {
+			body.source = ['$objectType': 'vmm.v4.content.UrlSource', url: sourceUri]
+		} else if (diskUuid) {
+			body.source = ['$objectType': 'vmm.v4.content.VmDiskSource', extId: diskUuid]
+		}
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, 'images'), authConfig, [:], 'POST', body)
+		if (result.success) {
+			result.data = [status: [execution_context: [task_uuid: result.data?.extId]]]
+		}
+		return result
+	}
+
+	private static Map normalizeImageV4(Map image) {
+		def sourceUrl = image.source?.url
+		return [
+				metadata: [uuid: image.extId],
+				status  : [
+						name     : image.name,
+						resources: [
+								image_type                    : image.type,
+								size_bytes                     : image.sizeBytes,
+								retrieval_uri_list             : sourceUrl ? [sourceUrl] : [],
+								source_uri                     : sourceUrl,
+								current_cluster_reference_list : (image.clusterLocationExtIds ?: []).collect { [uuid: it] }
+						]
+				]
+		]
+	}
+
+	/**
+	 * V3-only direct binary upload of image bytes. Confirmed unused anywhere in this codebase today
+	 * (grep found no callers) - the actual "customer uploaded image" flow instead has Morpheus serve
+	 * the file via its own HTTP stream URL and passes that URL to {@code createImage}'s {@code sourceUri}
+	 * (see the comment in {@code NutanixPrismProvisionProvider} explaining this). Left as V3-only and
+	 * NOT migrated: Nutanix's vmm v4.0.b1 API has no binary/multipart image upload endpoint at all -
+	 * image creation is exclusively URL-based ({@code UrlSource}) or disk-clone-based
+	 * ({@code VmDiskSource}), confirmed by inspecting every {@code images} path in the vmm v4.0.b1
+	 * OpenAPI spec. Since the existing URL-based flow already covers the plugin's real usage, this is
+	 * not considered a functional regression - flagging here so it isn't silently assumed migrated.
+	 */
 	static ServiceResponse uploadImage(HttpApiClient client, Map authConfig, String imageExternalId, InputStream stream, Long contentLength) {
 		log.debug("uploadImage: ${imageExternalId}")
 		def imageStream = new BufferedInputStream(stream, 1200)
@@ -303,6 +407,79 @@ class NutanixPrismComputeUtility {
 		} else {
 			return ServiceResponse.error("Error getting task ${uuid}", null, results.data)
 		}
+	}
+
+	/**
+	 * Gets a task via the Prism V4 REST API (confirmed against Nutanix's published prism v4.0.b1
+	 * OpenAPI spec - Task, TaskStatus, EntityReference schemas). V4's {@code TaskStatus} enum
+	 * ("QUEUED"/"RUNNING"/"CANCELING"/"SUCCEEDED"/"FAILED"/"CANCELED") already matches the terminal
+	 * values ("SUCCEEDED"/"FAILED") the V3-based {@code checkTaskReady} polling loop checks for, so no
+	 * transform is needed there. Normalizes the response into the same shape V3 callers expect:
+	 * <ul>
+	 *   <li>V4 {@code status} -&gt; V3 {@code status} (values already match)</li>
+	 *   <li>V4 {@code entitiesAffected[]} ({@code {extId, rel}}, where {@code rel} is
+	 *       "namespace:module[:submodule]:entityType", e.g. "vmm:ahv:vm") -&gt; V3
+	 *       {@code entity_reference_list[]} ({@code {kind, uuid}})</li>
+	 * </ul>
+	 * <b>Not independently verified against a live task response:</b> {@code kind} is inferred as the
+	 * last colon-separated segment of {@code rel} (per the schema's documented format), since no live
+	 * Prism Central instance was available this session to confirm the exact {@code rel} string Nutanix
+	 * returns for an image-creation task. Confirm this before relying on it for anything beyond the
+	 * "find the created image's extId" use in {@code createImageV4}.
+	 */
+	static ServiceResponse getTaskV4(HttpApiClient client, Map authConfig, String uuid) {
+		log.debug("getTaskV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildPrismV4Path("tasks/${uuid}"), authConfig)
+		if (result.success) {
+			result.data = normalizeTaskV4(result.data)
+		}
+		return result
+	}
+
+	private static Map normalizeTaskV4(Map task) {
+		return [
+				status               : task.status,
+				entity_reference_list: (task.entitiesAffected ?: []).collect { ref ->
+					[kind: ref.rel?.tokenize(':')?.last(), uuid: ref.extId]
+				}
+		]
+	}
+
+	/**
+	 * V4 equivalent of {@code checkTaskReady} - polls a Prism V4 task via {@link #getTaskV4} using the
+	 * exact same polling contract (20s interval, 60 attempts, success/data on "SUCCEEDED",
+	 * failure/data on "FAILED") so callers migrated to V4 create/delete flows can reuse the same
+	 * calling pattern as the V3 task-polling code elsewhere in the provision provider.
+	 */
+	static checkTaskReadyV4(HttpApiClient client, Map authConfig, String taskId) {
+		def rtn = [success: false]
+		try {
+			def pending = true
+			def attempts = 0
+			while (pending) {
+				sleep(1000l * 20l)
+				def taskDetail = getTaskV4(client, authConfig, taskId)
+				log.debug("taskDetail: ${taskDetail}")
+				def taskStatus = taskDetail?.data?.status
+				if (taskDetail.success == true && taskStatus) {
+					if (taskStatus == 'SUCCEEDED') {
+						rtn.success = true
+						rtn.data = taskDetail.data
+						pending = false
+					} else if (taskStatus == 'FAILED') {
+						rtn.success = false
+						rtn.data = taskDetail.data
+						pending = false
+					}
+				}
+				attempts++
+				if (attempts > 60)
+					pending = false
+			}
+		} catch (e) {
+			log.error("An Exception Has Occurred: ${e.message}", e)
+		}
+		return rtn
 	}
 
 	static ServiceResponse getVm(HttpApiClient client, Map authConfig, String uuid) {
@@ -879,6 +1056,21 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse listImages(HttpApiClient client, Map authConfig) {
 		log.debug("listImages")
 		return callListApi(client, 'image', 'images/list', authConfig)
+	}
+
+	/**
+	 * Lists images via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.0.b1 OpenAPI
+	 * spec - Image, ImageType, UrlSource/VmDiskSource schemas). Normalizes each V4 Image entity into
+	 * the same shape the V3 {@code listImages}/{@code ImagesSync} consumers already expect - see
+	 * {@link #normalizeImageV4}.
+	 */
+	static ServiceResponse listImagesV4(HttpApiClient client, Map authConfig) {
+		log.debug("listImagesV4")
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, 'images'), authConfig)
+		if (listResult.success) {
+			listResult.data = listResult.data?.collect { image -> normalizeImageV4(image) }
+		}
+		return listResult
 	}
 
 	static ServiceResponse listDisksV2(HttpApiClient client, Map authConfig) {

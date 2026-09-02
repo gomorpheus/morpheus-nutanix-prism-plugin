@@ -406,18 +406,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def vmDetails = NutanixPrismComputeUtility.getVm(client, authConfig, serverId)
 			def diskToClone = vmDetails?.data?.spec?.resources?.disk_list?[0]
 			if(diskToClone && diskToClone.uuid) {
-				def cloneResults = NutanixPrismComputeUtility.createImage(client, authConfig, opts.templateName as String, "DISK_IMAGE", null, diskToClone.uuid)
+				def cloneResults = NutanixPrismComputeUtility.createImageV4(client, authConfig, opts.templateName as String, "DISK_IMAGE", null, diskToClone.uuid)
 				log.debug("cloneResults: ${cloneResults}")
 				if(cloneResults.success == true) {
 					def cloneTaskId = cloneResults?.data?.status?.execution_context?.task_uuid
 					if (cloneTaskId) {
 						//make a virtual image or let it sync in? - sync for now
-						def cloneTaskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, cloneTaskId)
+						def cloneTaskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, cloneTaskId)
 						log.debug("cloneTaskResults: ${cloneTaskResults}")
 						if (cloneTaskResults.success == true && cloneTaskResults.error != true) {
 							//get the image id - create the image
 							def imageId = cloneTaskResults?.data?.entity_reference_list?.find { it.kind == 'image' }?.uuid
-							def imageResults = NutanixPrismComputeUtility.getImage(client, authConfig, imageId)
+							def imageResults = NutanixPrismComputeUtility.getImageV4(client, authConfig, imageId)
 							log.debug("imageResults: ${imageResults}")
 							if (imageResults.success == true) {
 								def vmImage = imageResults?.data
@@ -1750,7 +1750,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					if(virtualImage.externalType == "template") {
 						response = NutanixPrismComputeUtility.getTemplate(client, authConfig, imageExternalId)
 					} else {
-						response = NutanixPrismComputeUtility.getImage(client, authConfig, imageExternalId)
+						response = NutanixPrismComputeUtility.getImageV4(client, authConfig, imageExternalId)
 					}
 					if (!response.success) {
 						imageExternalId = null
@@ -1758,7 +1758,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				}
 			}
 			if(!imageExternalId && virtualImage.systemImage || virtualImage.userUploaded) {
-				def imageList = NutanixPrismComputeUtility.listImages(client, authConfig)
+				def imageList = NutanixPrismComputeUtility.listImagesV4(client, authConfig)
 				if(imageList.success) {
 					def existingImage = imageList.data.find {it.status?.name == virtualImage.name}
 					if(existingImage) {
@@ -1787,76 +1787,39 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				// The url given will be used by Nutanix to download the image.. it will be in a RUNNING status until the download is complete
 				// For morpheus images, this is fine as it is publicly accessible. But, for customer uploaded images, need to upload the bytes
 				def copyUrl =  morpheusContext.async.virtualImage.getCloudFileStreamUrl(virtualImage, imageFile, createdBy, cloud).blockingGet()
-				def imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, virtualImage.name, 'DISK_IMAGE',copyUrl)
+				def imageResults = NutanixPrismComputeUtility.createImageV4(client, authConfig, virtualImage.name, 'DISK_IMAGE',copyUrl)
 				if (imageResults.success) {
-					imageExternalId = imageResults.data.metadata.uuid
-					// Create the VirtualImageLocation before waiting for the upload
-					VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
-						virtualImage: virtualImage,
-						externalId  : imageExternalId,
-						imageRegion : cloud.regionCode,
-						code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
-						internalId  : imageExternalId,
-						refId		: cloud.id,
-						refType		: 'ComputeZone',
-						sharedStorage : true
-					])
-					location = morpheusContext.async.virtualImage.location.create(virtualImageLocation, cloud).blockingGet()
+					def taskId = imageResults.data?.status?.execution_context?.task_uuid
+					def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
+					if (taskResults.success) {
+						// V4 image creation is fully async (unlike V3, which returned the new image's uuid
+						// synchronously and tracked download progress separately via getImage/status.state) -
+						// the image doesn't exist/have an extId until its creation task succeeds, so there is
+						// no "create a pending location, then wait, then flip sharedStorage false" step here;
+						// by the time we know imageExternalId the image is already fully created.
+						imageExternalId = taskResults.data?.entity_reference_list?.find { it.kind == 'image' }?.uuid
+						VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
+							virtualImage: virtualImage,
+							externalId  : imageExternalId,
+							imageRegion : cloud.regionCode,
+							code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
+							internalId  : imageExternalId,
+							refId		: cloud.id,
+							refType		: 'ComputeZone'
+						])
+						location = morpheusContext.async.virtualImage.location.create(virtualImageLocation, cloud).blockingGet()
+					} else {
+						throw new Exception("Error in creating the image: ${taskResults.data}")
+					}
 				} else {
-					VirtualImageLocation virtualImageLocation = new VirtualImageLocation([
-						virtualImage: virtualImage,
-						externalId  : imageExternalId,
-						imageRegion : cloud.regionCode,
-						code        : "nutanix.prism.image.${cloud.id}.${imageExternalId}",
-						internalId  : imageExternalId,
-						refId		: cloud.id,
-						refType		: 'ComputeZone'
-					])
-					location = morpheusContext.async.virtualImage.location.create(virtualImageLocation, cloud).blockingGet()
 					throw new Exception("Error in creating the image: ${imageResults.msg}")
 				}
-
-				// Wait till the image is COMPLETE
-				waitForImageComplete(client, authConfig, imageExternalId)
-				//update location status
-				location = morpheusContext.async.virtualImage.location.get(location.id).blockingGet()
-				location.sharedStorage = false
-				morpheusContext.async.virtualImage.location.save(location).blockingGet()
 
 			}
 		} finally {
 			morpheusContext.releaseLock(lockKey, [lock:lock]).blockingGet()
 		}
 		return imageExternalId
-	}
-
-	private waitForImageComplete(HttpApiClient apiClient, Map authConfig, String imageExternalId, Boolean requireResources=true) {
-		def rtn = [success:false]
-		try {
-			def pending = true
-			def attempts = 0
-			while(pending) {
-				sleep(1000l * 20l)
-				def imageDetail = NutanixPrismComputeUtility.getImage(apiClient, authConfig, imageExternalId)
-				log.debug("imageDetail: ${imageDetail}")
-				if(!imageDetail.success && imageDetail.data?.code == 404 ) {
-					pending = false
-				}
-				def imageStatus = imageDetail?.data?.status
-				def retrievalList = imageStatus?.resources?.retrieval_uri_list
-				if(imageDetail.success == true && imageStatus?.state == "COMPLETE" && (!requireResources || retrievalList?.size() > 0)) {
-					rtn.success = true
-					rtn.data = imageDetail.data
-					pending = false
-				}
-				attempts ++
-				if(attempts > 180)
-					pending = false
-			}
-		} catch(e) {
-			log.error("An Exception Has Occurred: ${e.message}",e)
-		}
-		return rtn
 	}
 
 	private getDataDiskList(Workload workload) {
@@ -2312,12 +2275,18 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						//upload cloud-init iso
 						if(url) {
 							def fileName = "morpheus_${server.id}.iso"
-							imageResults = NutanixPrismComputeUtility.createImage(client, authConfig, fileName, "ISO_IMAGE", url)
+							imageResults = NutanixPrismComputeUtility.createImageV4(client, authConfig, fileName, "ISO_IMAGE", url)
 							def imageExternalId
 							if (imageResults.success) {
-								imageExternalId = imageResults.data.metadata.uuid
-								def imageWaitResults = waitForImageComplete(client, authConfig, imageExternalId)
-								if(!imageWaitResults.success) {
+								def isoTaskId = imageResults.data?.status?.execution_context?.task_uuid
+								def isoTaskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, isoTaskId)
+								if (isoTaskResults.success) {
+									imageExternalId = isoTaskResults.data?.entity_reference_list?.find { it.kind == 'image' }?.uuid
+									// keep imageResults.data.metadata.uuid populated in the V3 shape so the
+									// cleanup code further down (which reads imageResults?.data?.metadata?.uuid)
+									// does not need to change
+									imageResults.data.metadata = [uuid: imageExternalId]
+								} else {
 									log.warn("Error uploading user-data via ISO image. Cloud-init or unattend data will not be available to the resource.")
 								}
 							} else {
@@ -2466,7 +2435,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			//clean up iso
 			def imageExternalId = imageResults?.data?.metadata?.uuid
 			if(imageExternalId) {
-				def imageDeleteResults = NutanixPrismComputeUtility.deleteImage(client, authConfig, imageExternalId)
+				def imageDeleteResults = NutanixPrismComputeUtility.deleteImageV4(client, authConfig, imageExternalId)
 			}
 		}
 
