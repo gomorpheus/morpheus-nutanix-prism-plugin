@@ -70,6 +70,16 @@ class NutanixPrismV4Client {
 		return "api/vmm/${apiVersion.getCode()}/content/${resourcePath}"
 	}
 
+	/**
+	 * VM statistics (CPU/memory/controller usage) live under a separate "ahv/stats" module
+	 * (e.g. {@code /vmm/v4.0.b1/ahv/stats/vms/{extId}}), not the "ahv/config" module used for VM
+	 * CRUD - confirmed against Nutanix's published vmm v4.0.b1 OpenAPI spec.
+	 */
+	static String buildVmmStatsV4Path(Map authConfig, String resourcePath) {
+		NutanixPrismComputeUtility.VMM_API_VERSION apiVersion = authConfig?.vmmApiVersion ?: NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
+		return "api/vmm/${apiVersion.getCode()}/ahv/stats/${resourcePath}"
+	}
+
 	static String buildNetworkingV4Path(String resourcePath) {
 		return "${NETWORKING_V4_BASE_PATH}/${resourcePath}"
 	}

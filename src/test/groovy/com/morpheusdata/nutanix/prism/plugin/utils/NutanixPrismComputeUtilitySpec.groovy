@@ -415,4 +415,43 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.data.key == 'Environment'
 		result.data.value == 'Production'
 	}
+
+	void "getVmStatsV4 calls the vmm V4 ahv stats endpoint for a single VM with a required time range"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.getVmStatsV4(client, authConfig, 'vm-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/stats/vms/vm-1', authConfig.username, authConfig.password, {
+			it.queryParams['$statType'] == 'LAST' && it.queryParams['$startTime'] != null && it.queryParams['$endTime'] != null
+		}, 'GET') >> ServiceResponse.success([data: [vmExtId: 'vm-1', stats: [[timestamp: '2024-01-01T00:00:00Z', memoryUsagePpm: 100000, hypervisorCpuUsagePpm: 50000, controllerUserBytes: 1024]]]])
+		result.success
+		result.data.stats[0].memoryUsagePpm == 100000
+	}
+
+	void "listVMMetricsV4 calls getVmStatsV4 per VM and normalizes to the V3 Groups API shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listVMMetricsV4(client, authConfig, ['vm-1', 'vm-2'])
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/stats/vms/vm-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [vmExtId: 'vm-1', stats: [[memoryUsagePpm: 100000, hypervisorCpuUsagePpm: 50000, controllerUserBytes: 1024]]]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/stats/vms/vm-2', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [vmExtId: 'vm-2', stats: [[memoryUsagePpm: 200000, hypervisorCpuUsagePpm: 60000, controllerUserBytes: 2048]]]
+		])
+		result.success
+		result.data.size() == 2
+		def vm1 = result.data.find { it.entity_id == 'vm-1' }
+		NutanixPrismComputeUtility.getGroupEntityValue(vm1.data, 'memory_usage_ppm') == 100000
+		NutanixPrismComputeUtility.getGroupEntityValue(vm1.data, 'hypervisor_cpu_usage_ppm') == 50000
+		NutanixPrismComputeUtility.getGroupEntityValue(vm1.data, 'controller_user_bytes') == 1024
+		def vm2 = result.data.find { it.entity_id == 'vm-2' }
+		NutanixPrismComputeUtility.getGroupEntityValue(vm2.data, 'memory_usage_ppm') == 200000
+	}
 }

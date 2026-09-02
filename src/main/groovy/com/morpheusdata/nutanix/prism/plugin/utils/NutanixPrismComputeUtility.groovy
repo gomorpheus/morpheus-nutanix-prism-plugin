@@ -51,6 +51,7 @@ import org.apache.http.message.BasicNameValuePair
 import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
 import java.security.cert.X509Certificate
+import java.time.OffsetDateTime
 
 import com.morpheusdata.retry.*
 import com.morpheusdata.retry.policies.*
@@ -1364,6 +1365,52 @@ class NutanixPrismComputeUtility {
 				entity_ids: vmUUIDs
 		]
 		return callGroupApi(client, 'mh_vm', 'memory_usage_ppm', groupMemberAttributes, authConfig, appendToBody)
+	}
+
+	/**
+	 * Fetches point-in-time stats for a single VM via the VMM V4 REST API (confirmed against Nutanix's
+	 * published vmm v4.0.b1 OpenAPI spec - {@code ahv.stats.VmStats}/{@code VmStatsTuple} schemas).
+	 * Unlike clustermgmt's host/cluster stats endpoints (where {@code $startTime}/{@code $endTime} are
+	 * optional), this endpoint requires both even when using {@code $statType=LAST} - a 5 minute lookback
+	 * window is used since only the last sample in the window is needed.
+	 */
+	static ServiceResponse getVmStatsV4(HttpApiClient client, Map authConfig, String vmExtId) {
+		log.debug("getVmStatsV4: vm=${vmExtId}")
+		def endTime = OffsetDateTime.now()
+		def startTime = endTime.minusMinutes(5)
+		return NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmStatsV4Path(authConfig, "vms/${vmExtId}"), authConfig,
+				['$statType': 'LAST', '$startTime': startTime.toString(), '$endTime': endTime.toString()])
+	}
+
+	/**
+	 * Lists per-VM stats via the VMM V4 REST API (one {@link #getVmStatsV4} call per VM - v4.0.b1 has no
+	 * batch/multi-entity stats endpoint verified to accept a list of VM extIds) and normalizes the result
+	 * into the same {@code [[entity_id, data: [{name, values}]]]} shape the V3 Groups API-based
+	 * {@code listVMMetrics} already returns, so {@code NutanixPrismSyncUtils.updateMetrics} and
+	 * {@code getGroupEntityValue} keep working unchanged. V4's {@code VmStatsTuple} fields
+	 * ({@code memoryUsagePpm}, {@code hypervisorCpuUsagePpm}, {@code controllerUserBytes}) map 1:1 onto
+	 * the V3 attribute names by value - only the envelope shape differs.
+	 */
+	static ServiceResponse listVMMetricsV4(HttpApiClient client, Map authConfig, List<String> vmUUIDs) {
+		log.debug("listVMMetricsV4")
+		def rtn = new ServiceResponse(success: true, data: [])
+		vmUUIDs?.each { vmUuid ->
+			ServiceResponse statsResult = getVmStatsV4(client, authConfig, vmUuid)
+			if(statsResult.success) {
+				def latestTuple = statsResult.data?.stats ? statsResult.data.stats.last() : [:]
+				rtn.data << [
+						entity_id: vmUuid,
+						data     : [
+								[name: 'memory_usage_ppm', values: [[values: [latestTuple.memoryUsagePpm]]]],
+								[name: 'hypervisor_cpu_usage_ppm', values: [[values: [latestTuple.hypervisorCpuUsagePpm]]]],
+								[name: 'controller_user_bytes', values: [[values: [latestTuple.controllerUserBytes]]]]
+						]
+				]
+			} else {
+				log.warn "Error getting VM stats for ${vmUuid}: ${statsResult.msg}"
+			}
+		}
+		return rtn
 	}
 
 	static getGroupEntityValue(List groupData, attributeName) {

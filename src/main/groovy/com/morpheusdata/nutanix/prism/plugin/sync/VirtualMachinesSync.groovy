@@ -123,7 +123,7 @@ class VirtualMachinesSync {
 		if (!createNew)
 			return
 
-		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, addList?.collect{ it.metadata.uuid } )
+		def metricsResult = NutanixPrismComputeUtility.listVMMetricsV4(apiClient, authConfig, addList?.collect{ it.metadata.uuid } )
 		ServicePlan fallbackPlan = new ServicePlan(code: 'nutanix-prism-internal-custom')
 
 		Collection<ResourcePermission> availablePlanPermissions = []
@@ -180,7 +180,7 @@ class VirtualMachinesSync {
 		def managedServerIds = servers?.findAll{it.computeServerType?.managed }?.collect{it.id}
 		Map<Long, WorkloadIdentityProjection> tmpWorkloads = morpheusContext.async.workload.list(new DataQuery().withFilter('server.id', 'in', managedServerIds)).toMap {it.serverId}.blockingGet()
 		List<ComputeServer> serversToSave = []
-		def metricsResult = NutanixPrismComputeUtility.listVMMetrics(apiClient, authConfig, updateList?.collect{ it.masterItem.metadata.uuid } )
+		def metricsResult = NutanixPrismComputeUtility.listVMMetricsV4(apiClient, authConfig, updateList?.collect{ it.masterItem.metadata.uuid } )
 		for(update in updateList) {
 			try {
 				ComputeServer currentServer = update.existingItem
