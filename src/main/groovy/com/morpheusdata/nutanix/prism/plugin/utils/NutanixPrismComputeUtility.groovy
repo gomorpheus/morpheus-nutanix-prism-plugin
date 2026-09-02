@@ -931,6 +931,21 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	/**
+	 * Creates a category via the Prism Central V4 REST API. Unlike V3 (a separate "create key" PUT
+	 * followed by a "create value under key" PUT), V4's {@code Category} resource always combines
+	 * {@code key}/{@code value} in a single entity - creating a new value under an already-existing
+	 * key is simply another POST with the same {@code key} and a different {@code value}, there is no
+	 * separate key-only resource to pre-create. Confirmed against Nutanix's published prism v4.0.b1
+	 * OpenAPI spec: {@code POST /api/prism/v4.0/config/categories} requires only {@code key}/{@code value}
+	 * and responds synchronously (201) with the created {@code Category}, not a task reference.
+	 */
+	static ServiceResponse createCategoryV4(HttpApiClient client, Map authConfig, String keyName, String valueName) {
+		log.debug("createCategoryV4")
+		def body = [key: keyName, value: valueName]
+		return NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildPrismV4Path('categories'), authConfig, [:], 'POST', body)
+	}
+
 	static ServiceResponse createVmFromTemplate(HttpApiClient client, Map authConfig, Map runConfig) {
 		def templateUuid = runConfig.imageExternalId
 		def headers = [

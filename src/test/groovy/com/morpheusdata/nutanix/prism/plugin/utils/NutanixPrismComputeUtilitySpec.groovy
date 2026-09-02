@@ -399,4 +399,20 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
 		result.success
 	}
+
+	void "createCategoryV4 posts a combined key/value body to the prism V4 categories endpoint"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.createCategoryV4(client, authConfig, 'Environment', 'Production')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/prism/v4.0/config/categories', authConfig.username, authConfig.password, {
+			it.body.key == 'Environment' && it.body.value == 'Production'
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'cat-1', key: 'Environment', value: 'Production']])
+		result.success
+		result.data.key == 'Environment'
+		result.data.value == 'Production'
+	}
 }

@@ -1187,7 +1187,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		HttpApiClient client = new HttpApiClient()
 		client.networkProxy = cloud.apiProxy
 		def authConfig = plugin.getAuthConfig(cloud)
-		def tags = opts.cloudTags ?: getAllTags(cloud)
 		def cloudItem = opts.cloudVm ?: NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)?.data
 
 		def currentTags = []
@@ -1195,12 +1194,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		server.metadata?.each { MetadataTag tag ->
 			if(!tag.externalId) {
 				log.info("Creating Category")
-				//check if key exists
-				def keyExists = tags.find {it.key.split(":")[0] == tag.name}
-				if(!keyExists) {
-					def x= NutanixPrismComputeUtility.createCategoryKey(client, authConfig, tag.name)
-				}
-				def categoryResults = NutanixPrismComputeUtility.createCategoryValue(client, authConfig, tag.name, tag.value)
+				// V4's categories API always creates key+value together in one call - no separate
+				// "create key" step exists (see createCategoryV4 doc comment).
+				def categoryResults = NutanixPrismComputeUtility.createCategoryV4(client, authConfig, tag.name, tag.value)
 				if(categoryResults.success) {
 					tag.externalId = "${tag.name}:${tag.value}"
 					tag.refType = 'ComputeZone'
