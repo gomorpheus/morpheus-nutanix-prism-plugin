@@ -48,6 +48,10 @@ class NutanixPrismV4Client {
 	// Cluster/host statistics are a separate "stats" sub-namespace (not on the config resource itself),
 	// queried per-entity with a time range / $statType, not paginated like list endpoints.
 	static final String CLUSTERMGMT_STATS_V4_BASE_PATH = 'api/clustermgmt/v4.0/stats'
+	// Snapshots ("recovery points" in V4) live in their own "dataprotection" namespace, not under
+	// vmm/prism - confirmed against Nutanix's published dataprotection v4.4 OpenAPI spec (the
+	// stable/GA version, unlike vmm which is still on a beta release for this plugin's other V4 work).
+	static final String DATAPROTECTION_V4_BASE_PATH = 'api/dataprotection/v4.4/config'
 
 	/**
 	 * Builds a VMM V4 REST path using the cloud's configured VMM API version
@@ -98,6 +102,10 @@ class NutanixPrismV4Client {
 
 	static String buildClusterMgmtStatsV4Path(String resourcePath) {
 		return "${CLUSTERMGMT_STATS_V4_BASE_PATH}/${resourcePath}"
+	}
+
+	static String buildDataProtectionV4Path(String resourcePath) {
+		return "${DATAPROTECTION_V4_BASE_PATH}/${resourcePath}"
 	}
 
 	static Map<String, String> buildV4Headers() {

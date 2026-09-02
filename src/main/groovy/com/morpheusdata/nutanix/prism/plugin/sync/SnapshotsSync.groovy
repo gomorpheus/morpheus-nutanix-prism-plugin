@@ -53,7 +53,7 @@ class SnapshotsSync {
 			def allResults = []
 			def success = true
 			for(int i = 0; i < clusters.size(); i++ ) {
-				def listResults = NutanixPrismComputeUtility.listSnapshots(apiClient, authConfig, clusters[i])
+				def listResults = NutanixPrismComputeUtility.listSnapshotsV4(apiClient, authConfig, clusters[i])
 				success &= listResults.success
 				if(listResults.success) {
 					allResults += listResults.data

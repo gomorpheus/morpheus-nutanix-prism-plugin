@@ -440,6 +440,10 @@ class NutanixPrismComputeUtility {
 	private static Map normalizeTaskV4(Map task) {
 		return [
 				status               : task.status,
+				// V4's completedTime is ISO-8601 (unlike V3's completion_time, which is also a string
+				// timestamp) - both are handed to DateUtility.parseDate/DateUtility-style parsing by
+				// callers (e.g. NutanixPrismSnapshotProvider), so no reshaping needed, just a rename.
+				completion_time      : task.completedTime,
 				entity_reference_list: (task.entitiesAffected ?: []).collect { ref ->
 					[kind: ref.rel?.tokenize(':')?.last(), uuid: ref.extId]
 				}
@@ -808,6 +812,125 @@ class NutanixPrismComputeUtility {
 			return ServiceResponse.error("Error restoring snapshot ${snapshotUuid}", null, results.data)
 		}
 	}
+
+	/**
+	 * NOT migrated - deliberately left on the V2 REST API (confirmed against Nutanix's published
+	 * dataprotection v4.4 OpenAPI spec, the stable/GA release for this domain). V4's only restore
+	 * action ({@code POST recovery-points/{extId}/$actions/restore}) always <b>creates a new VM</b>
+	 * from the recovery point (its task completion details literally return "created VM external
+	 * identifiers") - there is no in-place "revert this existing VM to snapshot state, same extId"
+	 * operation like V2's {@code vms/{uuid}/restore}. Callers of {@code restoreSnapshot}
+	 * ({@code revertSnapshot}, {@code restoreBackup}) assume the server's externalId is unchanged
+	 * after restore, which V4's create-a-new-VM model would break. This is a genuine product/UX
+	 * decision (surface a new VM after restore vs. keep reverting in place), not a migration task -
+	 * left on V2 (which is REST, not SDK, so this does not block SDK removal) until revisited.
+	 */
+
+	/**
+	 * Lists snapshots ("recovery points" in V4) via the Nutanix Data Protection V4 REST API
+	 * (confirmed against the published dataprotection v4.4 OpenAPI spec - the stable/GA version,
+	 * unlike vmm which is still on a beta release for this plugin's other V4 work). Cluster scoping,
+	 * done via a {@code proxyClusterUuid} query param in V2, has no equivalent path/query param in V4
+	 * ({@code X-Cluster-Id} is unrelated - it selects "AOS" vs "MST" cluster *type*, not a specific
+	 * cluster) - instead uses the documented OData {@code $filter} expression
+	 * {@code sourceLocation/clusterExtIds/any(a:a eq '<uuid>')}.
+	 */
+	static ServiceResponse listSnapshotsV4(HttpApiClient client, Map authConfig, String clusterUuid) {
+		log.debug("listSnapshotsV4")
+		ServiceResponse result = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildDataProtectionV4Path("recovery-points"), authConfig,
+				['$filter': "sourceLocation/clusterExtIds/any(a:a eq '${clusterUuid}')".toString()])
+		if (result.success) {
+			result.data = (result.data ?: []).collect { normalizeSnapshotV4(it) }
+		}
+		return result
+	}
+
+	static ServiceResponse getSnapshotV4(HttpApiClient client, Map authConfig, String clusterUuid, String snapshotUuid) {
+		log.debug("getSnapshotV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildDataProtectionV4Path("recovery-points/${snapshotUuid}"), authConfig)
+		if (result.success) {
+			result.data = normalizeSnapshotV4(result.data)
+		}
+		return result
+	}
+
+	/**
+	 * Normalizes a V4 {@code RecoveryPoint} into the exact shape V3 callers (built around V2's
+	 * {@code snapshot} resource) already read: {@code uuid}, {@code snapshot_name}, {@code vm_uuid},
+	 * {@code created_time} (epoch microseconds). This plugin only ever creates one VM per recovery
+	 * point (see {@link #createSnapshotV4}), so {@code vmRecoveryPoints[0]} is always the relevant one -
+	 * V4 technically supports up to 32 VM/volume-group recovery points per top-level recovery point
+	 * (consistency groups), which this plugin does not use.
+	 */
+	private static Map normalizeSnapshotV4(Map recoveryPoint) {
+		Long createdTimeMicros = null
+		if (recoveryPoint.creationTime) {
+			// V4's creationTime is RFC-3339 (e.g. "2024-01-15T10:30:00.123456+00:00"), not one of the
+			// fixed string lengths DateUtility.parseDate(CharSequence) special-cases - OffsetDateTime
+			// is the standards-compliant parser already used elsewhere in this file (see getVmStatsV4).
+			createdTimeMicros = OffsetDateTime.parse(recoveryPoint.creationTime as String).toInstant().toEpochMilli() * 1000
+		}
+		return [
+				uuid         : recoveryPoint.extId,
+				snapshot_name: recoveryPoint.name,
+				vm_uuid      : recoveryPoint.vmRecoveryPoints?.getAt(0)?.vmExtId,
+				created_time : createdTimeMicros
+		]
+	}
+
+	/**
+	 * Creates a snapshot ("recovery point" in V4) via the Data Protection V4 REST API. Like V2's
+	 * {@code createSnapshot}, this returns a task reference rather than the created resource
+	 * immediately - normalized to the same flat {@code {task_uuid}} shape V2 already returned (V2's
+	 * snapshot create was already task-based, unlike V3 SDK-shaped creates elsewhere in this plugin),
+	 * so existing call sites reading {@code snapshotResult?.data?.task_uuid} need no restructuring,
+	 * only a {@code checkTaskReady} -&gt; {@link #checkTaskReadyV4} swap. Always creates a
+	 * crash-consistent recovery point (matching V2's behavior - this plugin has never exposed an
+	 * application-consistent snapshot option).
+	 * <b>Not independently verified against a live task response:</b> the created recovery point's
+	 * {@code extId} is found via {@code entity_reference_list[].kind == 'recoverypoint'}, inferred
+	 * from the {@code Task.entitiesAffected[].rel} format the same way as {@code createImageV4}'s
+	 * {@code kind == 'image'} guess - no live Prism Central instance was available to confirm the
+	 * exact {@code rel} string for a recovery-point creation task.
+	 */
+	static ServiceResponse createSnapshotV4(HttpApiClient client, Map authConfig, String clusterUuid, String vmUuid, String snapshotName) {
+		log.debug("createSnapshotV4")
+		def body = [
+				name              : snapshotName,
+				recoveryPointType : 'CRASH_CONSISTENT',
+				vmRecoveryPoints  : [[vmExtId: vmUuid]]
+		]
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildDataProtectionV4Path("recovery-points"), authConfig, [:], 'POST', body)
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Deletes a snapshot ("recovery point" in V4) via the Data Protection V4 REST API. Like
+	 * {@link #createSnapshotV4}, normalized to the same flat {@code {task_uuid}} shape V2 already
+	 * returned, so existing call sites need only a {@code checkTaskReady} -&gt; {@link #checkTaskReadyV4}
+	 * swap.
+	 */
+	static ServiceResponse deleteSnapshotV4(HttpApiClient client, Map authConfig, String clusterUuid, String snapshotUuid) {
+		log.debug("deleteSnapshotV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildDataProtectionV4Path("recovery-points/${snapshotUuid}"), authConfig, [:], 'DELETE')
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * NOT migrated - deliberately left on the V2 REST API, for the same reason as
+	 * {@link #restoreSnapshot}: this clones a new VM from a snapshot with CPU/memory/cloud-init
+	 * overrides (V2 {@code snapshots/{uuid}/clone}). V4's equivalent mechanism (restore-with-override,
+	 * {@code VmConfigOverrideSpecification}) only supports overriding name/description/categories/
+	 * NIC/project on the newly-created VM - it has no fields for vCPU count, memory size, or
+	 * cloud-init user data, all of which this method's callers rely on. Confirmed by inspecting the
+	 * full override spec schema in the dataprotection v4.4 spec.
+	 */
 
 	static ServiceResponse listTemplates(HttpApiClient client, Map authConfig) {
 		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion

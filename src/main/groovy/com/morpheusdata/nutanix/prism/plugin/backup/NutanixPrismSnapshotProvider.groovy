@@ -132,7 +132,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			def x = getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old; sudo rm -f /etc/machine-id; sudo touch /etc/machine-id ; sync ; sync ; sleep 5', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
 		}
 
-		def snapshotResult = NutanixPrismComputeUtility.createSnapshot(client, authConfig, server.resourcePool?.externalId, vmUuid, snapshotName)
+		def snapshotResult = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, server.resourcePool?.externalId, vmUuid, snapshotName)
 		def taskId = snapshotResult?.data?.task_uuid
 
 		if(snapshotResult.success && taskId) {
@@ -174,12 +174,12 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 
 					log.debug("refreshBackupResult snapshot task ID: ${taskId}")
 					if(taskId) {
-						def taskResults = NutanixPrismComputeUtility.getTask(client, authConfig, taskId)
+						def taskResults = NutanixPrismComputeUtility.getTaskV4(client, authConfig, taskId)
 						if(taskResults?.data?.status == "SUCCEEDED"){
 							log.debug("snapshot complete ${taskId}")
 							if(taskResults.success && taskResults.data){
-								def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}?.uuid
-								def snapshotResp = NutanixPrismComputeUtility.getSnapshot(client, authConfig, computeServer?.resourcePool?.externalId, snapshotUuid)
+								def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'recoverypoint'}?.uuid
+								def snapshotResp = NutanixPrismComputeUtility.getSnapshotV4(client, authConfig, computeServer?.resourcePool?.externalId, snapshotUuid)
 								def snapshot = snapshotResp.data
 								log.debug("Snapshot details: ${snapshot}")
 								if(snapshotResp.success && snapshot && !rtn.data.backupResult.externalId) {
@@ -265,7 +265,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 				if(cloud && computeServerId) {
 					def computeServer = getPlugin().morpheus.async.computeServer.get(computeServerId).blockingGet()
 					def clusterId = computeServer?.resourcePool?.externalId ?: backupResult.getConfigProperty('instanceConfig')?.config?.clusterName ?: backupResult.getConfigProperty('instanceConfig')?.vmwareResourcePoolId
-					def resp = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, clusterId, snapshotId)
+					def resp = NutanixPrismComputeUtility.deleteSnapshotV4(client, authConfig, clusterId, snapshotId)
 					log.debug("Delete snapshot resp: ${resp}")
 					if(resp.success) { //ignore snapshots already removed
 						log.debug("Delete successful")

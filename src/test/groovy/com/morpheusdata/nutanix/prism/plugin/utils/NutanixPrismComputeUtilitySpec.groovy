@@ -454,4 +454,79 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		def vm2 = result.data.find { it.entity_id == 'vm-2' }
 		NutanixPrismComputeUtility.getGroupEntityValue(vm2.data, 'memory_usage_ppm') == 200000
 	}
+
+	void "listSnapshotsV4 calls the dataprotection V4 recovery-points endpoint filtered by cluster and normalizes to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listSnapshotsV4(client, authConfig, 'cluster-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points', authConfig.username, authConfig.password, {
+			it.queryParams['$filter'] == "sourceLocation/clusterExtIds/any(a:a eq 'cluster-1')"
+		}, 'GET') >> ServiceResponse.success([
+				data    : [[
+						extId            : 'rp-1',
+						name             : 'server1.123456',
+						creationTime     : '2024-01-15T10:30:00Z',
+						vmRecoveryPoints : [[vmExtId: 'vm-1']]
+				]],
+				metadata: [totalAvailableResults: 1]
+		])
+		result.success
+		result.data.size() == 1
+		def snapshot = result.data[0]
+		snapshot.uuid == 'rp-1'
+		snapshot.snapshot_name == 'server1.123456'
+		snapshot.vm_uuid == 'vm-1'
+		snapshot.created_time == 1705314600000L * 1000
+	}
+
+	void "getSnapshotV4 calls the dataprotection V4 recovery-points endpoint for a single snapshot and normalizes to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.getSnapshotV4(client, authConfig, 'cluster-1', 'rp-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points/rp-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [extId: 'rp-1', name: 'server1.123456', creationTime: '2024-01-15T10:30:00Z', vmRecoveryPoints: [[vmExtId: 'vm-1']]]
+		])
+		result.success
+		result.data.uuid == 'rp-1'
+		result.data.snapshot_name == 'server1.123456'
+		result.data.vm_uuid == 'vm-1'
+	}
+
+	void "createSnapshotV4 posts a crash-consistent recovery point body and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, 'cluster-1', 'vm-1', 'server1.123456')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points', authConfig.username, authConfig.password, {
+			it.body.name == 'server1.123456' &&
+			it.body.recoveryPointType == 'CRASH_CONSISTENT' &&
+			it.body.vmRecoveryPoints == [[vmExtId: 'vm-1']]
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "deleteSnapshotV4 calls DELETE on the dataprotection V4 recovery-points endpoint and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.deleteSnapshotV4(client, authConfig, 'cluster-1', 'rp-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points/rp-1', authConfig.username, authConfig.password, _, 'DELETE') >> ServiceResponse.success([data: [extId: 'task-2']])
+		result.success
+		result.data.task_uuid == 'task-2'
+	}
 }

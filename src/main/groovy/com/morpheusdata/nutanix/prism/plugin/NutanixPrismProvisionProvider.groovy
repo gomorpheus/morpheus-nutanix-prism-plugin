@@ -520,14 +520,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		def snapshotName = opts.snapshotName ?: "${server.name}.${System.currentTimeMillis()}"
 		log.debug("Executing Nutanix Prism Central snapshot for ${server?.name}")
-		def snapshotResult = NutanixPrismComputeUtility.createSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshotName)
+		def snapshotResult = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshotName)
 		def taskId = snapshotResult?.data?.task_uuid
-		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+		def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 		log.debug("Snapshot results: ${taskResults}")
 		if(taskResults.success) {
-			def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'snapshot'}?.uuid
+			def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'recoverypoint'}?.uuid
 			if(snapshotUuid) {
-				def rawSnapshot = NutanixPrismComputeUtility.getSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshotUuid)
+				def rawSnapshot = NutanixPrismComputeUtility.getSnapshotV4(client, authConfig, server?.resourcePool?.externalId, snapshotUuid)
 				Date createdDate = null
 				if(rawSnapshot?.data?.created_time) {
 					long milliseconds = TimeUnit.MICROSECONDS.toMillis(rawSnapshot?.data?.created_time)
@@ -568,9 +568,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		Boolean success = true
 		for(int i = 0; i < snapshots.size(); i++) {
 			SnapshotIdentityProjection snapshot = snapshots[i]
-			def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
+			def snapshotResult = NutanixPrismComputeUtility.deleteSnapshotV4(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
 			def taskId = snapshotResult?.data?.task_uuid
-			def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+			def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 			success &= taskResults.success
 			if(!taskResults.success) {
 				log.error("API error deleting snapshot ${taskResults}")
@@ -589,9 +589,9 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		ComputeServer server = morpheusContext.async.computeServer.get(opts.serverId).blockingGet()
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		log.debug("Deleting Nutanix Prism Central Snapshot ${snapshot.name}")
-		def snapshotResult = NutanixPrismComputeUtility.deleteSnapshot(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
+		def snapshotResult = NutanixPrismComputeUtility.deleteSnapshotV4(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
 		def taskId = snapshotResult?.data?.task_uuid
-		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+		def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 		log.debug("Snapshot delete results : ${taskResults}")
 		if(taskResults.success) {
 			return ServiceResponse.success()
