@@ -1,5 +1,6 @@
 package com.morpheusdata.nutanix.prism.plugin.utils
 
+import com.morpheusdata.core.util.ComputeUtility
 import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.response.ServiceResponse
 import spock.lang.Specification
@@ -316,5 +317,86 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/images/image-1', authConfig.username, authConfig.password, _, 'DELETE') >> ServiceResponse.success([data: [extId: 'task-3']])
 		result.success
 		result.data.status.execution_context.task_uuid == 'task-3'
+	}
+
+	void "listTemplates calls the vmm V4 content templates endpoint and fetches full vmSpec per template on the stable API version"() {
+		given:
+		def client = Mock(HttpApiClient)
+		authConfig.vmmApiVersion = NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
+
+		when:
+		def result = NutanixPrismComputeUtility.listTemplates(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/templates', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [[extId: 'template-1', templateName: 'CentOS Template', templateVersionSpec: [vmSpec: null]]]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/templates/template-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [extId: 'template-1', templateVersionSpec: [vmSpec: [disks: [[extId: 'disk-1', diskAddress: [busType: 'SCSI', index: 0], backingInfo: [diskSizeBytes: 1073741824, storageContainer: [extId: 'container-1']]]]]]]
+		])
+		result.success
+		result.data.data[0].templateName == 'CentOS Template'
+		result.data.data[0].templateVersionSpec.vmSpec.disk_list.size() == 1
+		result.data.data[0].templateVersionSpec.vmSpec.disk_list[0].disk_size_bytes == 1073741824
+		result.data.data[0].templateVersionSpec.vmSpec.disk_list[0].storage_config.storage_container_reference.uuid == 'container-1'
+	}
+
+	void "listTemplates calls the preview vmm V4 templates endpoint and expands vmSpec inline on the a1 API version"() {
+		given:
+		def client = Mock(HttpApiClient)
+		authConfig.vmmApiVersion = NutanixPrismComputeUtility.VMM_API_VERSION.V4_0_A1
+
+		when:
+		def result = NutanixPrismComputeUtility.listTemplates(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0.a1/templates', authConfig.username, authConfig.password, { it.queryParams['$expand'] == 'vmSpec' }, 'GET') >> ServiceResponse.success([
+				data: [[extId: 'template-1', templateName: 'CentOS Template', templateVersionSpec: [vmSpec: '{"spec":{"resources":{"disk_list":[{"extId":"disk-1"}]}}}']]]
+		])
+		result.success
+		result.data.data[0].templateVersionSpec.vmSpec.disk_list.size() == 1
+		result.data.data[0].templateVersionSpec.vmSpec.disk_list[0].extId == 'disk-1'
+	}
+
+	void "getTemplate calls the vmm V4 content templates endpoint for a single template and normalizes the vmSpec disk list"() {
+		given:
+		def client = Mock(HttpApiClient)
+		authConfig.vmmApiVersion = NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
+
+		when:
+		def result = NutanixPrismComputeUtility.getTemplate(client, authConfig, 'template-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/templates/template-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [extId: 'template-1', templateVersionSpec: [vmSpec: [disks: [[extId: 'disk-1', diskAddress: [busType: 'SCSI', index: 0], backingInfo: [diskSizeBytes: 2147483648, storageContainer: [extId: 'container-1']]]]]]]
+		])
+		result.success
+		result.data.data.templateVersionSpec.vmSpec.disk_list[0].disk_size_bytes == 2147483648
+	}
+
+	void "createVmFromTemplate posts a deploy action to the vmm V4 content templates endpoint"() {
+		given:
+		def client = Mock(HttpApiClient)
+		authConfig.vmmApiVersion = NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
+		def runConfig = [
+				imageExternalId : 'template-1',
+				clusterReference: [uuid: 'cluster-1'],
+				name            : 'new-vm',
+				numSockets      : 1,
+				coresPerSocket  : 2,
+				maxMemory       : 4096l * ComputeUtility.ONE_MEGABYTE,
+				nicList         : []
+		]
+
+		when:
+		def result = NutanixPrismComputeUtility.createVmFromTemplate(client, authConfig, runConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/content/templates/template-1/$actions/deploy', authConfig.username, authConfig.password, {
+			it.body.clusterReference == 'cluster-1' &&
+			it.body.vmName == 'new-vm' &&
+			it.body.overrideVmConfigMap['0'].numSockets == 1
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
 	}
 }
