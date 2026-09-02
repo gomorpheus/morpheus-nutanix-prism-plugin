@@ -153,4 +153,52 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		vm.status.resources.disk_list[0].device_properties.device_type == 'DISK'
 		vm.status.resources.disk_list[0].device_properties.disk_address.device_index == 0
 	}
+
+	void "listNetworksV4 calls the networking V4 subnets endpoint and normalizes to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listNetworksV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/networking/v4.0/config/subnets', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[
+						extId           : 'subnet-1',
+						name            : 'VLAN 100',
+						clusterReference: 'cluster-1',
+						vpcReference    : 'vpc-1',
+						subnetType      : 'VLAN',
+						ipConfig        : [[ipv4: [ipSubnet: [ip: [value: '10.0.0.0'], prefixLength: 24]]]]
+				]],
+				metadata: [totalAvailableResults: 1]
+		])
+		result.success
+		result.data.size() == 1
+		def subnet = result.data[0]
+		subnet.metadata.uuid == 'subnet-1'
+		subnet.status.name == 'VLAN 100'
+		subnet.status.cluster_reference.uuid == 'cluster-1'
+		subnet.status.resources.subnet_type == 'VLAN'
+		subnet.status.resources.ip_config.subnet_ip
+		subnet.spec.resources.vpc_reference.uuid == 'vpc-1'
+	}
+
+	void "listVPCsV4 calls the networking V4 vpcs endpoint and normalizes to the V3 shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listVPCsV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/networking/v4.0/config/vpcs', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[extId: 'vpc-1', name: 'VPC One']],
+				metadata: [totalAvailableResults: 1]
+		])
+		result.success
+		result.data.size() == 1
+		result.data[0].spec.name == 'VPC One'
+		result.data[0].metadata.uuid == 'vpc-1'
+	}
 }

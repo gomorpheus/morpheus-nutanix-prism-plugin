@@ -194,7 +194,7 @@ class VirtualPrivateCloudSync {
 		log.debug "getVPCs"
 		def rtn = [success: true, data: []]
 		try {
-			ServiceResponse listResult = NutanixPrismComputeUtility.listVPCs(apiClient, authConfig)
+			ServiceResponse listResult = NutanixPrismComputeUtility.listVPCsV4(apiClient, authConfig)
 			if (listResult.success) {
 				def vpcs =  listResult.data?.collect { [name: it.spec?.name, externalId: it.metadata?.uuid]}
 				if(vpcList?.size() > 0) {

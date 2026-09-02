@@ -242,7 +242,7 @@ class NetworksSync {
 		log.debug "getNetworks"
 		def rtn = [success: true, data: []]
 		try {
-			ServiceResponse listResult = NutanixPrismComputeUtility.listNetworks(apiClient, authConfig)
+			ServiceResponse listResult = NutanixPrismComputeUtility.listNetworksV4(apiClient, authConfig)
 			if (listResult.success) {
 				def networks = listResult.data
 				if(networkList?.size() > 0) {

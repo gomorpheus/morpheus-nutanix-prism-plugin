@@ -833,6 +833,49 @@ class NutanixPrismComputeUtility {
 		return callListApi(client, 'subnet', 'subnets/list', authConfig)
 	}
 
+	/**
+	 * Lists subnets via the Networking V4 REST API (confirmed against Nutanix's published networking
+	 * v4.0.b1 OpenAPI spec - Subnet, IPConfig, IPv4Config schemas). Normalizes each V4 Subnet entity into
+	 * the same shape the V3 {@code listNetworks}/{@code NetworksSync} consumers already expect:
+	 * <ul>
+	 *   <li>V4 {@code extId} -&gt; V3 {@code metadata.uuid}</li>
+	 *   <li>V4 {@code name} -&gt; V3 {@code status.name}</li>
+	 *   <li>V4 {@code clusterReference} (plain extId string) -&gt; V3 {@code status.cluster_reference.uuid}</li>
+	 *   <li>V4 {@code subnetType} (enum "OVERLAY"/"VLAN") -&gt; V3 {@code status.resources.subnet_type} (values already match)</li>
+	 *   <li>V4 {@code ipConfig[0].ipv4.ipSubnet} -&gt; V3 {@code status.resources.ip_config.subnet_ip} (only used as a
+	 *       truthy "is this subnet managed" check by the caller, so passing the raw sub-object through is sufficient)</li>
+	 *   <li>V4 {@code vpcReference} (plain extId string) -&gt; V3 {@code spec.resources.vpc_reference.uuid}</li>
+	 * </ul>
+	 */
+	static ServiceResponse listNetworksV4(HttpApiClient client, Map authConfig) {
+		log.debug("listNetworksV4")
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildNetworkingV4Path('subnets'), authConfig)
+		if (listResult.success) {
+			listResult.data = listResult.data?.collect { subnet -> normalizeSubnetV4(subnet) }
+		}
+		return listResult
+	}
+
+	private static Map normalizeSubnetV4(Map subnet) {
+		def ipv4Config = subnet.ipConfig?.find { it.ipv4 }?.ipv4
+		return [
+				metadata: [uuid: subnet.extId],
+				status  : [
+						name     : subnet.name,
+						cluster_reference: [uuid: subnet.clusterReference],
+						resources: [
+								subnet_type: subnet.subnetType,
+								ip_config  : [subnet_ip: ipv4Config?.ipSubnet]
+						]
+				],
+				spec    : [
+						resources: [
+								vpc_reference: [uuid: subnet.vpcReference]
+						]
+				]
+		]
+	}
+
 	static ServiceResponse listImages(HttpApiClient client, Map authConfig) {
 		log.debug("listImages")
 		return callListApi(client, 'image', 'images/list', authConfig)
@@ -920,6 +963,24 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse listVPCs(HttpApiClient client, Map authConfig) {
 		log.debug("listVPCs")
 		return callListApi(client, 'vpc', 'vpcs/list', authConfig)
+	}
+
+	/**
+	 * Lists VPCs via the Networking V4 REST API (confirmed against Nutanix's published networking v4.0.b1
+	 * OpenAPI spec - Vpc schema). Normalizes each V4 Vpc entity into the same shape the V3
+	 * {@code listVPCs}/{@code VirtualPrivateCloudSync} consumers already expect:
+	 * <ul>
+	 *   <li>V4 {@code name} -&gt; V3 {@code spec.name}</li>
+	 *   <li>V4 {@code extId} -&gt; V3 {@code metadata.uuid}</li>
+	 * </ul>
+	 */
+	static ServiceResponse listVPCsV4(HttpApiClient client, Map authConfig) {
+		log.debug("listVPCsV4")
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildNetworkingV4Path('vpcs'), authConfig)
+		if (listResult.success) {
+			listResult.data = listResult.data?.collect { vpc -> [spec: [name: vpc.name], metadata: [uuid: vpc.extId]] }
+		}
+		return listResult
 	}
 
 	static ServiceResponse listProjects(HttpApiClient client, Map authConfig) {
