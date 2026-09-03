@@ -924,4 +924,50 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.success
 		result.data.task_uuid == 'task-2'
 	}
+
+	void "createCdRomV4 posts a new CD-ROM with the given index and image reference, normalizing the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.createCdRomV4(client, authConfig, 'vm-1', 0, 'image-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1/cd-roms', authConfig.username, authConfig.password, {
+			it.body.diskAddress == [busType: 'SATA', index: 0] &&
+			it.body.backingInfo.dataSource.reference.imageExtId == 'image-1'
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "insertCdRomV4 posts the image reference to the vmm V4 cd-roms insert action, normalizing the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.insertCdRomV4(client, authConfig, 'vm-1', 'cdrom-1', 'image-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1/cd-roms/cdrom-1/$actions/insert', authConfig.username, authConfig.password, {
+			it.body.backingInfo.dataSource.reference.imageExtId == 'image-1'
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "ejectCdRomV4 posts to the vmm V4 cd-roms eject action with no request body, normalizing the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.ejectCdRomV4(client, authConfig, 'vm-1', 'cdrom-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1/cd-roms/cdrom-1/$actions/eject', authConfig.username, authConfig.password, {
+			it.body == [:]
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
 }

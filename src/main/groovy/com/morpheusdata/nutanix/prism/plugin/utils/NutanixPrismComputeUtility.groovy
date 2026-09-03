@@ -2055,6 +2055,126 @@ class NutanixPrismComputeUtility {
 		return ServiceResponse.success()
 	}
 
+	/**
+	 * Creates a new CD-ROM device on a VM via the VMM V4 REST API's dedicated CD-ROM resource
+	 * (confirmed against Nutanix's published vmm v4.3 OpenAPI spec - {@code POST
+	 * vms/{vmExtId}/cd-roms}). Unlike V3 (where CD-ROMs were just disk_list entries with
+	 * device_type "CDROM"), V4 gives CD-ROMs their own {@code cdRoms[]} array/resource, so no
+	 * full-VM PUT/ETag is needed - just a body with {@code diskAddress}/{@code backingInfo.dataSource}.
+	 * Async, normalized to {@code {task_uuid}} like other V4 mutations.
+	 */
+	static ServiceResponse createCdRomV4(HttpApiClient client, Map authConfig, String vmUuid, Integer index, String imageUuid) {
+		log.debug("createCdRomV4")
+		def body = [
+				diskAddress: [busType: 'SATA', index: index],
+				backingInfo: [
+						dataSource: [
+								reference: [
+										"\$objectType": "vmm.v4.ahv.config.ImageReference",
+										imageExtId   : imageUuid
+								]
+						]
+				]
+		]
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/cd-roms"), authConfig, [:], 'POST', body)
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Inserts an ISO into an existing CD-ROM device via the VMM V4 REST API's dedicated insert
+	 * action (confirmed against the vmm v4.3 spec - {@code POST
+	 * vms/{vmExtId}/cd-roms/{extId}/$actions/insert}). No ETag/If-Match needed. Async, normalized
+	 * to {@code {task_uuid}}.
+	 */
+	static ServiceResponse insertCdRomV4(HttpApiClient client, Map authConfig, String vmUuid, String cdromExtId, String imageUuid) {
+		log.debug("insertCdRomV4")
+		def body = [
+				backingInfo: [
+						dataSource: [
+								reference: [
+										"\$objectType": "vmm.v4.ahv.config.ImageReference",
+										imageExtId   : imageUuid
+								]
+						]
+				]
+		]
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/cd-roms/${cdromExtId}/\$actions/insert"), authConfig, [:], 'POST', body)
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Ejects the ISO from a CD-ROM device via the VMM V4 REST API's dedicated eject action
+	 * (confirmed against the vmm v4.3 spec - {@code POST vms/{vmExtId}/cd-roms/{extId}/$actions/eject}).
+	 * No ETag/If-Match needed. Async, normalized to {@code {task_uuid}}.
+	 */
+	static ServiceResponse ejectCdRomV4(HttpApiClient client, Map authConfig, String vmUuid, String cdromExtId) {
+		log.debug("ejectCdRomV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/cd-roms/${cdromExtId}/\$actions/eject"), authConfig, [:], 'POST', [:])
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * V4 equivalent of {@code cloudInitViaCD} - attaches the cloud-init/unattend ISO to a VM's
+	 * CD-ROM. V4's {@code cdRoms[]} is a separate array/resource from {@code disks[]} (unlike V3
+	 * where CD-ROMs lived in {@code disk_list} alongside real disks), so this fetches the VM once
+	 * via {@link #getVmV4} just to find an existing CD-ROM's extId/next free index - the actual
+	 * mutation goes through {@link #insertCdRomV4}/{@link #createCdRomV4}, not a full-VM PUT, so no
+	 * ETag is needed for the mutation itself. Polls the returned task before returning.
+	 */
+	static ServiceResponse cloudInitViaCDV4(HttpApiClient client, Map authConfig, String vmUuid, String imageUuid) {
+		log.debug("cloudInitViaCDV4")
+		def vmDetail = getVmV4(client, authConfig, vmUuid)
+		if (!vmDetail.success) {
+			return ServiceResponse.error("Error fetching vm ${vmUuid} to attach cloud-init ISO", null, vmDetail.data)
+		}
+		def cdRoms = vmDetail.data?.cdRoms ?: []
+		def existingCdRom = cdRoms ? cdRoms[0] : null
+		ServiceResponse result
+		if (existingCdRom?.extId) {
+			result = insertCdRomV4(client, authConfig, vmUuid, existingCdRom.extId as String, imageUuid)
+		} else {
+			def nextIndex = (cdRoms.collect { it.diskAddress?.index ?: 0 }.max() ?: -1) + 1
+			result = createCdRomV4(client, authConfig, vmUuid, nextIndex, imageUuid)
+		}
+		if (result.success && result.data?.task_uuid) {
+			NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, result.data.task_uuid)
+		}
+		return result
+	}
+
+	/**
+	 * V4 equivalent of {@code ejectCdrom} - ejects any ISO currently inserted in the VM's CD-ROM(s)
+	 * via {@link #ejectCdRomV4}, one action call per CD-ROM found (V4 has no "eject all" action).
+	 * Best-effort, matching V3's semantics: returns success (no-op) if the VM fetch fails or no
+	 * CD-ROMs are attached.
+	 */
+	static ServiceResponse ejectCdromV4(HttpApiClient client, Map authConfig, String vmUuid) {
+		log.debug("ejectCdromV4")
+		def vmDetail = getVmV4(client, authConfig, vmUuid)
+		if (!vmDetail.success) {
+			return ServiceResponse.success()
+		}
+		def cdRoms = vmDetail.data?.cdRoms ?: []
+		ServiceResponse lastResult = ServiceResponse.success()
+		cdRoms.each { cdrom ->
+			def result = ejectCdRomV4(client, authConfig, vmUuid, cdrom.extId as String)
+			if (result.success && result.data?.task_uuid) {
+				NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, result.data.task_uuid)
+			}
+			lastResult = result
+		}
+		return lastResult
+	}
+
 	private static ServiceResponse callListApi(HttpApiClient client, String kind, String path, Map authConfig) {
 		log.debug("callListApi: kind ${kind}, path: ${path}")
 		def rtn = new ServiceResponse(success: false)

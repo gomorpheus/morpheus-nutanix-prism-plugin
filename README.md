@@ -7,13 +7,13 @@ This plugin provides a full integration between [Nutanix Prism Central](https://
 | Component | Minimum Version |
 |-----------|----------------|
 | Morpheus | 9.0.0 |
-| Nutanix Prism Central | pc.7.3 |
-| Nutanix AOS | 7.3 |
+| Nutanix Prism Central | pc.7.6 |
+| Nutanix AOS | 7.6 |
 | Nutanix AHV | 10.3 |
 | Nutanix NCC | 4.6.0 |
 
 > **Note:** As of the V4 REST migration, this plugin standardizes on the Nutanix `vmm` v4.3 API
-> (required for VM-level project scoping). Environments below pc.7.3/AOS 7.3/AHV 10.3 are not
+> (required for VM-level project scoping). Environments below pc.7.6/AOS 7.6/AHV 10.3 are not
 > supported.
 
 ## Installation

@@ -810,7 +810,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			def guestCustomized = server?.getConfigProperty("guestCustomized")
 			if(guestCustomized?.toString()?.toBoolean() == true) {
 				log.info("Ejecting any existing CDROM disks")
-				NutanixPrismComputeUtility.ejectCdrom(client, authConfig, vmId)
+				NutanixPrismComputeUtility.ejectCdromV4(client, authConfig, vmId)
 			}
 
 			def serverDetails = NutanixPrismComputeUtility.getVm(client, authConfig, vmId)
@@ -2305,7 +2305,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						server.internalId = server.externalId
 						server = saveAndGet(server)
 					}
-					def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
 					if(insertIso) {
 						def byteArray = morpheusContext.services.provision.buildIsoOutputStream(runConfig.isSysprep as Boolean, runConfig.serverOs?.platform, cloudConfigMeta, cloudConfigUser, cloudConfigNetwork)
 						def isoStream = new ByteArrayInputStream(byteArray)
@@ -2342,8 +2341,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							} else {
 								log.debug "Error configuring cloud-init - failed to upload iso"
 							}
-							def cloudInitResults = NutanixPrismComputeUtility.cloudInitViaCD(client, authConfig, server.externalId, imageExternalId, vmResource.data)
-							vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
+							def cloudInitResults = NutanixPrismComputeUtility.cloudInitViaCDV4(client, authConfig, server.externalId, imageExternalId)
 							log.debug("cloudInitResults: ${cloudInitResults}")
 						} else {
 							log.debug "Error configuring cloud-init - no appliance url"
