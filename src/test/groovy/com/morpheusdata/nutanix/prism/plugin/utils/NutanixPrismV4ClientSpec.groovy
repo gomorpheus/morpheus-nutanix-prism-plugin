@@ -30,21 +30,9 @@ class NutanixPrismV4ClientSpec extends Specification {
 		'ClusterMgmt'  | { String p -> NutanixPrismV4Client.buildClusterMgmtV4Path(p) }         | 'api/clustermgmt/v4.0/config/clusters'
 	}
 
-	void "buildVmmV4Path defaults to V4_0 when authConfig has no vmmApiVersion set"() {
+	void "buildVmmV4Path is hardcoded to v4.3 regardless of authConfig"() {
 		expect:
-		NutanixPrismV4Client.buildVmmV4Path([:], 'vms') == 'api/vmm/v4.0/ahv/config/vms'
-	}
-
-	@Unroll
-	void "buildVmmV4Path uses the cloud-configured VMM API version #apiVersion"() {
-		expect:
-		NutanixPrismV4Client.buildVmmV4Path([vmmApiVersion: apiVersion], 'vms') == expectedPath
-
-		where:
-		apiVersion                                                       | expectedPath
-		NutanixPrismComputeUtility.VMM_API_VERSION.V4_0_A1               | 'api/vmm/v4.0.a1/ahv/config/vms'
-		NutanixPrismComputeUtility.VMM_API_VERSION.V4_0_B1               | 'api/vmm/v4.0.b1/ahv/config/vms'
-		NutanixPrismComputeUtility.VMM_API_VERSION.V4_0                  | 'api/vmm/v4.0/ahv/config/vms'
+		NutanixPrismV4Client.buildVmmV4Path('vms') == 'api/vmm/v4.3/ahv/config/vms'
 	}
 
 	void "buildV4Headers returns JSON content type"() {

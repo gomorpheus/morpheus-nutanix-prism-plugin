@@ -132,7 +132,11 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			def x = getPlugin().morpheus.executeCommandOnServer(server, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old; sudo rm -f /etc/machine-id; sudo touch /etc/machine-id ; sync ; sync ; sleep 5', false, server.sshUsername, server.sshPassword, null, null, null, null, true, true).blockingGet()
 		}
 
-		def snapshotResult = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, server.resourcePool?.externalId, vmUuid, snapshotName)
+		// look up the VM's current project (if any) so it can be preserved on the recovery point -
+		// V4 does not default this itself if the source VM belongs to a project (see gap C4)
+		def vmResult = NutanixPrismComputeUtility.getVm(client, authConfig, vmUuid)
+		def projectExtId = vmResult?.data?.metadata?.project_reference?.uuid
+		def snapshotResult = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, server.resourcePool?.externalId, vmUuid, snapshotName, projectExtId)
 		def taskId = snapshotResult?.data?.task_uuid
 
 		if(snapshotResult.success && taskId) {
@@ -322,7 +326,13 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 				Cloud cloud = computeServer.cloud
 				HttpApiClient client = new HttpApiClient()
 				Map authConfig = plugin.getAuthConfig(cloud)
-				def restoreResults = NutanixPrismComputeUtility.restoreSnapshot(client, authConfig, computeServer.resourcePool?.externalId, computeServer.externalId, snapshotId)
+				// V4's revert action requires the *per-VM* recovery point's own extId, not the
+				// top-level recovery point extId stored as snapshotId - see normalizeSnapshotV4
+				def rawSnapshot = NutanixPrismComputeUtility.getSnapshotV4(client, authConfig, computeServer.resourcePool?.externalId, snapshotId)
+				def vmRecoveryPointExtId = rawSnapshot?.data?.vm_recovery_point_uuid
+				def restoreResults = vmRecoveryPointExtId ?
+						NutanixPrismComputeUtility.revertVmV4(client, authConfig, computeServer.externalId, vmRecoveryPointExtId) :
+						ServiceResponse.error("Unable to determine VM recovery point for snapshot ${snapshotId}", null, rawSnapshot)
 				log.info("restore results: ${restoreResults}")
 				def taskId = restoreResults?.data?.task_uuid
 				if(restoreResults.success){
@@ -361,7 +371,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 			def cloud = computeServer.cloud
 			HttpApiClient client = new HttpApiClient()
 			Map authConfig = plugin.getAuthConfig(cloud)
-			def taskResults = NutanixPrismComputeUtility.getTask(client, authConfig, taskId)
+			def taskResults = NutanixPrismComputeUtility.getTaskV4(client, authConfig, taskId)
 			if(taskResults.success && taskResults.data){
 				def task = taskResults.data
 				if(task.status == "SUCCEEDED"){

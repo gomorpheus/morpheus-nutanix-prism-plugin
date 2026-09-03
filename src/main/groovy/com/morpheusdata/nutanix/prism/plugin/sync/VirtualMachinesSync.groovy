@@ -460,7 +460,7 @@ class VirtualMachinesSync {
 		log.debug "getVms"
 		def rtn = [success: true, data: []]
 		try {
-			ServiceResponse listResult = NutanixPrismComputeUtility.listVMs(apiClient, authConfig)
+			ServiceResponse listResult = NutanixPrismComputeUtility.listVMsV4(apiClient, authConfig)
 			if (listResult.success) {
 				def vms = listResult.data
 				if(projectUuid) {

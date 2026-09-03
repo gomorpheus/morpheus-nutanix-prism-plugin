@@ -52,16 +52,23 @@ class NutanixPrismV4Client {
 	// vmm/prism - confirmed against Nutanix's published dataprotection v4.4 OpenAPI spec (the
 	// stable/GA version, unlike vmm which is still on a beta release for this plugin's other V4 work).
 	static final String DATAPROTECTION_V4_BASE_PATH = 'api/dataprotection/v4.4/config'
+	// Storage containers/datastores live in their own "storage" namespace. Only an alpha release
+	// (v4.0.a3) is published - no stable/GA version exists yet (see gap A5 in the migration spec).
+	static final String STORAGE_V4_BASE_PATH = 'api/storage/v4.0.a3/config'
+	// VM config/stats operations are hardcoded to vmm v4.3 (2026-09-02 decision) - the only stable
+	// GA version with a Projects field on the Vm schema (project/projectExtId first appear here,
+	// see gap A1). Unlike images/templates (still on the per-cloud VMM_API_VERSION selector -
+	// buildVmmContentV4Path - not yet migrated), VM CRUD/list/stats have no reason to support any
+	// older version now that v4.3 is required, so the selector is bypassed entirely for these paths.
+	static final String VMM_VM_API_VERSION = 'v4.3'
 
 	/**
-	 * Builds a VMM V4 REST path using the cloud's configured VMM API version
-	 * (see {@code NutanixPrismComputeUtility.VMM_API_VERSION} and the "VMM API Version"
-	 * cloud option users set on cloud create, threaded through as {@code authConfig.vmmApiVersion}).
-	 * Falls back to V4_0 if not set.
+	 * Builds a VMM V4 REST path for VM config (CRUD/list) operations - hardcoded to {@link #VMM_VM_API_VERSION}
+	 * (v4.3), not the per-cloud {@code VMM_API_VERSION} selector still used by images/templates
+	 * ({@link #buildVmmContentV4Path}) - see gap A1 in the migration spec for why v4.3 is required.
 	 */
-	static String buildVmmV4Path(Map authConfig, String resourcePath) {
-		NutanixPrismComputeUtility.VMM_API_VERSION apiVersion = authConfig?.vmmApiVersion ?: NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
-		return "api/vmm/${apiVersion.getCode()}/ahv/config/${resourcePath}"
+	static String buildVmmV4Path(String resourcePath) {
+		return "api/vmm/${VMM_VM_API_VERSION}/ahv/config/${resourcePath}"
 	}
 
 	/**
@@ -76,12 +83,12 @@ class NutanixPrismV4Client {
 
 	/**
 	 * VM statistics (CPU/memory/controller usage) live under a separate "ahv/stats" module
-	 * (e.g. {@code /vmm/v4.0.b1/ahv/stats/vms/{extId}}), not the "ahv/config" module used for VM
-	 * CRUD - confirmed against Nutanix's published vmm v4.0.b1 OpenAPI spec.
+	 * (e.g. {@code /vmm/v4.3/ahv/stats/vms/{extId}}), not the "ahv/config" module used for VM
+	 * CRUD - confirmed against Nutanix's published vmm OpenAPI specs. Hardcoded to
+	 * {@link #VMM_VM_API_VERSION} for the same reason as {@link #buildVmmV4Path}.
 	 */
-	static String buildVmmStatsV4Path(Map authConfig, String resourcePath) {
-		NutanixPrismComputeUtility.VMM_API_VERSION apiVersion = authConfig?.vmmApiVersion ?: NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
-		return "api/vmm/${apiVersion.getCode()}/ahv/stats/${resourcePath}"
+	static String buildVmmStatsV4Path(String resourcePath) {
+		return "api/vmm/${VMM_VM_API_VERSION}/ahv/stats/${resourcePath}"
 	}
 
 	static String buildNetworkingV4Path(String resourcePath) {
@@ -106,6 +113,10 @@ class NutanixPrismV4Client {
 
 	static String buildDataProtectionV4Path(String resourcePath) {
 		return "${DATAPROTECTION_V4_BASE_PATH}/${resourcePath}"
+	}
+
+	static String buildStorageV4Path(String resourcePath) {
+		return "${STORAGE_V4_BASE_PATH}/${resourcePath}"
 	}
 
 	static Map<String, String> buildV4Headers() {

@@ -398,6 +398,89 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	/**
+	 * Clones a new VM from a snapshot ("recovery point" in V4) via the Data Protection V4 REST API's
+	 * restore-with-override action (confirmed against the published dataprotection v4.4 OpenAPI spec -
+	 * {@code RecoveryPointRestorationSpec}/{@code VmRecoveryPointRestoreOverride}/{@code AhvVmOverrideSpec}
+	 * schemas, the latter a pass-through alias of {@code vmm.v4.3.ahv.config.VmConfigOverrideSpecification}).
+	 * Unlike V2's {@code snapshots/{uuid}/clone}, this override spec has no CPU/memory/cloud-init fields -
+	 * only name/description/categories/NIC/project/bios/guest-tools can be overridden on the newly-created
+	 * VM. CPU/memory must be patched separately post-clone via {@link #getVmV4}/{@link #updateVmCpuMemoryV4}
+	 * (see gap A3); cloud-init is delivered independently via the existing post-clone ISO-attach
+	 * mechanism, unaffected by this override schema. Requires the *per-VM* recovery point's own extId
+	 * (fetched here via {@link #getSnapshotV4}), not the top-level recovery point extId used to identify
+	 * the snapshot elsewhere. Normalized to the same flat {@code {task_uuid}} shape V2's
+	 * {@code cloneSnapshot} already returned so existing call sites need only a
+	 * {@code checkTaskReady} -&gt; {@link #checkTaskReadyV4} swap; the new VM's extId is found in the
+	 * completed task's {@code completion_details} (see {@link #normalizeTaskV4}), under the
+	 * {@code vmExtIds} key, not {@code entity_reference_list} (dataprotection restore tasks do not
+	 * populate that field the way createSnapshotV4's recovery-point creation task does).
+	 */
+	static ServiceResponse cloneSnapshotV4(HttpApiClient client, Map authConfig, Map runConfig, String snapshotUuid) {
+		log.debug("cloneSnapshotV4")
+		ServiceResponse rawSnapshot = getSnapshotV4(client, authConfig, runConfig.clusterReference?.uuid, snapshotUuid)
+		def vmRecoveryPointExtId = rawSnapshot?.data?.vm_recovery_point_uuid
+		if (!vmRecoveryPointExtId) {
+			return ServiceResponse.error("Unable to determine VM recovery point for snapshot ${snapshotUuid}", null, rawSnapshot)
+		}
+		def body = [
+				vmRecoveryPointRestoreOverrides: [[
+						vmRecoveryPointExtId: vmRecoveryPointExtId,
+						vmOverrideSpec      : [name: runConfig.name]
+				]]
+		]
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildDataProtectionV4Path("recovery-points/${snapshotUuid}/\$actions/restore"), authConfig, [:], 'POST', body)
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Fetches a single VM's full config via the VMM V4 REST API, along with the ETag needed for the
+	 * mandatory {@code If-Match} header on a subsequent update ({@link #updateVmCpuMemoryV4}) -
+	 * confirmed against Nutanix's published vmm v4.3 OpenAPI spec: Update/Delete operations require an
+	 * If-Match header carrying the ETag returned in this GET's *response headers* - V4 does not surface
+	 * it in the JSON body/metadata (unlike some other Nutanix resources), so it is read directly off
+	 * the underlying {@code HttpApiClient} response here rather than via {@link NutanixPrismV4Client#callApiV4}
+	 * (which does not expose response headers to callers).
+	 */
+	static ServiceResponse getVmV4(HttpApiClient client, Map authConfig, String vmUuid) {
+		log.debug("getVmV4")
+		def results = client.callJsonApi(authConfig.apiUrl, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}"), authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers: NutanixPrismV4Client.buildV4Headers(), contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
+		if (results?.success) {
+			ServiceResponse result = ServiceResponse.success(results.data?.data)
+			result.data.etag = results.headers?.find { it.key?.equalsIgnoreCase('etag') }?.value
+			return result
+		} else {
+			return ServiceResponse.error("Error getting vm ${vmUuid}", null, results.data)
+		}
+	}
+
+	/**
+	 * Updates a VM's vCPU/memory configuration via the VMM V4 REST API (confirmed against Nutanix's
+	 * published vmm v4.3 OpenAPI spec - {@code updateVmById}). Requires the full current VM config
+	 * ({@code vmBody}, from a prior {@link #getVmV4}) plus its ETag as the mandatory {@code If-Match}
+	 * header - V4 returns HTTP 428 without it. Used post-clone to apply CPU/memory overrides that V4's
+	 * restore-with-override action cannot express (see gap A3, {@link #cloneSnapshotV4}).
+	 */
+	static ServiceResponse updateVmCpuMemoryV4(HttpApiClient client, Map authConfig, String vmUuid, Map vmBody, String etag, Integer numSockets, Integer coresPerSocket, Long memorySizeBytes) {
+		log.debug("updateVmCpuMemoryV4")
+		vmBody.remove('etag')
+		vmBody.numSockets = numSockets
+		vmBody.numCoresPerSocket = coresPerSocket
+		vmBody.memorySizeBytes = memorySizeBytes
+		def headers = NutanixPrismV4Client.buildV4Headers() + ['If-Match': etag]
+		def results = client.callJsonApi(authConfig.apiUrl, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}"), authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')
+		if (results?.success) {
+			return ServiceResponse.success(results.data?.data)
+		} else {
+			return ServiceResponse.error("Error updating vm ${vmUuid} cpu/memory", null, results.data)
+		}
+	}
+
 
 	static ServiceResponse getTask(HttpApiClient client, Map authConfig, String uuid) {
 		log.debug("getTask")
@@ -440,12 +523,21 @@ class NutanixPrismComputeUtility {
 	private static Map normalizeTaskV4(Map task) {
 		return [
 				status               : task.status,
-				// V4's completedTime is ISO-8601 (unlike V3's completion_time, which is also a string
-				// timestamp) - both are handed to DateUtility.parseDate/DateUtility-style parsing by
-				// callers (e.g. NutanixPrismSnapshotProvider), so no reshaping needed, just a rename.
+				// V4's completedTime/startedTime are ISO-8601 (unlike V3's completion_time/start_time,
+				// which are also string timestamps) - both are handed to DateUtility.parseDate/
+				// DateUtility-style parsing by callers (e.g. NutanixPrismSnapshotProvider), so no
+				// reshaping needed, just a rename.
 				completion_time      : task.completedTime,
+				start_time           : task.startedTime,
 				entity_reference_list: (task.entitiesAffected ?: []).collect { ref ->
 					[kind: ref.rel?.tokenize(':')?.last(), uuid: ref.extId]
+				},
+				// V4's dataprotection restore action does not populate entitiesAffected with the newly
+				// created VM (unlike createSnapshotV4's recovery-point creation task) - per its published
+				// documentation, the created VM's extId is only available here, under the
+				// {name: "vmExtIds", value: "<uuid>[,<uuid>...]"} completion detail (see cloneSnapshotV4).
+				completion_details   : (task.completionDetails ?: []).collect { detail ->
+					[name: detail.name, value: detail.value]
 				}
 		]
 	}
@@ -814,17 +906,25 @@ class NutanixPrismComputeUtility {
 	}
 
 	/**
-	 * NOT migrated - deliberately left on the V2 REST API (confirmed against Nutanix's published
-	 * dataprotection v4.4 OpenAPI spec, the stable/GA release for this domain). V4's only restore
-	 * action ({@code POST recovery-points/{extId}/$actions/restore}) always <b>creates a new VM</b>
-	 * from the recovery point (its task completion details literally return "created VM external
-	 * identifiers") - there is no in-place "revert this existing VM to snapshot state, same extId"
-	 * operation like V2's {@code vms/{uuid}/restore}. Callers of {@code restoreSnapshot}
-	 * ({@code revertSnapshot}, {@code restoreBackup}) assume the server's externalId is unchanged
-	 * after restore, which V4's create-a-new-VM model would break. This is a genuine product/UX
-	 * decision (surface a new VM after restore vs. keep reverting in place), not a migration task -
-	 * left on V2 (which is REST, not SDK, so this does not block SDK removal) until revisited.
+	 * Reverts a VM in-place to a prior recovery point via the VMM V4 REST API (confirmed against
+	 * Nutanix's published vmm v4.3 OpenAPI spec - {@code ahv.config.RevertParams} schema, also present
+	 * at v4.0.b1). Unlike Data Protection's {@code recovery-points/{extId}/$actions/restore} (which
+	 * always creates a new VM from the recovery point), this action reverts the VM identified by
+	 * {@code vmUuid} in-place, keeping the same {@code extId} - the correct V4 equivalent of V2's
+	 * {@code vms/{uuid}/restore}. Requires the *per-VM* recovery point's own {@code extId}
+	 * ({@code vmRecoveryPointExtId} - see {@link #normalizeSnapshotV4}'s {@code vm_recovery_point_uuid}),
+	 * not the top-level {@code RecoveryPoint.extId}. By default, project/categories/owner are not
+	 * reverted (matches this plugin's V2 behavior, which never touched those either).
 	 */
+	static ServiceResponse revertVmV4(HttpApiClient client, Map authConfig, String vmUuid, String vmRecoveryPointExtId) {
+		log.debug("revertVmV4")
+		def body = [vmRecoveryPointExtId: vmRecoveryPointExtId]
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/\$actions/revert"), authConfig, [:], 'POST', body)
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
 
 	/**
 	 * Lists snapshots ("recovery points" in V4) via the Nutanix Data Protection V4 REST API
@@ -857,26 +957,32 @@ class NutanixPrismComputeUtility {
 	/**
 	 * Normalizes a V4 {@code RecoveryPoint} into the exact shape V3 callers (built around V2's
 	 * {@code snapshot} resource) already read: {@code uuid}, {@code snapshot_name}, {@code vm_uuid},
-	 * {@code created_time} (epoch microseconds). This plugin only ever creates one VM per recovery
-	 * point (see {@link #createSnapshotV4}), so {@code vmRecoveryPoints[0]} is always the relevant one -
-	 * V4 technically supports up to 32 VM/volume-group recovery points per top-level recovery point
-	 * (consistency groups), which this plugin does not use.
+	 * {@code created_time} (epoch microseconds). Also exposes {@code vm_recovery_point_uuid} -
+	 * {@code vmRecoveryPoints[0].extId}, the per-VM recovery point's own identifier (distinct from
+	 * {@code vmExtId}, the *source* VM's identifier) - this is what {@link #revertVmV4}'s
+	 * {@code vmRecoveryPointExtId} parameter requires, not the top-level {@code uuid}. This plugin
+	 * only ever creates one VM per recovery point (see {@link #createSnapshotV4}), so
+	 * {@code vmRecoveryPoints[0]} is always the relevant one - V4 technically supports up to 32
+	 * VM/volume-group recovery points per top-level recovery point (consistency groups), which this
+	 * plugin does not use.
 	 */
 	private static Map normalizeSnapshotV4(Map recoveryPoint) {
 		Long createdTimeMicros = null
 		if (recoveryPoint.creationTime) {
 			// V4's creationTime is RFC-3339 (e.g. "2024-01-15T10:30:00.123456+00:00"), not one of the
 			// fixed string lengths DateUtility.parseDate(CharSequence) special-cases - OffsetDateTime
-			// is the standards-compliant parser already used elsewhere in this file (see getVmStatsV4).
+			// is the standards-compliant parser already used elsewhere in this file (see listVMMetricsV4).
 			createdTimeMicros = OffsetDateTime.parse(recoveryPoint.creationTime as String).toInstant().toEpochMilli() * 1000
 		}
 		return [
-				uuid         : recoveryPoint.extId,
-				snapshot_name: recoveryPoint.name,
-				vm_uuid      : recoveryPoint.vmRecoveryPoints?.getAt(0)?.vmExtId,
-				created_time : createdTimeMicros
+				uuid                  : recoveryPoint.extId,
+				snapshot_name         : recoveryPoint.name,
+				vm_uuid               : recoveryPoint.vmRecoveryPoints?.getAt(0)?.vmExtId,
+				vm_recovery_point_uuid: recoveryPoint.vmRecoveryPoints?.getAt(0)?.extId,
+				created_time          : createdTimeMicros
 		]
 	}
+
 
 	/**
 	 * Creates a snapshot ("recovery point" in V4) via the Data Protection V4 REST API. Like V2's
@@ -892,14 +998,21 @@ class NutanixPrismComputeUtility {
 	 * from the {@code Task.entitiesAffected[].rel} format the same way as {@code createImageV4}'s
 	 * {@code kind == 'image'} guess - no live Prism Central instance was available to confirm the
 	 * exact {@code rel} string for a recovery-point creation task.
+	 * <p>{@code projectExtId}, when known, is passed through as {@code RecoveryPoint.projectExtId} -
+	 * the schema description states this is "required in create requests for authorization and must
+	 * match the project identifier of all associated entities", so it is only sent when the calling
+	 * VM's project is known (never guessed/defaulted).
 	 */
-	static ServiceResponse createSnapshotV4(HttpApiClient client, Map authConfig, String clusterUuid, String vmUuid, String snapshotName) {
+	static ServiceResponse createSnapshotV4(HttpApiClient client, Map authConfig, String clusterUuid, String vmUuid, String snapshotName, String projectExtId = null) {
 		log.debug("createSnapshotV4")
 		def body = [
 				name              : snapshotName,
 				recoveryPointType : 'CRASH_CONSISTENT',
 				vmRecoveryPoints  : [[vmExtId: vmUuid]]
 		]
+		if (projectExtId) {
+			body.projectExtId = projectExtId
+		}
 		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildDataProtectionV4Path("recovery-points"), authConfig, [:], 'POST', body)
 		if (result.success) {
 			result.data = [task_uuid: result.data?.extId]
@@ -1217,10 +1330,118 @@ class NutanixPrismComputeUtility {
 		return callListApiV2(client, 'disks', authConfig)
 	}
 
+	/**
+	 * Lists per-host disks via the clustermgmt V4 REST API (confirmed against Nutanix's published
+	 * clustermgmt v4.0 OpenAPI spec - {@code config.Disk}/{@code stats.DiskStats} schemas), already
+	 * stable/GA at the same {@code v4.0} release this plugin uses for hosts/clusters (no version bump
+	 * needed, unlike gap A1's vmm concerns). The {@code Disk} config resource is capacity-only
+	 * ({@code diskSizeBytes}/{@code physicalCapacityBytes}, no usage field) - actual used-storage comes
+	 * from a separate per-disk stats call ({@link #getDiskStatsV4}), mirroring the
+	 * {@code listHostsV4}/{@link #getHostStatsV4} pattern. Normalizes into the same
+	 * {@code {id, node_uuid, disk_size, mount_path, usage_stats: {"storage.usage_bytes"}}} shape the V2
+	 * {@code listDisksV2} already returns, so {@code HostsSync.syncHostVolumes}/{@code getMaxAndUsedStorage}/
+	 * {@code getDiskName} need zero changes beyond the single call-site swap.
+	 */
+	static ServiceResponse listDisksV4(HttpApiClient client, Map authConfig) {
+		log.debug("listDisksV4")
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildClusterMgmtV4Path('disks'), authConfig)
+		if (listResult.success) {
+			listResult.data = listResult.data?.collect { disk -> normalizeDiskV4(client, authConfig, disk) }
+		}
+		return listResult
+	}
+
+	private static Map normalizeDiskV4(HttpApiClient client, Map authConfig, Map disk) {
+		def diskExtId = disk.extId
+		Long usedStorage = null
+		if(diskExtId) {
+			ServiceResponse statsResult = getDiskStatsV4(client, authConfig, diskExtId)
+			if(statsResult.success) {
+				Long capacityBytes = latestStatValue(statsResult.data?.diskCapacityBytes)
+				Long usagePpm = latestStatValue(statsResult.data?.diskUsagePpm)
+				if(capacityBytes != null && usagePpm != null) {
+					usedStorage = ((capacityBytes * usagePpm) / 1000000L) as Long
+				}
+			} else {
+				log.warn "Error getting disk stats for ${diskExtId}: ${statsResult.msg}"
+			}
+		}
+		return [
+				id         : diskExtId,
+				node_uuid  : disk.nodeExtId,
+				disk_size  : disk.diskSizeBytes,
+				mount_path : disk.mountPath,
+				usage_stats: ['storage.usage_bytes': usedStorage]
+		]
+	}
+
+	/**
+	 * Fetches point-in-time per-disk stats via the clustermgmt V4 REST API - {@code diskUsagePpm}
+	 * ("disk space used ... in parts per million") combined with {@code diskCapacityBytes} gives the
+	 * true used-storage value V2's {@code usage_stats["storage.usage_bytes"]} provided directly.
+	 * Same {@code $statType=LAST} pattern as {@link #getHostStatsV4}.
+	 */
+	static ServiceResponse getDiskStatsV4(HttpApiClient client, Map authConfig, String diskExtId) {
+		log.debug("getDiskStatsV4: disk=${diskExtId}")
+		return NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildClusterMgmtStatsV4Path("disks/${diskExtId}"), authConfig, ['$statType': 'LAST'])
+	}
+
 	static ServiceResponse listDatastores(HttpApiClient client, Map authConfig) {
 		log.debug("listDatastores")
 		def groupMemberAttributes = ['container_name','serial','storage.capacity_bytes','cluster','storage.free_bytes','state','message','reason']
 		return callGroupApi(client, 'storage_container', 'serial', groupMemberAttributes, authConfig)
+	}
+
+	/**
+	 * Lists datastores via the alpha-only "storage" V4 REST namespace (confirmed against Nutanix's
+	 * published storage v4.0.a3 OpenAPI spec - {@code StorageContainer}/{@code DataStore} schemas).
+	 * No stable/GA version of this namespace exists yet (see gap A5 in the migration spec) - this
+	 * plugin has decided to build against the alpha contract rather than continue holding on the V2
+	 * Groups API, since {@code storage_container} was already an undocumented/legacy Groups API usage.
+	 * <p>
+	 * Two calls are needed since neither resource alone has everything the V2 result had:
+	 * <ul>
+	 *   <li>{@code GET /storage-containers} - has {@code clusterExtId}/{@code markedForRemoval}, but no
+	 *       capacity/usage fields.</li>
+	 *   <li>{@code GET /storage-containers/datastores} - has {@code capacity}/{@code freeSpace}, but is
+	 *       modeled per (container, host) mount rather than per-container (one row per host that mounts
+	 *       the container) - since capacity/freeSpace describe the underlying container (identical
+	 *       across all of a container's host-mount rows), the first matching row per
+	 *       {@code containerExtId} is used.</li>
+	 * </ul>
+	 * Normalizes the merged result into the same {@code [[entity_id, data: [{name, values}]]]} shape
+	 * the V2 Groups API-based {@code listDatastores} already returns, so
+	 * {@code DatastoresSync}/{@code getGroupEntityValue} keep working unchanged. There is no V4
+	 * equivalent of V2's {@code state} attribute (Arithmos operational state, e.g. {@code kComplete}) -
+	 * {@code markedForRemoval} is used instead (inverted: not marked for removal -&gt; {@code kComplete}).
+	 */
+	static ServiceResponse listDatastoresV4(HttpApiClient client, Map authConfig) {
+		log.debug("listDatastoresV4")
+		ServiceResponse containersResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildStorageV4Path('storage-containers'), authConfig)
+		if (!containersResult.success) {
+			return containersResult
+		}
+		ServiceResponse dataStoresResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildStorageV4Path('storage-containers/datastores'), authConfig)
+		if (!dataStoresResult.success) {
+			return dataStoresResult
+		}
+		Map dataStoresByContainer = dataStoresResult.data?.groupBy { it.containerExtId }
+
+		def rtn = new ServiceResponse(success: true, data: [])
+		containersResult.data?.each { container ->
+			def dataStore = dataStoresByContainer[container.containerExtId]?.getAt(0)
+			rtn.data << [
+					entity_id: container.containerExtId,
+					data     : [
+							[name: 'container_name', values: [[values: [container.name]]]],
+							[name: 'storage.capacity_bytes', values: [[values: [dataStore?.capacity]]]],
+							[name: 'cluster', values: [[values: [container.clusterExtId]]]],
+							[name: 'storage.free_bytes', values: [[values: [dataStore?.freeSpace]]]],
+							[name: 'state', values: [[values: [container.markedForRemoval ? 'kMarkedForRemoval' : 'kComplete']]]]
+					]
+			]
+		}
+		return rtn
 	}
 
 	static ServiceResponse listCategories(HttpApiClient client, Map authConfig) {
@@ -1415,22 +1636,23 @@ class NutanixPrismComputeUtility {
 	 *       disk_size_bytes, device_properties.device_type hardcoded to "DISK" since V4 already separates
 	 *       cdRoms into their own array)</li>
 	 * </ul>
-	 * <b>Known gap:</b> V4 {@code categories} is a list of category *references* (just {@code extId}), not
-	 * {@code {key, value}} pairs like V3 {@code metadata.categories}. Resolving extId -&gt; key/value requires
-	 * a lookup against {@link #listCategoriesV4} output that the caller does not currently provide, so
-	 * {@code metadata.categories} is normalized to an empty list for now - VM tag sync will not pick up
-	 * category tags until this is wired up (tracked as a follow-up, not silently "working").
+	 * VM {@code categories} is a list of category *references* (just {@code extId}) - resolved to
+	 * {@code {key, value}} pairs (matching V3 {@code metadata.categories} shape) via a lookup built
+	 * from {@link #listCategoriesV4}, so downstream tag sync (which expects {@code key:value} pairs,
+	 * see {@code VirtualMachinesSync.performPostSaveSync}) keeps working unchanged.
 	 */
 	static ServiceResponse listVMsV4(HttpApiClient client, Map authConfig) {
 		log.debug("listVMsV4")
-		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildVmmV4Path(authConfig, 'vms'), authConfig)
+		ServiceResponse categoriesResult = listCategoriesV4(client, authConfig)
+		Map categoriesByExtId = categoriesResult.success ? categoriesResult.data?.collectEntries { [(it.extId): it] } : [:]
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildVmmV4Path('vms'), authConfig)
 		if (listResult.success) {
-			listResult.data = listResult.data?.collect { vm -> normalizeVmV4(vm) }
+			listResult.data = listResult.data?.collect { vm -> normalizeVmV4(vm, categoriesByExtId) }
 		}
 		return listResult
 	}
 
-	private static Map normalizeVmV4(Map vm) {
+	private static Map normalizeVmV4(Map vm, Map categoriesByExtId = [:]) {
 		def nicList = (vm.nics ?: []).collect { nic ->
 			def ip = nic.networkInfo?.ipv4Config?.ipAddress?.value
 			[
@@ -1451,11 +1673,12 @@ class NutanixPrismComputeUtility {
 					]
 			]
 		}
+		def categories = (vm.categories ?: []).findResults { categoriesByExtId[it.extId] }.collect { [key: it.key, value: it.value] }
 		return [
 				metadata: [
 						uuid              : vm.extId,
-						categories        : [], // see listVMsV4 doc - extId->key/value resolution not yet wired up
-						project_reference : null
+						categories        : categories,
+						project_reference : vm.projectExtId ? [uuid: vm.projectExtId] : null
 				],
 				status  : [
 						name     : vm.name,
@@ -1491,36 +1714,29 @@ class NutanixPrismComputeUtility {
 	}
 
 	/**
-	 * Fetches point-in-time stats for a single VM via the VMM V4 REST API (confirmed against Nutanix's
-	 * published vmm v4.0.b1 OpenAPI spec - {@code ahv.stats.VmStats}/{@code VmStatsTuple} schemas).
-	 * Unlike clustermgmt's host/cluster stats endpoints (where {@code $startTime}/{@code $endTime} are
-	 * optional), this endpoint requires both even when using {@code $statType=LAST} - a 5 minute lookback
-	 * window is used since only the last sample in the window is needed.
-	 */
-	static ServiceResponse getVmStatsV4(HttpApiClient client, Map authConfig, String vmExtId) {
-		log.debug("getVmStatsV4: vm=${vmExtId}")
-		def endTime = OffsetDateTime.now()
-		def startTime = endTime.minusMinutes(5)
-		return NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmStatsV4Path(authConfig, "vms/${vmExtId}"), authConfig,
-				['$statType': 'LAST', '$startTime': startTime.toString(), '$endTime': endTime.toString()])
-	}
-
-	/**
-	 * Lists per-VM stats via the VMM V4 REST API (one {@link #getVmStatsV4} call per VM - v4.0.b1 has no
-	 * batch/multi-entity stats endpoint verified to accept a list of VM extIds) and normalizes the result
-	 * into the same {@code [[entity_id, data: [{name, values}]]]} shape the V3 Groups API-based
-	 * {@code listVMMetrics} already returns, so {@code NutanixPrismSyncUtils.updateMetrics} and
-	 * {@code getGroupEntityValue} keep working unchanged. V4's {@code VmStatsTuple} fields
-	 * ({@code memoryUsagePpm}, {@code hypervisorCpuUsagePpm}, {@code controllerUserBytes}) map 1:1 onto
-	 * the V3 attribute names by value - only the envelope shape differs.
+	 * Lists per-VM stats via the VMM V4 REST API's batch list endpoint
+	 * ({@code GET /vmm/v4.3/ahv/stats/vms}, confirmed against Nutanix's published vmm v4.3 OpenAPI
+	 * spec - {@code ahv.stats.VmStats}/{@code VmStatsTuple} schemas), replacing the previous
+	 * one-request-per-VM loop. Like the single-VM stats endpoint this superseded, {@code $startTime}/
+	 * {@code $endTime} are required even with {@code $statType=LAST} - a 5 minute lookback window is
+	 * used since only the last sample in the window is needed. Normalizes the result into the same
+	 * {@code [[entity_id, data: [{name, values}]]]} shape the V3 Groups API-based {@code listVMMetrics}
+	 * already returns, so {@code NutanixPrismSyncUtils.updateMetrics} and {@code getGroupEntityValue}
+	 * keep working unchanged. V4's {@code VmStatsTuple} fields ({@code memoryUsagePpm},
+	 * {@code hypervisorCpuUsagePpm}, {@code controllerUserBytes}) map 1:1 onto the V3 attribute names
+	 * by value - only the envelope shape differs.
 	 */
 	static ServiceResponse listVMMetricsV4(HttpApiClient client, Map authConfig, List<String> vmUUIDs) {
 		log.debug("listVMMetricsV4")
-		def rtn = new ServiceResponse(success: true, data: [])
-		vmUUIDs?.each { vmUuid ->
-			ServiceResponse statsResult = getVmStatsV4(client, authConfig, vmUuid)
-			if(statsResult.success) {
-				def latestTuple = statsResult.data?.stats ? statsResult.data.stats.last() : [:]
+		def endTime = OffsetDateTime.now()
+		def startTime = endTime.minusMinutes(5)
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildVmmStatsV4Path('vms'), authConfig,
+				['$statType': 'LAST', '$startTime': startTime.toString(), '$endTime': endTime.toString()])
+		def rtn = new ServiceResponse(success: listResult.success, data: [])
+		if(listResult.success) {
+			Map statsByExtId = listResult.data?.collectEntries { [(it.extId): it] }
+			vmUUIDs?.each { vmUuid ->
+				def latestTuple = statsByExtId[vmUuid]?.stats ? statsByExtId[vmUuid].stats.last() : [:]
 				rtn.data << [
 						entity_id: vmUuid,
 						data     : [
@@ -1529,9 +1745,9 @@ class NutanixPrismComputeUtility {
 								[name: 'controller_user_bytes', values: [[values: [latestTuple.controllerUserBytes]]]]
 						]
 				]
-			} else {
-				log.warn "Error getting VM stats for ${vmUuid}: ${statsResult.msg}"
 			}
+		} else {
+			log.warn "Error getting VM stats: ${listResult.msg}"
 		}
 		return rtn
 	}

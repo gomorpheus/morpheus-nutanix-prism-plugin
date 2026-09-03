@@ -100,7 +100,7 @@ class DatastoresSync {
 				}
 			}
 
-			def listResults = NutanixPrismComputeUtility.listDatastores(apiClient, authConfig)
+			def listResults = NutanixPrismComputeUtility.listDatastoresV4(apiClient, authConfig)
 			if(listResults.success == true) {
 
 				Observable domainRecords = morpheusContext.async.cloud.datastore.list(new DataQuery().withFilters(

@@ -520,7 +520,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		def snapshotName = opts.snapshotName ?: "${server.name}.${System.currentTimeMillis()}"
 		log.debug("Executing Nutanix Prism Central snapshot for ${server?.name}")
-		def snapshotResult = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshotName)
+		// look up the VM's current project (if any) so it can be preserved on the recovery point -
+		// V4 does not default this itself if the source VM belongs to a project (see gap C4)
+		def vmResult = NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)
+		def projectExtId = vmResult?.data?.metadata?.project_reference?.uuid
+		def snapshotResult = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshotName, projectExtId)
 		def taskId = snapshotResult?.data?.task_uuid
 		def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 		log.debug("Snapshot results: ${taskResults}")
@@ -605,9 +609,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		HttpApiClient client = new HttpApiClient()
 		Map authConfig = plugin.getAuthConfig(server.cloud)
 		log.debug("Reverting Nutanix Prism Central Snapshot ${snapshot.name}")
-		def snapshotResult = NutanixPrismComputeUtility.restoreSnapshot(client, authConfig, server?.resourcePool?.externalId, server.externalId, snapshot.externalId)
+		// V4's revert action requires the *per-VM* recovery point's own extId, not the top-level
+		// recovery point extId already stored as snapshot.externalId - see normalizeSnapshotV4
+		def rawSnapshot = NutanixPrismComputeUtility.getSnapshotV4(client, authConfig, server?.resourcePool?.externalId, snapshot.externalId)
+		def vmRecoveryPointExtId = rawSnapshot?.data?.vm_recovery_point_uuid
+		if(!vmRecoveryPointExtId) {
+			return ServiceResponse.error("Unable to determine VM recovery point for snapshot ${snapshot.name}", null, rawSnapshot)
+		}
+		def snapshotResult = NutanixPrismComputeUtility.revertVmV4(client, authConfig, server.externalId, vmRecoveryPointExtId)
 		def taskId = snapshotResult?.data?.task_uuid
-		def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+		def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 		log.debug("Snapshot revert results : ${taskResults}")
 		if(taskResults.success) {
 			return ServiceResponse.success()
@@ -2199,7 +2210,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			client.networkProxy = buildNetworkProxy(proxyConfiguration)
 
 			if(runConfig.snapshotId) {
-				createResults = NutanixPrismComputeUtility.cloneSnapshot(client, authConfig, runConfig, runConfig.snapshotId as String)
+				createResults = NutanixPrismComputeUtility.cloneSnapshotV4(client, authConfig, runConfig, runConfig.snapshotId as String)
 				log.debug("clone snapshot results: ${createResults}")
 			} else if(runConfig.cloneContainerId) {
 				sourceWorkload = morpheusContext.async.workload.get(runConfig.cloneContainerId).blockingGet()
@@ -2237,7 +2248,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				morpheusContext.async.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
 				def taskId = createResults.data?.status?.execution_context?.task_uuid ?: createResults.data?.task_uuid ?: (createResults.data.data.extId.toString().split(":")[1])
-				def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+				// V4's dataprotection restore action (runConfig.snapshotId - see cloneSnapshotV4) returns a
+				// V4-shaped task extId, which V3's checkTaskReady/getTask (a different tasks endpoint) cannot
+				// resolve - must poll via checkTaskReadyV4 instead for that path only.
+				def taskResults = runConfig.snapshotId ?
+						NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId) :
+						NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 				if(taskResults.success) {
 					if(createResults.data?.task_uuid) {
 						def sourceServer = sourceWorkload?.server
@@ -2246,7 +2262,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						}
 					}
 					if(!server.externalId) {
-						server.externalId = taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}?.uuid
+						// V4's dataprotection restore task does not populate entity_reference_list with the
+						// created VM (unlike V3/V2-shaped task normalization) - its extId is only available
+						// under the "vmExtIds" completion detail (see normalizeTaskV4/cloneSnapshotV4).
+						server.externalId = runConfig.snapshotId ?
+								taskResults?.data?.completion_details?.find { it.name == 'vmExtIds' }?.value?.toString()?.tokenize(',')?.first() :
+								taskResults?.data?.entity_reference_list?.find { it.kind == 'vm'}?.uuid
 						provisionResponse.externalId = server.externalId
 						server.internalId = server.externalId
 						server = saveAndGet(server)
@@ -2293,6 +2314,24 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							log.debug("cloudInitResults: ${cloudInitResults}")
 						} else {
 							log.debug "Error configuring cloud-init - no appliance url"
+						}
+					}
+					if(runConfig.snapshotId) {
+						// V4's restore-with-override action (cloneSnapshotV4) has no CPU/memory override
+						// fields - patch them here via a separate V4 VM update, alongside the cloud-init ISO
+						// attach above (see gap A3). Best-effort: a failure here leaves the VM at the
+						// snapshot's original CPU/memory rather than failing the whole provision.
+						def vmDetailV4 = NutanixPrismComputeUtility.getVmV4(client, authConfig, server.externalId)
+						if(vmDetailV4.success) {
+							def cpuMemResults = NutanixPrismComputeUtility.updateVmCpuMemoryV4(client, authConfig, server.externalId, vmDetailV4.data,
+									vmDetailV4.data?.etag as String, runConfig.numSockets as Integer, runConfig.coresPerSocket as Integer,
+									(runConfig.maxMemory as Long) * 1024L * 1024L)
+							log.debug("clone snapshot cpu/memory override results: ${cpuMemResults}")
+							if(!cpuMemResults.success) {
+								log.warn("Error applying CPU/memory override to cloned VM ${server.externalId}: ${cpuMemResults.msg}")
+							}
+						} else {
+							log.warn("Error fetching cloned VM ${server.externalId} to apply CPU/memory override: ${vmDetailV4.msg}")
 						}
 					}
 					def startResults, reconfigureResults

@@ -82,7 +82,7 @@ class HostsSync {
 
 			if (listResultSuccess) {
 				// Need to fetch all the disks for all Hosts for sync operations
-				def diskResults = NutanixPrismComputeUtility.listDisksV2(apiClient, authConfig)
+				def diskResults = NutanixPrismComputeUtility.listDisksV4(apiClient, authConfig)
 				if (diskResults.success) {
 					def cloudHostDisks = diskResults?.data
 					

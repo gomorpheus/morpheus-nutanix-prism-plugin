@@ -102,7 +102,63 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		host.stats.hypervisor_memory_usage_ppm == 500000
 	}
 
-	void "listVMsV4 calls the VMM V4 vms endpoint and normalizes to the V3 shape"() {
+	void "listDisksV4 calls the clustermgmt V4 disks endpoint, normalizes to the V2 shape, and fetches per-disk usage stats"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listDisksV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/clustermgmt/v4.0/config/disks', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[
+						extId        : 'disk-1',
+						nodeExtId    : 'host-1',
+						diskSizeBytes: 1000000000000,
+						mountPath    : '/dev/sda'
+				]],
+				metadata: [totalAvailableResults: 1]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/clustermgmt/v4.0/stats/disks/disk-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [
+						diskCapacityBytes: [[timestamp: '2024-01-01T00:00:00Z', value: 1000000000000]],
+						diskUsagePpm     : [[timestamp: '2024-01-01T00:00:00Z', value: 250000]]
+				]
+		])
+		result.success
+		result.data.size() == 1
+		def disk = result.data[0]
+		disk.id == 'disk-1'
+		disk.node_uuid == 'host-1'
+		disk.disk_size == 1000000000000
+		disk.mount_path == '/dev/sda'
+		disk.usage_stats['storage.usage_bytes'] == 250000000000
+	}
+
+	void "listDisksV4 leaves usage_stats bytes null when the per-disk stats call fails"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listDisksV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/clustermgmt/v4.0/config/disks', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[
+						extId        : 'disk-1',
+						nodeExtId    : 'host-1',
+						diskSizeBytes: 1000000000000,
+						mountPath    : '/dev/sda'
+				]],
+				metadata: [totalAvailableResults: 1]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/clustermgmt/v4.0/stats/disks/disk-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.error('boom')
+		result.success
+		result.data.size() == 1
+		result.data[0].usage_stats['storage.usage_bytes'] == null
+	}
+
+	void "listVMsV4 calls the VMM V4 vms endpoint, resolves categories, and normalizes to the V3 shape"() {
 		given:
 		def client = Mock(HttpApiClient)
 
@@ -110,7 +166,11 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		def result = NutanixPrismComputeUtility.listVMsV4(client, authConfig)
 
 		then:
-		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/config/vms', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/prism/v4.0/config/categories', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[extId: 'cat-1', key: 'Environment', value: 'Production']],
+				metadata: [totalAvailableResults: 1]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
 				data    : [[
 						extId            : 'vm-1',
 						name             : 'VM One',
@@ -119,6 +179,8 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 						memorySizeBytes  : 4294967296,
 						numSockets       : 2,
 						numCoresPerSocket: 4,
+						projectExtId     : 'project-1',
+						categories       : [[extId: 'cat-1']],
 						nics             : [[
 								extId      : 'nic-1',
 								backingInfo: [macAddress: 'AA:BB:CC:DD:EE:FF'],
@@ -136,6 +198,8 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.data.size() == 1
 		def vm = result.data[0]
 		vm.metadata.uuid == 'vm-1'
+		vm.metadata.project_reference.uuid == 'project-1'
+		vm.metadata.categories == [[key: 'Environment', value: 'Production']]
 		vm.status.name == 'VM One'
 		vm.status.cluster_reference.uuid == 'cluster-1'
 		vm.status.resources.power_state == 'ON'
@@ -153,6 +217,28 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		vm.status.resources.disk_list[0].disk_size_bytes == 107374182400
 		vm.status.resources.disk_list[0].device_properties.device_type == 'DISK'
 		vm.status.resources.disk_list[0].device_properties.disk_address.device_index == 0
+	}
+
+	void "listVMsV4 normalizes a VM with no project and no categories"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listVMsV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/prism/v4.0/config/categories', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [],
+				metadata: [totalAvailableResults: 0]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[extId: 'vm-2', name: 'VM Two', cluster: [extId: 'cluster-1'], powerState: 'OFF']],
+				metadata: [totalAvailableResults: 1]
+		])
+		result.success
+		def vm = result.data[0]
+		vm.metadata.project_reference == null
+		vm.metadata.categories == []
 	}
 
 	void "listNetworksV4 calls the networking V4 subnets endpoint and normalizes to the V3 shape"() {
@@ -214,11 +300,15 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		1 * client.callJsonApi(authConfig.apiUrl, 'api/prism/v4.0/config/tasks/task-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
 				data: [
 						status          : 'SUCCEEDED',
+						startedTime     : '2024-01-01T00:00:00Z',
+						completedTime   : '2024-01-01T00:05:00Z',
 						entitiesAffected: [[extId: 'image-1', rel: 'vmm:content:image']]
 				]
 		])
 		result.success
 		result.data.status == 'SUCCEEDED'
+		result.data.start_time == '2024-01-01T00:00:00Z'
+		result.data.completion_time == '2024-01-01T00:05:00Z'
 		result.data.entity_reference_list.size() == 1
 		result.data.entity_reference_list[0].kind == 'image'
 		result.data.entity_reference_list[0].uuid == 'image-1'
@@ -253,6 +343,68 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		image.status.resources.retrieval_uri_list == ['https://files.example.com/centos.qcow2']
 		image.status.resources.source_uri == 'https://files.example.com/centos.qcow2'
 		image.status.resources.current_cluster_reference_list[0].uuid == 'cluster-1'
+	}
+
+	void "listDatastoresV4 merges the storage-containers and datastores V4 endpoints and normalizes to the V2 Groups API shape"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listDatastoresV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/storage/v4.0.a3/config/storage-containers', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[
+						containerExtId  : 'container-1',
+						name            : 'default-container',
+						clusterExtId    : 'cluster-1',
+						markedForRemoval: false
+				]],
+				metadata: [totalAvailableResults: 1]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/storage/v4.0.a3/config/storage-containers/datastores', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[
+						containerExtId: 'container-1',
+						capacity      : 1000,
+						freeSpace     : 400,
+						hostExtId     : 'host-1'
+				], [
+						containerExtId: 'container-1',
+						capacity      : 1000,
+						freeSpace     : 400,
+						hostExtId     : 'host-2'
+				]],
+				metadata: [totalAvailableResults: 2]
+		])
+		result.success
+		result.data.size() == 1
+		def datastore = result.data[0]
+		datastore.entity_id == 'container-1'
+		NutanixPrismComputeUtility.getGroupEntityValue(datastore.data, 'container_name') == 'default-container'
+		NutanixPrismComputeUtility.getGroupEntityValue(datastore.data, 'cluster') == 'cluster-1'
+		NutanixPrismComputeUtility.getGroupEntityValue(datastore.data, 'storage.capacity_bytes') == 1000
+		NutanixPrismComputeUtility.getGroupEntityValue(datastore.data, 'storage.free_bytes') == 400
+		NutanixPrismComputeUtility.getGroupEntityValue(datastore.data, 'state') == 'kComplete'
+	}
+
+	void "listDatastoresV4 marks a container kMarkedForRemoval when the V4 flag is set"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listDatastoresV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/storage/v4.0.a3/config/storage-containers', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[containerExtId: 'container-1', name: 'default-container', clusterExtId: 'cluster-1', markedForRemoval: true]],
+				metadata: [totalAvailableResults: 1]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/storage/v4.0.a3/config/storage-containers/datastores', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [[containerExtId: 'container-1', capacity: 1000, freeSpace: 400, hostExtId: 'host-1']],
+				metadata: [totalAvailableResults: 1]
+		])
+		result.success
+		NutanixPrismComputeUtility.getGroupEntityValue(result.data[0].data, 'state') == 'kMarkedForRemoval'
 	}
 
 	void "getImageV4 calls the vmm V4 content images endpoint for a single image and normalizes to the V3 shape"() {
@@ -416,22 +568,7 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.data.value == 'Production'
 	}
 
-	void "getVmStatsV4 calls the vmm V4 ahv stats endpoint for a single VM with a required time range"() {
-		given:
-		def client = Mock(HttpApiClient)
-
-		when:
-		def result = NutanixPrismComputeUtility.getVmStatsV4(client, authConfig, 'vm-1')
-
-		then:
-		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/stats/vms/vm-1', authConfig.username, authConfig.password, {
-			it.queryParams['$statType'] == 'LAST' && it.queryParams['$startTime'] != null && it.queryParams['$endTime'] != null
-		}, 'GET') >> ServiceResponse.success([data: [vmExtId: 'vm-1', stats: [[timestamp: '2024-01-01T00:00:00Z', memoryUsagePpm: 100000, hypervisorCpuUsagePpm: 50000, controllerUserBytes: 1024]]]])
-		result.success
-		result.data.stats[0].memoryUsagePpm == 100000
-	}
-
-	void "listVMMetricsV4 calls getVmStatsV4 per VM and normalizes to the V3 Groups API shape"() {
+	void "listVMMetricsV4 calls the batch VMM V4 ahv stats endpoint and normalizes to the V3 Groups API shape"() {
 		given:
 		def client = Mock(HttpApiClient)
 
@@ -439,11 +576,14 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		def result = NutanixPrismComputeUtility.listVMMetricsV4(client, authConfig, ['vm-1', 'vm-2'])
 
 		then:
-		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/stats/vms/vm-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
-				data: [vmExtId: 'vm-1', stats: [[memoryUsagePpm: 100000, hypervisorCpuUsagePpm: 50000, controllerUserBytes: 1024]]]
-		])
-		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.0/ahv/stats/vms/vm-2', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
-				data: [vmExtId: 'vm-2', stats: [[memoryUsagePpm: 200000, hypervisorCpuUsagePpm: 60000, controllerUserBytes: 2048]]]
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/stats/vms', authConfig.username, authConfig.password, {
+			it.queryParams['$statType'] == 'LAST' && it.queryParams['$startTime'] != null && it.queryParams['$endTime'] != null
+		}, 'GET') >> ServiceResponse.success([
+				data    : [
+						[extId: 'vm-1', stats: [[memoryUsagePpm: 100000, hypervisorCpuUsagePpm: 50000, controllerUserBytes: 1024]]],
+						[extId: 'vm-2', stats: [[memoryUsagePpm: 200000, hypervisorCpuUsagePpm: 60000, controllerUserBytes: 2048]]]
+				],
+				metadata: [totalAvailableResults: 2]
 		])
 		result.success
 		result.data.size() == 2
@@ -453,6 +593,26 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		NutanixPrismComputeUtility.getGroupEntityValue(vm1.data, 'controller_user_bytes') == 1024
 		def vm2 = result.data.find { it.entity_id == 'vm-2' }
 		NutanixPrismComputeUtility.getGroupEntityValue(vm2.data, 'memory_usage_ppm') == 200000
+	}
+
+	void "listVMMetricsV4 only returns entries for the requested VM UUIDs even when the batch endpoint returns more"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.listVMMetricsV4(client, authConfig, ['vm-1'])
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/stats/vms', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data    : [
+						[extId: 'vm-1', stats: [[memoryUsagePpm: 100000, hypervisorCpuUsagePpm: 50000, controllerUserBytes: 1024]]],
+						[extId: 'vm-2', stats: [[memoryUsagePpm: 200000, hypervisorCpuUsagePpm: 60000, controllerUserBytes: 2048]]]
+				],
+				metadata: [totalAvailableResults: 2]
+		])
+		result.success
+		result.data.size() == 1
+		result.data[0].entity_id == 'vm-1'
 	}
 
 	void "listSnapshotsV4 calls the dataprotection V4 recovery-points endpoint filtered by cluster and normalizes to the V3 shape"() {
@@ -470,7 +630,7 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 						extId            : 'rp-1',
 						name             : 'server1.123456',
 						creationTime     : '2024-01-15T10:30:00Z',
-						vmRecoveryPoints : [[vmExtId: 'vm-1']]
+						vmRecoveryPoints : [[extId: 'vm-rp-1', vmExtId: 'vm-1']]
 				]],
 				metadata: [totalAvailableResults: 1]
 		])
@@ -480,6 +640,7 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		snapshot.uuid == 'rp-1'
 		snapshot.snapshot_name == 'server1.123456'
 		snapshot.vm_uuid == 'vm-1'
+		snapshot.vm_recovery_point_uuid == 'vm-rp-1'
 		snapshot.created_time == 1705314600000L * 1000
 	}
 
@@ -492,12 +653,28 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 
 		then:
 		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points/rp-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
-				data: [extId: 'rp-1', name: 'server1.123456', creationTime: '2024-01-15T10:30:00Z', vmRecoveryPoints: [[vmExtId: 'vm-1']]]
+				data: [extId: 'rp-1', name: 'server1.123456', creationTime: '2024-01-15T10:30:00Z', vmRecoveryPoints: [[extId: 'vm-rp-1', vmExtId: 'vm-1']]]
 		])
 		result.success
 		result.data.uuid == 'rp-1'
 		result.data.snapshot_name == 'server1.123456'
 		result.data.vm_uuid == 'vm-1'
+		result.data.vm_recovery_point_uuid == 'vm-rp-1'
+	}
+
+	void "revertVmV4 posts the vmRecoveryPointExtId body to the vmm V4 revert action and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.revertVmV4(client, authConfig, 'vm-1', 'vm-rp-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1/$actions/revert', authConfig.username, authConfig.password, {
+			it.body == [vmRecoveryPointExtId: 'vm-rp-1']
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
 	}
 
 	void "createSnapshotV4 posts a crash-consistent recovery point body and normalizes the task reference"() {
@@ -511,10 +688,94 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points', authConfig.username, authConfig.password, {
 			it.body.name == 'server1.123456' &&
 			it.body.recoveryPointType == 'CRASH_CONSISTENT' &&
-			it.body.vmRecoveryPoints == [[vmExtId: 'vm-1']]
+			it.body.vmRecoveryPoints == [[vmExtId: 'vm-1']] &&
+			!it.body.containsKey('projectExtId')
 		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
 		result.success
 		result.data.task_uuid == 'task-1'
+	}
+
+	void "createSnapshotV4 includes projectExtId on the recovery point body when the VM's project is known"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.createSnapshotV4(client, authConfig, 'cluster-1', 'vm-1', 'server1.123456', 'project-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points', authConfig.username, authConfig.password, {
+			it.body.projectExtId == 'project-1'
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "cloneSnapshotV4 fetches the per-VM recovery point extId and posts the restore-with-override action, normalizing the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+		def runConfig = [name: 'new-server', clusterReference: [uuid: 'cluster-1']]
+
+		when:
+		def result = NutanixPrismComputeUtility.cloneSnapshotV4(client, authConfig, runConfig, 'rp-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points/rp-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [extId: 'rp-1', name: 'server1.123456', vmRecoveryPoints: [[extId: 'vm-rp-1', vmExtId: 'vm-1']]]
+		])
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points/rp-1/$actions/restore', authConfig.username, authConfig.password, {
+			it.body.vmRecoveryPointRestoreOverrides == [[vmRecoveryPointExtId: 'vm-rp-1', vmOverrideSpec: [name: 'new-server']]]
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "cloneSnapshotV4 errors out when the snapshot has no per-VM recovery point extId"() {
+		given:
+		def client = Mock(HttpApiClient)
+		def runConfig = [name: 'new-server', clusterReference: [uuid: 'cluster-1']]
+
+		when:
+		def result = NutanixPrismComputeUtility.cloneSnapshotV4(client, authConfig, runConfig, 'rp-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points/rp-1', authConfig.username, authConfig.password, _, 'GET') >> ServiceResponse.success([
+				data: [extId: 'rp-1', name: 'server1.123456', vmRecoveryPoints: []]
+		])
+		0 * client.callJsonApi(authConfig.apiUrl, 'api/dataprotection/v4.4/config/recovery-points/rp-1/$actions/restore', _, _, _, _)
+		!result.success
+	}
+
+	void "getVmV4 fetches the VM config and reads the ETag off the response headers"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.getVmV4(client, authConfig, 'vm-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1', authConfig.username, authConfig.password, _, 'GET') >> new ServiceResponse(success: true, data: [data: [extId: 'vm-1', numSockets: 2]], headers: ['ETag': 'etag-value'])
+		result.success
+		result.data.extId == 'vm-1'
+		result.data.etag == 'etag-value'
+	}
+
+	void "updateVmCpuMemoryV4 sends the If-Match header with the ETag and the new cpu/memory values"() {
+		given:
+		def client = Mock(HttpApiClient)
+		def vmBody = [extId: 'vm-1', numSockets: 1, etag: 'etag-value']
+
+		when:
+		def result = NutanixPrismComputeUtility.updateVmCpuMemoryV4(client, authConfig, 'vm-1', vmBody, 'etag-value', 4, 2, 8589934592L)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1', authConfig.username, authConfig.password, {
+			it.headers['If-Match'] == 'etag-value' &&
+			it.body.numSockets == 4 &&
+			it.body.numCoresPerSocket == 2 &&
+			it.body.memorySizeBytes == 8589934592L &&
+			!it.body.containsKey('etag')
+		}, 'PUT') >> ServiceResponse.success([data: [extId: 'vm-1']])
+		result.success
 	}
 
 	void "deleteSnapshotV4 calls DELETE on the dataprotection V4 recovery-points endpoint and normalizes the task reference"() {
