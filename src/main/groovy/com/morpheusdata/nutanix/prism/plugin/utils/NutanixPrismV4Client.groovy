@@ -57,28 +57,28 @@ class NutanixPrismV4Client {
 	static final String STORAGE_V4_BASE_PATH = 'api/storage/v4.0.a3/config'
 	// VM config/stats operations are hardcoded to vmm v4.3 (2026-09-02 decision) - the only stable
 	// GA version with a Projects field on the Vm schema (project/projectExtId first appear here,
-	// see gap A1). Unlike images/templates (still on the per-cloud VMM_API_VERSION selector -
-	// buildVmmContentV4Path - not yet migrated), VM CRUD/list/stats have no reason to support any
-	// older version now that v4.3 is required, so the selector is bypassed entirely for these paths.
+	// see gap A1). Images/templates (buildVmmContentV4Path) are likewise hardcoded to v4.3 - the
+	// per-cloud VMM_API_VERSION selector that used to pick between v4.0.a1/v4.0.b1/v4.0 has been
+	// removed now that AOS 7.6/pc.7.6 (which ships vmm v4.3) is this plugin's minimum supported
+	// version.
 	static final String VMM_VM_API_VERSION = 'v4.3'
 
 	/**
-	 * Builds a VMM V4 REST path for VM config (CRUD/list) operations - hardcoded to {@link #VMM_VM_API_VERSION}
-	 * (v4.3), not the per-cloud {@code VMM_API_VERSION} selector still used by images/templates
-	 * ({@link #buildVmmContentV4Path}) - see gap A1 in the migration spec for why v4.3 is required.
+	 * Builds a VMM V4 REST path for VM config (CRUD/list) operations - hardcoded to
+	 * {@link #VMM_VM_API_VERSION} (v4.3) - see gap A1 in the migration spec for why v4.3 is required.
 	 */
 	static String buildVmmV4Path(String resourcePath) {
 		return "api/vmm/${VMM_VM_API_VERSION}/ahv/config/${resourcePath}"
 	}
 
 	/**
-	 * Images live under the VMM "content" module (e.g. {@code /vmm/v4.0.b1/content/images}), not the
-	 * "ahv/config" module used by VMs/templates - confirmed against Nutanix's published vmm v4.0.b1
-	 * OpenAPI spec.
+	 * Images/templates live under the VMM "content" module (e.g. {@code /vmm/v4.3/content/images}),
+	 * not the "ahv/config" module used by VMs - confirmed against Nutanix's published vmm v4.0.b1
+	 * OpenAPI spec. Hardcoded to {@link #VMM_VM_API_VERSION} for the same reason as
+	 * {@link #buildVmmV4Path}.
 	 */
-	static String buildVmmContentV4Path(Map authConfig, String resourcePath) {
-		NutanixPrismComputeUtility.VMM_API_VERSION apiVersion = authConfig?.vmmApiVersion ?: NutanixPrismComputeUtility.VMM_API_VERSION.V4_0
-		return "api/vmm/${apiVersion.getCode()}/content/${resourcePath}"
+	static String buildVmmContentV4Path(String resourcePath) {
+		return "api/vmm/${VMM_VM_API_VERSION}/content/${resourcePath}"
 	}
 
 	/**

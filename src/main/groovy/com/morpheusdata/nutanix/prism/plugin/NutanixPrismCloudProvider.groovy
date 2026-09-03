@@ -138,18 +138,6 @@ class NutanixPrismCloudProvider implements CloudProvider {
 			dependsOnCode: 'zone.serviceUrl, serviceUrl, zone.serviceUsername, serviceUsername, zone.servicePassword, servicePassword, credential.type, credential.username, credential.password'
 		)
 
-		OptionType vmmApiVersion = new OptionType(
-						name: 'VMM API Version',
-						code: 'nutanix-prism-vmm-api-version',
-						fieldName: 'vmmApiVersion',
-						displayOrder: 31,
-						fieldLabel: 'VMM API Version',
-						required: true,
-						inputType: OptionType.InputType.SELECT,
-						fieldContext: 'config',
-						optionSource: 'supportedVmmApiVersions',
-		)
-
 		OptionType inventoryInstances = new OptionType(
 				name: 'Inventory Existing Instances',
 				code: 'nutanix-prism-import-existing',
@@ -187,7 +175,7 @@ class NutanixPrismCloudProvider implements CloudProvider {
 				optionSource: 'nutanixPrismWindowsNicConfigModeOptions'
 		)
 
-		return [apiUrl, credentials, username, password, project, vmmApiVersion, inventoryInstances, enableVnc, windowsNicConfigMode]
+		return [apiUrl, credentials, username, password, project, inventoryInstances, enableVnc, windowsNicConfigMode]
 	}
 
 	@Override

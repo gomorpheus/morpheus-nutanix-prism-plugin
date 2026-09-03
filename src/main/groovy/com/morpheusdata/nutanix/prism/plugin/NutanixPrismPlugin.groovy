@@ -70,16 +70,8 @@ class NutanixPrismPlugin extends Plugin {
 				basePath: 'api/nutanix/v3',
 				v2basePath: 'api/nutanix/v2.0',
 				username: null,
-				password: null,
-			  vmmApiVersion: NutanixPrismComputeUtility.VMM_API_VERSION.V4_0_A1
+				password: null
 		]
-		String vmmApiVersionCode = cloud.configMap?.vmmApiVersion?.toString()
-		if(vmmApiVersionCode) {
-			def vmmApiVersion = NutanixPrismComputeUtility.VMM_API_VERSION.findByCode(vmmApiVersionCode)
-			if(vmmApiVersion) {
-				rtn.vmmApiVersion = vmmApiVersion
-			}
-		}
 		if(!cloud.accountCredentialLoaded) {
 			AccountCredential accountCredential
 			try {

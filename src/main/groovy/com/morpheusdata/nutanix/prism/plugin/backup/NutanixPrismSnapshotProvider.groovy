@@ -182,7 +182,7 @@ class NutanixPrismSnapshotProvider extends AbstractMorpheusBackupTypeProvider {
 						if(taskResults?.data?.status == "SUCCEEDED"){
 							log.debug("snapshot complete ${taskId}")
 							if(taskResults.success && taskResults.data){
-								def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'recoverypoint'}?.uuid
+								def snapshotUuid = taskResults?.data?.entity_reference_list?.find { it.kind == 'vmrecoverypoint'}?.uuid
 								def snapshotResp = NutanixPrismComputeUtility.getSnapshotV4(client, authConfig, computeServer?.resourcePool?.externalId, snapshotUuid)
 								def snapshot = snapshotResp.data
 								log.debug("Snapshot details: ${snapshot}")

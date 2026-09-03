@@ -37,9 +37,9 @@ class NutanixPrismCloudProviderSpec extends Specification {
 		def optionTypes = service.getOptionTypes()
 
 		then:
-		optionTypes.size() == 9
+		optionTypes.size() == 8
 		optionTypes*.code as Set == ['nutanix-prism-api-url', 'nutanix-prism-credential', 'nutanix-prism-username',
-									  'nutanix-prism-password', 'nutanix-prism-project', 'nutanix-prism-vmm-api-version',
+									  'nutanix-prism-password', 'nutanix-prism-project',
 									  'nutanix-prism-import-existing', 'nutanix-prism-enableVnc',
 									  'nutanix-prism-windows-nic-config-mode'] as Set
 	}

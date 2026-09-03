@@ -56,23 +56,6 @@ import java.time.OffsetDateTime
 @Slf4j
 class NutanixPrismComputeUtility {
 
-	public static enum VMM_API_VERSION {
-		V4_0_A1('v4.0.a1', '4.0.a1'),
-		V4_0_B1('v4.0.b1', '4.0.b1'),
-		V4_0('v4.0', '4.0')
-		VMM_API_VERSION(String code, String desc) {
-			this.code = code
-			this.desc = desc
-		}
-		protected String code
-		protected String desc
-		def getCode() { return this.code }
-		def getDescription() { return this.desc}
-		static VMM_API_VERSION findByCode(String code) {
-			return values()?.find{it.getCode() == code}
-		}
-	}
-
 	static testConnection(HttpApiClient client, Map authConfig) {
 		def rtn = [success:false, invalidLogin:false]
 		try {
@@ -122,7 +105,7 @@ class NutanixPrismComputeUtility {
 	 */
 	static ServiceResponse getImageV4(HttpApiClient client, Map authConfig, String imageId) {
 		log.debug("getImageV4")
-		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, "images/${imageId}"), authConfig)
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path("images/${imageId}"), authConfig)
 		if (result.success) {
 			result.data = normalizeImageV4(result.data)
 		}
@@ -137,7 +120,7 @@ class NutanixPrismComputeUtility {
 	 */
 	static ServiceResponse deleteImageV4(HttpApiClient client, Map authConfig, String imageId) {
 		log.debug("deleteImageV4")
-		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, "images/${imageId}"), authConfig, [:], 'DELETE')
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path("images/${imageId}"), authConfig, [:], 'DELETE')
 		if (result.success) {
 			result.data = [status: [execution_context: [task_uuid: result.data?.extId]]]
 		}
@@ -178,7 +161,7 @@ class NutanixPrismComputeUtility {
 		} else if (diskUuid) {
 			body.source = ['$objectType': 'vmm.v4.content.VmDiskSource', extId: diskUuid]
 		}
-		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, 'images'), authConfig, [:], 'POST', body)
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path('images'), authConfig, [:], 'POST', body)
 		if (result.success) {
 			result.data = [status: [execution_context: [task_uuid: result.data?.extId]]]
 		}
@@ -549,14 +532,15 @@ class NutanixPrismComputeUtility {
 	 * <ul>
 	 *   <li>V4 {@code status} -&gt; V3 {@code status} (values already match)</li>
 	 *   <li>V4 {@code entitiesAffected[]} ({@code {extId, rel}}, where {@code rel} is
-	 *       "namespace:module[:submodule]:entityType", e.g. "vmm:ahv:vm") -&gt; V3
+	 *       "namespace:module[:submodule]:entityType", e.g. "vmm:ahv:config:vm") -&gt; V3
 	 *       {@code entity_reference_list[]} ({@code {kind, uuid}})</li>
 	 * </ul>
-	 * <b>Not independently verified against a live task response:</b> {@code kind} is inferred as the
-	 * last colon-separated segment of {@code rel} (per the schema's documented format), since no live
-	 * Prism Central instance was available this session to confirm the exact {@code rel} string Nutanix
-	 * returns for an image-creation task. Confirm this before relying on it for anything beyond the
-	 * "find the created image's extId" use in {@code createImageV4}.
+	 * {@code kind} is inferred as the last colon-separated segment of {@code rel} (per the schema's
+	 * documented format). Confirmed for VM-creation ({@code rel} = "vmm:ahv:config:vm" -&gt;
+	 * {@code kind} = "vm") and image-creation ({@code rel} = "vmm:content:image" -&gt; {@code kind} =
+	 * "image") task types. The recovery-point-creation case ({@code kind} = "vmrecoverypoint", see
+	 * {@code createSnapshotV4}) remains an educated guess (not independently verified against a live
+	 * task response) based on the {@code VmRecoveryPoint} resource name.
 	 */
 	static ServiceResponse getTaskV4(HttpApiClient client, Map authConfig, String uuid) {
 		log.debug("getTaskV4")
@@ -868,11 +852,14 @@ class NutanixPrismComputeUtility {
 	 * only a {@code checkTaskReady} -&gt; {@link #checkTaskReadyV4} swap. Always creates a
 	 * crash-consistent recovery point (matching V2's behavior - this plugin has never exposed an
 	 * application-consistent snapshot option).
-	 * <b>Not independently verified against a live task response:</b> the created recovery point's
-	 * {@code extId} is found via {@code entity_reference_list[].kind == 'recoverypoint'}, inferred
-	 * from the {@code Task.entitiesAffected[].rel} format the same way as {@code createImageV4}'s
-	 * {@code kind == 'image'} guess - no live Prism Central instance was available to confirm the
-	 * exact {@code rel} string for a recovery-point creation task.
+	 * <b>Best-guess, not independently verified against a live task response:</b> the created recovery
+	 * point's {@code extId} is found via {@code entity_reference_list[].kind == 'vmrecoverypoint'},
+	 * inferred from the {@code Task.entitiesAffected[].rel} format the same way as
+	 * {@code createImageV4}'s {@code kind == 'image'} guess. {@code vmrecoverypoint} (not just
+	 * {@code recoverypoint}) is used because the request body's resource is literally named
+	 * {@code VmRecoveryPoint} (see {@code vmRecoveryPoints} below) - no live Prism Central instance
+	 * was available to confirm the exact {@code rel} string Nutanix returns for this task type, so
+	 * this remains a best guess pending real-instance testing.
 	 * <p>{@code projectExtId}, when known, is passed through as {@code RecoveryPoint.projectExtId} -
 	 * the schema description states this is "required in create requests for authorization and must
 	 * match the project identifier of all associated entities", so it is only sent when the calling
@@ -920,27 +907,25 @@ class NutanixPrismComputeUtility {
 	 * full override spec schema in the dataprotection v4.4 spec.
 	 */
 
+	/**
+	 * Lists templates via the vmm V4 REST API's "content" module, hardcoded to
+	 * {@link NutanixPrismV4Client#VMM_VM_API_VERSION} (v4.3) - previously this branched on the
+	 * per-cloud {@code VMM_API_VERSION} selector (v4.0.a1's preview {@code templates} endpoint vs.
+	 * v4.0.b1/v4.0's stable {@code content/templates} endpoint), but that selector has been removed
+	 * now that AOS 7.6/pc.7.6 (which ships vmm v4.3) is this plugin's minimum supported version.
+	 * v4.3 is assumed to keep the same {@code content/templates} shape v4.0.b1/v4.0 already used
+	 * (not independently re-confirmed against the v4.3 OpenAPI spec this session).
+	 */
 	static ServiceResponse listTemplates(HttpApiClient client, Map authConfig) {
-		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion
-		def results = [success: false]
-		if (apiVersion == VMM_API_VERSION.V4_0_A1) {
-			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/templates", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: ["\$expand":"vmSpec"], ignoreSSL: true), 'GET')
-		} else {
-			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/content/templates", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
-		}
+		def results = client.callJsonApi(authConfig.apiUrl, NutanixPrismV4Client.buildVmmContentV4Path('templates'), authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
 		if(results?.success) {
 			results.data?.data?.each { template ->
 				if (template && template?.templateVersionSpec) {
 					//have to fetch full template to get vmSpec with storage containers and disk info
-					if (apiVersion == VMM_API_VERSION.V4_0_A1) {
-						template.templateVersionSpec?.vmSpec = normalizeVmSpec(template.templateVersionSpec?.vmSpec, apiVersion)
-					} else  {
-						def getResponse = getTemplate(client, authConfig, template.extId)
-						if(getResponse.success) {
-							template.templateVersionSpec?.vmSpec = getResponse.data?.data?.templateVersionSpec?.vmSpec
-						}
+					def getResponse = getTemplate(client, authConfig, template.extId)
+					if(getResponse.success) {
+						template.templateVersionSpec?.vmSpec = getResponse.data?.data?.templateVersionSpec?.vmSpec
 					}
 				}
 			}
@@ -950,70 +935,52 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static normalizeVmSpec(Object vmSpec, VMM_API_VERSION vmmApiVersion) {
+	static normalizeVmSpec(Object vmSpec) {
 		def rtn = [:]
 		def diskList = []
-		if(vmSpec) {
-			if (vmmApiVersion == VMM_API_VERSION.V4_0_A1) {
-				if (vmSpec instanceof String) {
-					rtn.rawSpec = new JsonSlurper().parseText(vmSpec)
-					diskList = rtn.rawSpec?.spec?.resources?.disk_list
-					rtn.disk_list = diskList
-				}
-			} else if (vmmApiVersion == VMM_API_VERSION.V4_0_B1 || vmmApiVersion == VMM_API_VERSION.V4_0) {
-				if (vmSpec instanceof Map) {
-					//ugly, but normalise to v3 style for now
-					rtn.rawSpec = vmSpec
-					diskList = rtn.rawSpec?.disks
-					diskList = diskList.collect { disk ->
-						def diskData = disk.backingInfo
-						def size = diskData?.diskSizeBytes
-						//no CDs listed under disk
-						def type = "DISK"
-						def busType = disk?.diskAddress?.busType
-						def deviceIndex = disk?.diskAddress?.index
-						def storageContainer = diskData?.storageContainer?.extId
-						def uuid = disk?.extId //todo:: Fix volumes re-creating on every cloud sync. documented property but it does not exist in my testing. Perhaps a 4_0_B1 bug
-						return [
-							device_properties: [
-								device_type: type,
-								disk_address: [
-									device_bus: busType,
-									device_index: deviceIndex,
-									adapter_type: busType,
-								]
-							],
-							disk_size_bytes: size,
-							storage_config: [
-								storage_container_reference: [
-									uuid: storageContainer
-								]
-							],
-							uuid: uuid
+		if(vmSpec instanceof Map) {
+			//ugly, but normalise to v3 style for now
+			rtn.rawSpec = vmSpec
+			diskList = rtn.rawSpec?.disks
+			diskList = diskList.collect { disk ->
+				def diskData = disk.backingInfo
+				def size = diskData?.diskSizeBytes
+				//no CDs listed under disk
+				def type = "DISK"
+				def busType = disk?.diskAddress?.busType
+				def deviceIndex = disk?.diskAddress?.index
+				def storageContainer = diskData?.storageContainer?.extId
+				def uuid = disk?.extId //todo:: Fix volumes re-creating on every cloud sync. documented property but it does not exist in my testing. Perhaps a 4_0_B1 bug
+				return [
+					device_properties: [
+						device_type: type,
+						disk_address: [
+							device_bus: busType,
+							device_index: deviceIndex,
+							adapter_type: busType,
 						]
-					}
-					rtn.disk_list = diskList
-				}
+					],
+					disk_size_bytes: size,
+					storage_config: [
+						storage_container_reference: [
+							uuid: storageContainer
+						]
+					],
+					uuid: uuid
+				]
 			}
-
+			rtn.disk_list = diskList
 		}
 		return rtn
 	}
 
 	static ServiceResponse getTemplate(HttpApiClient client, Map authConfig, String templateUuid) {
-		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion
-		def results = [success: false]
-		if (apiVersion == VMM_API_VERSION.V4_0_A1) {
-			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/templates/${templateUuid}", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
-		} else {
-			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/content/templates/${templateUuid}", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
-		}
+		def results = client.callJsonApi(authConfig.apiUrl, NutanixPrismV4Client.buildVmmContentV4Path("templates/${templateUuid}"), authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
 		if(results?.success) {
 			def template = results.data?.data
 			if (template && template?.templateVersionSpec) {
-				template.templateVersionSpec?.vmSpec = normalizeVmSpec(template.templateVersionSpec?.vmSpec, apiVersion)
+				template.templateVersionSpec?.vmSpec = normalizeVmSpec(template.templateVersionSpec?.vmSpec)
 			}
 			return ServiceResponse.success(results?.data)
 		} else {
@@ -1083,17 +1050,10 @@ class NutanixPrismComputeUtility {
 			}
 
 		}
-		VMM_API_VERSION apiVersion = authConfig.vmmApiVersion
-		def results = [success: false]
-		if (apiVersion == VMM_API_VERSION.V4_0_A1) {
-			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/templates/${templateUuid}/\$actions/deploy", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		} else {
-			results = client.callJsonApi(authConfig.apiUrl, "api/vmm/" + apiVersion.getCode() + "/content/templates/${templateUuid}/\$actions/deploy", authConfig.username, authConfig.password,
-							new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		}
+		def results = client.callJsonApi(authConfig.apiUrl, "${NutanixPrismV4Client.buildVmmContentV4Path("templates/${templateUuid}/\$actions/deploy")}", authConfig.username, authConfig.password,
+			new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
 		if(results?.success) {
-			return ServiceResponse.success(results?.data)
+			return ServiceResponse.success([task_uuid: results.data?.data?.extId])
 		} else {
 			return ServiceResponse.error("Error creating vm from template ${results}", null, results.data)
 		}
@@ -1161,7 +1121,7 @@ class NutanixPrismComputeUtility {
 	 */
 	static ServiceResponse listImagesV4(HttpApiClient client, Map authConfig) {
 		log.debug("listImagesV4")
-		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path(authConfig, 'images'), authConfig)
+		ServiceResponse listResult = NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildVmmContentV4Path('images'), authConfig)
 		if (listResult.success) {
 			listResult.data = listResult.data?.collect { image -> normalizeImageV4(image) }
 		}
