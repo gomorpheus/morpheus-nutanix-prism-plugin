@@ -2203,9 +2203,14 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			ProxyConfiguration proxyConfiguration = workloadRequest?.proxyConfiguration ?: hostRequest?.proxyConfiguration ?: null
 			client.networkProxy = buildNetworkProxy(proxyConfiguration)
 
+			// Tracks whether createResults came back from a V4 endpoint (cloneSnapshotV4/cloneVmV4/createVmV4,
+			// all normalized to a flat {task_uuid}) vs. the still-V3 createVmFromTemplate path, so the task
+			// polling/entity-lookup below know which task API to poll.
+			def isV4Create = false
 			if(runConfig.snapshotId) {
 				createResults = NutanixPrismComputeUtility.cloneSnapshotV4(client, authConfig, runConfig, runConfig.snapshotId as String)
 				log.debug("clone snapshot results: ${createResults}")
+				isV4Create = true
 			} else if(runConfig.cloneContainerId) {
 				sourceWorkload = morpheusContext.async.workload.get(runConfig.cloneContainerId).blockingGet()
 				def sourceServer = sourceWorkload?.server
@@ -2213,14 +2218,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				if(server.serverOs?.platform != PlatformType.windows) {
 					getPlugin().morpheus.executeCommandOnServer(sourceServer, 'sudo rm -f /etc/cloud/cloud.cfg.d/99-manual-cache.cfg; sudo cp /etc/machine-id /tmp/machine-id-old ; sync', false, sourceServer.sshUsername, sourceServer.sshPassword, null, null, null, null, true, true).blockingGet()
 				}
-				createResults = NutanixPrismComputeUtility.cloneVm(client, authConfig, runConfig, vmUuid)
+				createResults = NutanixPrismComputeUtility.cloneVmV4(client, authConfig, runConfig, vmUuid)
 				log.debug("clone server results: ${createResults}")
+				isV4Create = true
 			} else if(runConfig.isTemplate) {
 				createResults = NutanixPrismComputeUtility.createVmFromTemplate(client, authConfig, runConfig)
 				log.debug("create server results: ${createResults}")
 			} else if(virtualImage) {
-				createResults = NutanixPrismComputeUtility.createVm(client, authConfig, runConfig)
+				createResults = NutanixPrismComputeUtility.createVmV4(client, authConfig, runConfig)
 				log.debug("create server results: ${createResults}")
+				isV4Create = true
 			}
 
 			//check success
@@ -2242,10 +2249,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				morpheusContext.async.process.startProcessStep(process, new ProcessEvent(type: ProcessEvent.ProcessType.provisionLaunch), 'starting vm')
 
 				def taskId = createResults.data?.status?.execution_context?.task_uuid ?: createResults.data?.task_uuid ?: (createResults.data.data.extId.toString().split(":")[1])
-				// V4's dataprotection restore action (runConfig.snapshotId - see cloneSnapshotV4) returns a
-				// V4-shaped task extId, which V3's checkTaskReady/getTask (a different tasks endpoint) cannot
-				// resolve - must poll via checkTaskReadyV4 instead for that path only.
-				def taskResults = runConfig.snapshotId ?
+				// V4 endpoints (cloneSnapshotV4/cloneVmV4/createVmV4) return a V4-shaped task extId, which
+				// V3's checkTaskReady/getTask (a different tasks endpoint) cannot resolve - must poll via
+				// checkTaskReadyV4 instead for those paths. createVmFromTemplate remains on V3 task polling
+				// for now (pre-existing, not part of this migration).
+				def taskResults = isV4Create ?
 						NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId) :
 						NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
 				if(taskResults.success) {
@@ -2346,7 +2354,16 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 					}
 					else {
-						startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
+						// V4's power-on action needs no request body (see startVmV4/stage 1) - covers the
+						// cloneContainerId (cloneVmV4) and virtualImage (createVmV4) paths here, both now V4.
+						// Async, so must poll the returned task before treating it as started.
+						startResults = NutanixPrismComputeUtility.startVmV4(client, authConfig, server.externalId)
+						if(startResults.success && startResults.data?.task_uuid) {
+							def startTaskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, startResults.data.task_uuid)
+							startResults = startTaskResults.success ?
+									ServiceResponse.success(startTaskResults.data) :
+									ServiceResponse.error('Error starting VM', null, startTaskResults.data)
+						}
 					}
 					log.debug("start: ${startResults.success}")
 					if (startResults.success) {

@@ -745,6 +745,79 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		!result.success
 	}
 
+	void "createVmV4 posts a reshaped V4 Vm body and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+		def runConfig = [
+				name              : 'new-server',
+				numSockets        : 2,
+				coresPerSocket    : 1,
+				maxMemory         : 4096,
+				storageType       : 'scsi',
+				clusterReference  : [uuid: 'cluster-1'],
+				projectReference  : [uuid: 'project-1'],
+				diskList          : [
+						[
+								device_properties: [device_type: 'DISK', disk_address: [adapter_type: 'SCSI', device_index: 0]],
+								disk_size_bytes  : 21474836480,
+								data_source_reference: [uuid: 'image-1', name: 'image', kind: 'image']
+						]
+				],
+				nicList           : [
+						[is_connected: true, subnet_reference: [uuid: 'subnet-1', name: 'net1', kind: 'subnet']]
+				]
+		]
+
+		when:
+		def result = NutanixPrismComputeUtility.createVmV4(client, authConfig, runConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms', authConfig.username, authConfig.password, {
+			it.body.name == 'new-server' &&
+			it.body.numSockets == 2 &&
+			it.body.numCoresPerSocket == 1 &&
+			it.body.memorySizeBytes == 4096L * 1024L * 1024L &&
+			it.body.cluster == [extId: 'cluster-1'] &&
+			it.body.projectExtId == 'project-1' &&
+			it.body.disks[0].diskAddress == [busType: 'SCSI', index: 0] &&
+			it.body.disks[0].backingInfo['$objectType'] == 'vmm.v4.ahv.config.VmDisk' &&
+			it.body.disks[0].backingInfo.diskSizeBytes == 21474836480 &&
+			it.body.disks[0].backingInfo.dataSource.reference == [ '$objectType': 'vmm.v4.ahv.config.ImageReference', imageExtId: 'image-1']
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "cloneVmV4 posts a bare CloneOverrideParams body to the vmm V4 clone action and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+		def runConfig = [
+				name          : 'cloned-server',
+				numSockets    : 2,
+				coresPerSocket: 1,
+				maxMemory     : 4096,
+				cloudInitUserData: 'IyBjbG91ZC1jb25maWc=',
+				nicList       : [
+						[is_connected: true, subnet_reference: [uuid: 'subnet-1', name: 'net1', kind: 'subnet']]
+				]
+		]
+
+		when:
+		def result = NutanixPrismComputeUtility.cloneVmV4(client, authConfig, runConfig, 'vm-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1/$actions/clone', authConfig.username, authConfig.password, {
+			it.body.name == 'cloned-server' &&
+			it.body.numSockets == 2 &&
+			it.body.numCoresPerSocket == 1 &&
+			it.body.memorySizeBytes == 4096L * 1024L * 1024L &&
+			it.body.guestCustomization.config['$objectType'] == 'vmm.v4.ahv.config.CloudInit' &&
+			it.body.guestCustomization.config.cloudInitScript.value == 'IyBjbG91ZC1jb25maWc='
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
 	void "getVmV4 fetches the VM config and reads the ETag off the response headers"() {
 		given:
 		def client = Mock(HttpApiClient)

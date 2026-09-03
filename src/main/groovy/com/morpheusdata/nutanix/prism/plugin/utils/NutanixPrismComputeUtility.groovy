@@ -366,6 +366,172 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	/**
+	 * Creates a new VM via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.3 OpenAPI
+	 * spec - {@code POST vms}, body is a bare {@code Vm} object, no wrapper). Reshapes the same V3-shaped
+	 * {@code runConfig.diskList}/{@code nicList} the existing V3 {@link #createVm} already consumes into
+	 * V4's {@code disks[]}/{@code nics[]} (see {@link #convertDiskListTov4}/{@link #convertNicListTov4}),
+	 * rather than changing how {@code runConfig} is built. Cloud-init/sysprep is expressed via V4's
+	 * {@code $objectType}-discriminated {@code guestCustomization.config} (see
+	 * {@link #buildGuestCustomizationV4}), matching the pattern the existing V4 {@link #createVmFromTemplate}
+	 * already uses. UEFI/secure-boot/vTPM are mapped to the equivalent V4 {@code bootConfig}/
+	 * {@code machineType}/{@code vtpmConfig} fields; {@code windowsCredentialGuard} (V3's
+	 * {@code hardware_virtualization_enabled}) has no confirmed V4 {@code Vm} field and is intentionally
+	 * not carried over. Async, normalized to the same flat {@code {task_uuid}} shape as the other V4
+	 * mutations.
+	 */
+	static ServiceResponse createVmV4(HttpApiClient client, Map authConfig, Map runConfig) {
+		log.debug("createVmV4")
+
+		def body = [
+				name             : runConfig.name,
+				numSockets       : runConfig.numSockets,
+				numCoresPerSocket: runConfig.coresPerSocket,
+				memorySizeBytes  : (runConfig.maxMemory as Long) * 1024L * 1024L,
+				cluster          : [extId: runConfig.clusterReference?.uuid],
+				disks            : convertDiskListTov4(runConfig.diskList),
+				nics             : convertNicListTov4(runConfig.nicList),
+		]
+
+		if(runConfig.diskList?.size() > 1 || runConfig.uefi) {
+			body['bootConfig'] = [
+					"\$objectType": runConfig.uefi ? "vmm.v4.ahv.config.UefiBoot" : "vmm.v4.ahv.config.LegacyBoot",
+					bootDevice   : [
+							"\$objectType": "vmm.v4.ahv.config.BootDeviceDisk",
+							diskAddress  : [busType: runConfig.storageType?.toUpperCase(), index: 0]
+					]
+			]
+			if(runConfig.uefi) {
+				body['bootConfig']['isSecureBootEnabled'] = runConfig.secureBoot ? true : false
+				if(runConfig.secureBoot) {
+					body['machineType'] = "Q35"
+				}
+			}
+		}
+
+		if(runConfig.vtpm) {
+			body['vtpmConfig'] = [isVtpmEnabled: true]
+		}
+
+		def guestCustomization = buildGuestCustomizationV4(runConfig)
+		if(guestCustomization) {
+			body['guestCustomization'] = guestCustomization
+		}
+
+		if(runConfig.projectReference) {
+			body['projectExtId'] = runConfig.projectReference.uuid
+		}
+
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms"), authConfig, [:], 'POST', body)
+		if(result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Clones a new VM from an existing VM (not a snapshot - see {@link #cloneSnapshotV4} for that path)
+	 * via the VMM V4 REST API's dedicated clone action (confirmed against Nutanix's published vmm v4.3
+	 * OpenAPI spec - {@code POST vms/{extId}/$actions/clone}, body is a bare {@code CloneOverrideParams}
+	 * object, no wrapper - unlike V3's {@link #cloneVm}, which wraps overrides under an
+	 * {@code override_spec} key). Unlike {@link #cloneSnapshotV4}'s restore-with-override action,
+	 * {@code CloneOverrideParams} directly supports CPU/memory/nic overrides, so - unlike the post-clone
+	 * CPU/memory patch needed for gap A3 - no separate {@link #updateVmCpuMemoryV4} call is required
+	 * here. Async, normalized to the same flat {@code {task_uuid}} shape as the other V4 mutations.
+	 */
+	static ServiceResponse cloneVmV4(HttpApiClient client, Map authConfig, Map runConfig, String vmUuid) {
+		log.debug("cloneVmV4")
+
+		def body = [
+				name             : runConfig.name,
+				numSockets       : runConfig.numSockets,
+				numCoresPerSocket: runConfig.coresPerSocket,
+				memorySizeBytes  : (runConfig.maxMemory as Long) * 1024L * 1024L,
+				nics             : convertNicListTov4(runConfig.nicList),
+		]
+
+		def guestCustomization = buildGuestCustomizationV4(runConfig)
+		if(guestCustomization) {
+			body['guestCustomization'] = guestCustomization
+		}
+
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/\$actions/clone"), authConfig, [:], 'POST', body)
+		if(result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Reshapes V3-shaped guest-customization inputs ({@code runConfig.cloudInitUserData}/{@code isSysprep})
+	 * into V4's {@code $objectType}-discriminated {@code guestCustomization.config} shape, matching the
+	 * pattern already used by the existing V4 {@link #createVmFromTemplate}. Shared by {@link #createVmV4}
+	 * and {@link #cloneVmV4} to avoid duplicating this mapping in both.
+	 */
+	private static Map buildGuestCustomizationV4(Map runConfig) {
+		if(!runConfig.cloudInitUserData) {
+			return null
+		}
+		if(runConfig.isSysprep) {
+			return [
+					config: [
+							"\$objectType" : "vmm.v4.ahv.config.Sysprep",
+							sysprepScript: [
+									"\$objectType": "vmm.v4.ahv.config.Unattendxml",
+									value        : runConfig.cloudInitUserData
+							]
+					]
+			]
+		} else {
+			return [
+					config: [
+							"\$objectType"   : "vmm.v4.ahv.config.CloudInit",
+							cloudInitScript: [
+									"\$objectType": "vmm.v4.ahv.config.Userdata",
+									value        : runConfig.cloudInitUserData
+							]
+					]
+			]
+		}
+	}
+
+	/**
+	 * Reshapes V3-shaped {@code diskList} entries ({@code device_properties.disk_address}/
+	 * {@code disk_size_bytes}/{@code data_source_reference}/{@code storage_config}) into V4's
+	 * {@code disks[]} shape ({@code diskAddress}/{@code backingInfo}), confirmed against Nutanix's
+	 * published vmm v4.3 OpenAPI spec ({@code Disk}/{@code VmDisk}/{@code DataSource}/
+	 * {@code ImageReference} schemas - {@code backingInfo} and {@code dataSource.reference} are both
+	 * {@code $objectType}-discriminated unions requiring the explicit type string). Only used by
+	 * {@link #createVmV4} - clone (via {@link #cloneVmV4}) inherits the source VM's disks as-is and
+	 * only overrides CPU/memory/nics.
+	 */
+	private static List convertDiskListTov4(List diskList) {
+		return (diskList ?: []).collect { disk ->
+			def backingInfo = [
+					"\$objectType"  : "vmm.v4.ahv.config.VmDisk",
+					diskSizeBytes: disk.disk_size_bytes
+			]
+			if(disk.data_source_reference) {
+				backingInfo['dataSource'] = [
+						reference: [
+								"\$objectType": "vmm.v4.ahv.config.ImageReference",
+								imageExtId   : disk.data_source_reference.uuid
+						]
+				]
+			}
+			if(disk.storage_config?.storage_container_reference) {
+				backingInfo['storageContainer'] = [extId: disk.storage_config.storage_container_reference.uuid]
+			}
+			return [
+					diskAddress: [
+							busType: disk.device_properties?.disk_address?.adapter_type,
+							index  : disk.device_properties?.disk_address?.device_index
+					],
+					backingInfo: backingInfo
+			]
+		}
+	}
+
 	static ServiceResponse cloneSnapshot(HttpApiClient client, Map authConfig, Map runConfig, String snapshotUuid) {
 		log.debug("cloneSnapshot")
 
