@@ -1895,7 +1895,7 @@ class NutanixPrismComputeUtility {
 		return listResult
 	}
 
-	private static Map normalizeVmV4(Map vm, Map categoriesByExtId = [:]) {
+	static Map normalizeVmV4(Map vm, Map categoriesByExtId = [:]) {
 		def nicList = (vm.nics ?: []).collect { nic ->
 			def ip = nic.networkInfo?.ipv4Config?.ipAddress?.value
 			[
@@ -1912,7 +1912,7 @@ class NutanixPrismComputeUtility {
 					disk_size_bytes   : disk.backingInfo?.diskSizeBytes,
 					device_properties: [
 							device_type : 'DISK',
-							disk_address: [device_index: disk.diskAddress?.index]
+							disk_address: [device_index: disk.diskAddress?.index, adapter_type: disk.diskAddress?.busType]
 					]
 			]
 		}
@@ -2325,6 +2325,19 @@ class NutanixPrismComputeUtility {
 	 * {@code nics[].networkInfo.ipv4Config.ipAddress.value} (a single assigned address, unlike V3's
 	 * {@code ip_endpoint_list} array) - same {@link #checkIpv4Ip} filter reused to skip non-IPv4 values.
 	 */
+	/**
+	 * V4 equivalent of {@code checkServerReady} - polls a VM via {@link #getVmV4} (V4's flat Vm shape,
+	 * confirmed against the vmm v4.3 OpenAPI spec) instead of V3's {@code getVm}/{@code status.resources}
+	 * nesting. Same polling contract (20s interval, 60 attempts) and same result shape callers already
+	 * expect ({@code success}, {@code virtualMachine}, {@code ipAddress}, {@code diskList}, {@code nicList},
+	 * {@code name}) so existing call sites need only a method-name swap. V4's IP address lives at
+	 * {@code nics[].networkInfo.ipv4Config.ipAddress.value} (a single assigned address, unlike V3's
+	 * {@code ip_endpoint_list} array) - same {@link #checkIpv4Ip} filter reused to skip non-IPv4 values.
+	 * {@code virtualMachine}/{@code nicList}/{@code diskList} are normalized to the same V3-ish shape
+	 * {@link #normalizeVmV4} already produces for {@code listVMsV4}, so downstream consumers that expect
+	 * V3 field names (e.g. {@code status.cluster_reference.uuid}, {@code nic_type}, {@code
+	 * device_properties.disk_address.adapter_type}) keep working unchanged.
+	 */
 	static Map checkServerReadyV4(HttpApiClient client, Map authConfig, String vmId) {
 		def rtn = [success: false]
 		try {
@@ -2337,11 +2350,12 @@ class NutanixPrismComputeUtility {
 				def vm = serverDetail?.data
 				def ipAddress = (vm?.nics ?: []).collect { it.networkInfo?.ipv4Config?.ipAddress?.value }.find { checkIpv4Ip(it) }
 				if (serverDetail.success == true && vm?.powerState == 'ON' && vm?.nics?.size() > 0 && ipAddress) {
+					def normalizedVm = normalizeVmV4(vm)
 					rtn.success = true
-					rtn.virtualMachine = vm
+					rtn.virtualMachine = normalizedVm
 					rtn.ipAddress = ipAddress
-					rtn.diskList = vm.disks
-					rtn.nicList = vm.nics ?: []
+					rtn.diskList = normalizedVm.status.resources.disk_list
+					rtn.nicList = normalizedVm.status.resources.nic_list
 					rtn.name = vm.name
 					pending = false
 				}

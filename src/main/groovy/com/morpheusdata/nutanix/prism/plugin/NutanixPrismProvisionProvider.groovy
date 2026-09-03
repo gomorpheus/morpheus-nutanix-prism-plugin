@@ -2370,19 +2370,37 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					def startResults, reconfigureResults
 					//hack for inability to set project on cloned snapshot
 					if(runConfig.snapshotId && runConfig.projectReference) {
-						vmResource.data
-						if(vmResource.data?.spec?.resources) {
-							vmResource.data.spec.resources.power_state = 'ON'
-							vmResource.data.metadata.project_reference = runConfig.projectReference
+						def vmDetail = NutanixPrismComputeUtility.getVmV4(client, authConfig, server.externalId)
+						if(vmDetail.success) {
+							def vmBody = vmDetail.data
+							vmBody.powerState = 'ON'
+							vmBody.projectExtId = runConfig.projectReference.uuid
+							startResults = NutanixPrismComputeUtility.updateVmV4(client, authConfig, server.externalId, vmBody, vmBody.etag as String)
+							if(startResults.success && startResults.data?.task_uuid) {
+								def startTaskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, startResults.data.task_uuid)
+								startResults = startTaskResults.success ?
+										ServiceResponse.success(startTaskResults.data) :
+										ServiceResponse.error('Error starting VM', null, startTaskResults.data)
+							}
+						} else {
+							startResults = ServiceResponse.error(vmDetail.msg ?: 'Error fetching VM to start', null, vmDetail.data)
 						}
-						startResults = NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, vmResource.data)
 					} else if (runConfig.isTemplate) {
-						def serverDetail = NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)
-
-						applyDiskUpdateOnTemplateCreate(serverDetail, runConfig)
-						serverDetail.data.spec.resources.power_state = 'ON'
-						startResults = NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, serverDetail.data)
-
+						def vmDetail = NutanixPrismComputeUtility.getVmV4(client, authConfig, server.externalId)
+						if(vmDetail.success) {
+							def vmBody = vmDetail.data
+							applyDiskUpdateOnTemplateCreate(vmBody, runConfig)
+							vmBody.powerState = 'ON'
+							startResults = NutanixPrismComputeUtility.updateVmV4(client, authConfig, server.externalId, vmBody, vmBody.etag as String)
+							if(startResults.success && startResults.data?.task_uuid) {
+								def startTaskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, startResults.data.task_uuid)
+								startResults = startTaskResults.success ?
+										ServiceResponse.success(startTaskResults.data) :
+										ServiceResponse.error('Error starting VM', null, startTaskResults.data)
+							}
+						} else {
+							startResults = ServiceResponse.error(vmDetail.msg ?: 'Error fetching VM to start', null, vmDetail.data)
+						}
 					}
 					else {
 						// V4's power-on action needs no request body (see startVmV4/stage 1) - covers the
@@ -2403,7 +2421,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 							server = saveAndGet(server)
 						} else {
 							//good to go
-							def serverDetail = NutanixPrismComputeUtility.checkServerReady(client, authConfig, server.externalId)
+							def serverDetail = NutanixPrismComputeUtility.checkServerReadyV4(client, authConfig, server.externalId)
 							log.debug("serverDetail: ${serverDetail}")
 							if (serverDetail.success == true) {
 
@@ -2518,45 +2536,38 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 	}
 
-	private applyDiskUpdateOnTemplateCreate(ServiceResponse serverDetail, Map runConfig) {
-		// Build a map of desired disks from runConfig, keyed by device_index and device_type
-		def rc_deviceIndex = runConfig.diskList.collectEntries { [ [ device_index : it.device_properties.disk_address.device_index,
-																	device_type : it.device_properties.device_type ]: it] }
-		// Build a map of current disks from serverDetail, only including those with device_type 'DISK'
+	private applyDiskUpdateOnTemplateCreate(Map vmBody, Map runConfig) {
+		// Build a map of desired disks (reshaped to V4) from runConfig, keyed by busType and index.
+		// V4's Vm.disks list contains only real disks (CD-ROMs live in a separate cdRoms list), unlike
+		// V3's disk_list which mixed both and needed a device_type == 'DISK' filter.
+		def rc_deviceIndex = NutanixPrismComputeUtility.convertDiskListTov4(runConfig.diskList).collectEntries {
+			[[busType: it.diskAddress.busType, index: it.diskAddress.index]: it] }
 
-		def sd_deviceIndex = serverDetail.data.spec.resources.disk_list
-			.findAll { it.device_properties.device_type == 'DISK' }
-			.collectEntries {
-				[[ device_index : it.device_properties.disk_address.device_index,
-				   device_type : it.device_properties.device_type ]: it] }
+		def sd_deviceIndex = (vmBody.disks ?: []).collectEntries {
+			[[busType: it.diskAddress?.busType, index: it.diskAddress?.index]: it] }
 
-		// Update existing disks or add new ones from runConfig to serverDetail
-		rc_deviceIndex.each { rc_key, rc_diskListValue ->
+		// Update existing disks or add new ones from runConfig to vmBody
+		rc_deviceIndex.each { rc_key, rc_diskValue ->
 			def sd_disk = sd_deviceIndex[rc_key]
-			if (sd_disk && sd_disk.device_properties.device_type == 'DISK')
-			{	log.debug("Updating existing disk in serverDetail: ${sd_disk} - ${rc_diskListValue}")
-				// Update properties except for 'device_properties' and 'data_source_reference'
-				rc_diskListValue.each { key, value ->
-					if (!key.equalsIgnoreCase('device_properties') && !key.equalsIgnoreCase('data_source_reference')) {
-						sd_disk[key] = value
-					}
+			if (sd_disk) {
+				log.debug("Updating existing disk in vmBody: ${sd_disk} - ${rc_diskValue}")
+				// Only update sizing - preserve the disk's own identity/data source/storage container
+				if(sd_disk.backingInfo != null) {
+					sd_disk.backingInfo.diskSizeBytes = rc_diskValue.backingInfo.diskSizeBytes
 				}
-
-				//Its likely the sd_disk came back with a disk_size_mib, so we should update that too.
-				sd_disk.disk_size_mib = rc_diskListValue.disk_size_mib ? rc_diskListValue.disk_size_mib : (rc_diskListValue.disk_size_bytes / (1024L * 1024L))
-				log.debug("finalizing disk update in serverDetail: ${sd_disk}")
+				log.debug("finalizing disk update in vmBody: ${sd_disk}")
 			} else {
-				// Add new disk to serverDetail
-				log.debug("Adding new disk to serverDetail: ${rc_key} - ${rc_diskListValue}")
-				sd_deviceIndex[rc_key] = rc_diskListValue
-				serverDetail.data.spec.resources.disk_list << rc_diskListValue
+				// Add new disk to vmBody
+				log.debug("Adding new disk to vmBody: ${rc_key} - ${rc_diskValue}")
+				sd_deviceIndex[rc_key] = rc_diskValue
+				vmBody.disks = (vmBody.disks ?: []) + rc_diskValue
 			}
 		}
-		// Remove any disks from serverDetail that are not present in runConfig
-		sd_deviceIndex.eachWithIndex { Map.Entry entry, int index ->
+		// Remove any disks from vmBody that are not present in runConfig
+		sd_deviceIndex.each { Map.Entry entry ->
 			if (!rc_deviceIndex[entry.key]) {
-				log.debug("Removing disk from serverDetail: ${entry.key} - ${entry.value}")
-				serverDetail.data.spec.resources.disk_list.remove(entry.value)
+				log.debug("Removing disk from vmBody: ${entry.key} - ${entry.value}")
+				vmBody.disks.remove(entry.value)
 			}
 		}
 	}
