@@ -481,6 +481,54 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
+	/**
+	 * Powers on a VM via the VMM V4 REST API's dedicated power-on action (confirmed against Nutanix's
+	 * published vmm v4.3 OpenAPI spec - {@code POST vms/{extId}/$actions/power-on}). Unlike V3's
+	 * {@code startVm} (which PUTs a full VM body with {@code spec.resources.power_state} mutated),
+	 * this action takes no request body at all - power state is a dedicated action, not a field update -
+	 * so no prior GET/ETag is needed. Async, normalized to the same flat {@code {task_uuid}} shape used
+	 * by other V4 mutations (see {@link #revertVmV4}).
+	 */
+	static ServiceResponse startVmV4(HttpApiClient client, Map authConfig, String vmUuid) {
+		log.debug("startVmV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/\$actions/power-on"), authConfig, [:], 'POST', [:])
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Powers off a VM via the VMM V4 REST API's dedicated power-off action (confirmed against
+	 * Nutanix's published vmm v4.3 OpenAPI spec - {@code POST vms/{extId}/$actions/power-off}). This
+	 * is a hard/forced power-off (equivalent to pulling the power cord), matching V3's
+	 * {@code stopVm}/{@code power_state: OFF} behavior which was also non-graceful. No request body,
+	 * same normalization as {@link #startVmV4}.
+	 */
+	static ServiceResponse stopVmV4(HttpApiClient client, Map authConfig, String vmUuid) {
+		log.debug("stopVmV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/\$actions/power-off"), authConfig, [:], 'POST', [:])
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
+
+	/**
+	 * Deletes a VM via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.3 OpenAPI
+	 * spec - {@code DELETE vms/{extId}}). Unlike the PUT update operation on this same resource, delete
+	 * does not require an {@code If-Match}/ETag header (confirmed absent from the operation's
+	 * parameter list, only present on PUT) - so no prior GET is needed here either. Async, same
+	 * {@code {task_uuid}} normalization as the other VM mutation actions.
+	 */
+	static ServiceResponse destroyVmV4(HttpApiClient client, Map authConfig, String vmUuid) {
+		log.debug("destroyVmV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}"), authConfig, [:], 'DELETE')
+		if (result.success) {
+			result.data = [task_uuid: result.data?.extId]
+		}
+		return result
+	}
 
 	static ServiceResponse getTask(HttpApiClient client, Map authConfig, String uuid) {
 		log.debug("getTask")

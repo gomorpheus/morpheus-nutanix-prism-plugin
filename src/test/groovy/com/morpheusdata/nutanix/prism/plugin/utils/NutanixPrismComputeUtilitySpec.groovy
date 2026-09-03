@@ -778,6 +778,49 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.success
 	}
 
+	void "startVmV4 posts to the vmm V4 power-on action with no request body and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.startVmV4(client, authConfig, 'vm-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1/$actions/power-on', authConfig.username, authConfig.password, {
+			it.body == [:]
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "stopVmV4 posts to the vmm V4 power-off action with no request body and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.stopVmV4(client, authConfig, 'vm-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1/$actions/power-off', authConfig.username, authConfig.password, {
+			it.body == [:]
+		}, 'POST') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
+	void "destroyVmV4 calls DELETE on the vmm V4 vms endpoint and normalizes the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.destroyVmV4(client, authConfig, 'vm-1')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1', authConfig.username, authConfig.password, _, 'DELETE') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
 	void "deleteSnapshotV4 calls DELETE on the dataprotection V4 recovery-points endpoint and normalizes the task reference"() {
 		given:
 		def client = Mock(HttpApiClient)

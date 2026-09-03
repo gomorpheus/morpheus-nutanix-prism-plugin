@@ -971,13 +971,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
-			def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, server.externalId, vmResource.data)
+			def stopResults = NutanixPrismComputeUtility.stopVmV4(client, authConfig, server.externalId)
 			log.debug("stopResults: ${stopResults}")
 			if(stopResults.success == true) {
-				def taskId = stopResults?.data?.status?.execution_context?.task_uuid
+				def taskId = stopResults?.data?.task_uuid
 				if(taskId) {
-					def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+					def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 					if(taskResults.success == true) {
 						return ServiceResponse.success()
 					} else {
@@ -1003,13 +1002,12 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
-			def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, server.externalId, vmResource.data)
+			def startResults = NutanixPrismComputeUtility.startVmV4(client, authConfig, server.externalId)
 			log.debug("startResults: ${startResults}")
 			if(startResults.success == true) {
-				def taskId = startResults?.data?.status?.execution_context?.task_uuid
+				def taskId = startResults?.data?.task_uuid
 				if(taskId) {
-					def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+					def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 					if(taskResults.success == true) {
 						return ServiceResponse.success()
 					} else {
@@ -1036,12 +1034,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				HttpApiClient client = new HttpApiClient()
 				client.networkProxy = cloud.apiProxy
 				def authConfig = plugin.getAuthConfig(cloud)
-				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
-				def startResults = NutanixPrismComputeUtility.startVm(client, authConfig, computeServer.externalId, vmResource.data)
+				def startResults = NutanixPrismComputeUtility.startVmV4(client, authConfig, computeServer.externalId)
 				if(startResults.success == true) {
-					def taskId = startResults?.data?.status?.execution_context?.task_uuid
+					def taskId = startResults?.data?.task_uuid
 					if(taskId) {
-						def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+						def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 						if (taskResults.success == true) {
 							rtn.success = true
 						}
@@ -1067,12 +1064,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				HttpApiClient client = new HttpApiClient()
 				client.networkProxy = cloud.apiProxy
 				def authConfig = plugin.getAuthConfig(cloud)
-				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
-				def stopResults = NutanixPrismComputeUtility.stopVm(client, authConfig, computeServer.externalId, vmResource.data)
+				def stopResults = NutanixPrismComputeUtility.stopVmV4(client, authConfig, computeServer.externalId)
 				if(stopResults.success == true) {
-					def taskId = stopResults?.data?.status?.execution_context?.task_uuid
+					def taskId = stopResults?.data?.task_uuid
 					if(taskId) {
-						def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+						def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 						if (taskResults.success == true) {
 							rtn.success = true
 						}
@@ -1097,12 +1093,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				HttpApiClient client = new HttpApiClient()
 				client.networkProxy = cloud.apiProxy
 				def authConfig = plugin.getAuthConfig(cloud)
-				def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, computeServer.externalId)
-				def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, computeServer.externalId)
+				def removeResults = NutanixPrismComputeUtility.destroyVmV4(client, authConfig, computeServer.externalId)
 				if(removeResults.success == true) {
-					def taskId = removeResults?.data?.status?.execution_context?.task_uuid
+					def taskId = removeResults?.data?.task_uuid
 					if(taskId) {
-						def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+						def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 						if (taskResults.success == true) {
 							rtn.success = true
 						}
@@ -1128,12 +1123,11 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			def vmResource = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, server.externalId)
-			def removeResults = NutanixPrismComputeUtility.destroyVm(client, authConfig, server.externalId)
+			def removeResults = NutanixPrismComputeUtility.destroyVmV4(client, authConfig, server.externalId)
 			if(removeResults.success == true) {
-				def taskId = removeResults?.data?.status?.execution_context?.task_uuid
+				def taskId = removeResults?.data?.task_uuid
 				if(taskId) {
-					def taskResults = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, taskId)
+					def taskResults = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, taskId)
 					if(taskResults.success == true) {
 						return ServiceResponse.success()
 					} else {
