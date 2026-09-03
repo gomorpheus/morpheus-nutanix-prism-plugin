@@ -53,9 +53,6 @@ import javax.net.ssl.SSLSocket
 import java.security.cert.X509Certificate
 import java.time.OffsetDateTime
 
-import com.morpheusdata.retry.*
-import com.morpheusdata.retry.policies.*
-
 @Slf4j
 class NutanixPrismComputeUtility {
 
@@ -112,17 +109,6 @@ class NutanixPrismComputeUtility {
 		return rtn
 	}
 
-	static ServiceResponse getImage(HttpApiClient client, Map authConfig, String imageId) {
-		log.debug("checkImageId")
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'GET')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error getting image with ID ${imageId}", null, results.data)
-		}
-	}
-
 	/**
 	 * Gets an image via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.0.b1
 	 * OpenAPI spec - Image, ImageType, UrlSource schemas). Normalizes into the same shape
@@ -143,17 +129,6 @@ class NutanixPrismComputeUtility {
 		return result
 	}
 
-	static ServiceResponse deleteImage(HttpApiClient client, Map authConfig, String imageId) {
-		log.debug("deleteImage")
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'DELETE')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error()
-		}
-	}
-
 	/**
 	 * Deletes an image via the VMM V4 REST API. Like {@link #createImageV4}, this is asynchronous -
 	 * the response is a {@code prism.config.TaskReference}, normalized into the same
@@ -167,37 +142,6 @@ class NutanixPrismComputeUtility {
 			result.data = [status: [execution_context: [task_uuid: result.data?.extId]]]
 		}
 		return result
-	}
-
-	static ServiceResponse createImage(HttpApiClient client, Map authConfig, String imageName, String imageType, String sourceUri = null, String diskUuid = null) {
-		log.debug("createImage")
-		def body = [
-				spec: [
-				        name: imageName,
-						resources: [
-						        image_type: imageType
-						]
-				],
-				metadata: [
-				        kind: 'image'
-				]
-		]
-		if(sourceUri) {
-			body.spec.resources.source_uri = sourceUri
-		}
-		if(diskUuid) {
-			body.spec.resources.data_source_reference = [
-			    "kind": "vm_disk",
-				"uuid": diskUuid
-			]
-		}
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error creating image for ${imageName}", null, results.data)
-		}
 	}
 
 	/**
@@ -256,136 +200,6 @@ class NutanixPrismComputeUtility {
 						]
 				]
 		]
-	}
-
-	/**
-	 * V3-only direct binary upload of image bytes. Confirmed unused anywhere in this codebase today
-	 * (grep found no callers) - the actual "customer uploaded image" flow instead has Morpheus serve
-	 * the file via its own HTTP stream URL and passes that URL to {@code createImage}'s {@code sourceUri}
-	 * (see the comment in {@code NutanixPrismProvisionProvider} explaining this). Left as V3-only and
-	 * NOT migrated: Nutanix's vmm v4.0.b1 API has no binary/multipart image upload endpoint at all -
-	 * image creation is exclusively URL-based ({@code UrlSource}) or disk-clone-based
-	 * ({@code VmDiskSource}), confirmed by inspecting every {@code images} path in the vmm v4.0.b1
-	 * OpenAPI spec. Since the existing URL-based flow already covers the plugin's real usage, this is
-	 * not considered a functional regression - flagging here so it isn't silently assumed migrated.
-	 */
-	static ServiceResponse uploadImage(HttpApiClient client, Map authConfig, String imageExternalId, InputStream stream, Long contentLength) {
-		log.debug("uploadImage: ${imageExternalId}")
-		def imageStream = new BufferedInputStream(stream, 1200)
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageExternalId}/file", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type': ContentType.APPLICATION_OCTET_STREAM.toString(), 'Connection': 'Keep-Alive'], contentType: ContentType.APPLICATION_OCTET_STREAM, body: imageStream, contentLength: contentLength, ignoreSSL: true), 'PUT')
-		if(results?.success) {
-			return ServiceResponse.success()
-		} else {
-			return ServiceResponse.error()
-		}
-	}
-
-	static ServiceResponse createVm(HttpApiClient client, Map authConfig, Map runConfig) {
-		log.debug("createVM")
-
-		def resources = [
-				num_sockets: runConfig.numSockets,
-				memory_size_mib: runConfig.maxMemory,
-				num_vcpus_per_socket: runConfig.coresPerSocket,
-				disk_list: runConfig.diskList,
-				nic_list: runConfig.nicList,
-		]
-
-		if(runConfig.diskList.size() > 1 || runConfig.uefi) {
-			resources['boot_config'] = [boot_device: [disk_address:[adapter_type:runConfig.storageType.toUpperCase(), device_index:0]]]
-		}
-
-		if(runConfig.uefi) {
-			resources['boot_config'] = resources['boot_config'] ?:[:]
-			resources['boot_config']['boot_type'] = "UEFI"
-			if(runConfig.secureBoot) {
-				resources['machine_type'] = "Q35"
-				resources['boot_config']['boot_type'] = "SECURE_BOOT"
-			}
-			if(runConfig.windowsCredentialGuard) {
-				resources['hardware_virtualization_enabled'] = true
-			}
-			if(runConfig.vtpm) {
-				resources['vtpm_config'] = ["vtpm_enabled": true]
-			}
-
-		}
-
-		if(runConfig.vtpm) {
-			resources['vtpm_config'] = ['vtpm_enabled': true]
-		}
-
-		if(runConfig.cloudInitUserData) {
-			if(runConfig.isSysprep) {
-				resources['guest_customization'] = [
-					"sysprep": [
-						"unattend_xml": runConfig.cloudInitUserData
-					]
-				]
-			} else {
-				resources['guest_customization'] = [
-					"cloud_init": [
-						"user_data": runConfig.cloudInitUserData
-					],
-					"is_overridable": true
-				]
-			}
-		}
-
-		def body = [
-				spec: [
-						name: runConfig.name,
-						resources: resources,
-						cluster_reference: runConfig.clusterReference
-				],
-				metadata: [
-						kind: 'vm'
-				]
-		]
-
-		if(runConfig.projectReference) {
-			body.metadata.project_reference = runConfig.projectReference
-		}
-
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error creating vm for ${runConfig.name}", null, results.data)
-		}
-	}
-
-	static ServiceResponse cloneVm(HttpApiClient client, Map authConfig, Map runConfig, String vmUuid) {
-		log.debug("cloneVm")
-
-		def body = [
-			override_spec: [
-				name: runConfig.name,
-				num_sockets: runConfig.numSockets,
-				memory_size_mib: runConfig.maxMemory,
-				num_vcpus_per_socket: runConfig.coresPerSocket,
-				nic_list: runConfig.nicList
-			]
-		]
-
-		if(runConfig.cloudInitUserData) {
-			body['override_spec']['guest_customization'] = [
-				"cloud_init": [
-					"user_data": runConfig.cloudInitUserData
-				],
-				"is_overridable": true
-			]
-		}
-
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${vmUuid}/clone", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error cloning vm for ${runConfig.name}", null, results.data)
-		}
 	}
 
 	/**
@@ -553,38 +367,6 @@ class NutanixPrismComputeUtility {
 					],
 					backingInfo: backingInfo
 			]
-		}
-	}
-
-	static ServiceResponse cloneSnapshot(HttpApiClient client, Map authConfig, Map runConfig, String snapshotUuid) {
-		log.debug("cloneSnapshot")
-
-		def clusterUuid = runConfig.clusterReference?.uuid
-
-		def body = [
-			spec_list: [
-				[
-					name: runConfig.name,
-					num_vcpus: runConfig.numSockets,
-					memory_mb: runConfig.maxMemory,
-					num_cores_per_vcpu: runConfig.coresPerSocket,
-					override_network_config: false
-				]
-			],
-			vm_customization_config: [
-			   userdata: runConfig.cloudInitUserData,
-			   fresh_install: false
-			]
-
-		]
-
-
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots/${snapshotUuid}/clone", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error cloning snapshot vm for ${runConfig.name}", null, results.data)
 		}
 	}
 
@@ -855,111 +637,6 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse startVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
-		log.debug("startVm")
-		if(vmBody?.spec?.resources?.power_state) {
-			vmBody.spec.resources.power_state = 'ON'
-		}
-		Closure<Map> refreshVmBodyClosure = {
-			Map vmResource = refreshVmBody(client, authConfig, uuid, vmBody)
-			if(vmResource?.spec?.resources?.power_state) {
-				vmResource.spec.resources.power_state = 'ON'
-			}
-			return vmResource
-		}
-		return retryableUpdateVm(client, authConfig, uuid, vmBody, null, refreshVmBodyClosure)
-	}
-
-	static ServiceResponse stopVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
-		log.debug("stopVm")
-		if(vmBody?.spec?.resources?.power_state) {
-			vmBody.spec.resources.power_state = 'OFF'
-		}
-		Closure<Map> refreshVmBodyClosure = {
-			Map vmResource = refreshVmBody(client, authConfig, uuid, vmBody)
-			if(vmResource?.spec?.resources?.power_state) {
-				vmResource.spec.resources.power_state = 'OFF'
-			}
-			return vmResource
-		}
-		return retryableUpdateVm(client, authConfig, uuid, vmBody, null, refreshVmBodyClosure)
-	}
-
-	static adjustVmResources(HttpApiClient client, Map authConfig, String uuid, Map updateConfig, Map vmBody) {
-
-		if(vmBody?.spec?.resources) {
-			vmBody?.spec?.resources['num_sockets'] = updateConfig.numSockets
-			vmBody?.spec?.resources['memory_size_mib'] = updateConfig.maxMemory
-			vmBody?.spec?.resources['num_vcpus_per_socket'] = updateConfig.coresPerSocket
-		}
-		return retryableUpdateVm(client, authConfig, uuid, vmBody)
-	}
-
-	static ServiceResponse updateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
-		vmBody?.remove('status')
-		vmBody?.metadata?.remove('spec_hash')
-		log.debug("updateVm")
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error updating vm ${uuid}", null, results.data)
-		}
-	}
-
-	static ServiceResponse retryableUpdateVm(HttpApiClient client, Map authConfig, String uuid, Map vmBody, RetryUtility retryUtility = null, Closure<Map> refreshVmBody = null) {
-		log.debug("retryableUpdateVm")
-		if(!retryUtility) {
-			retryUtility = getSimpleRetryUtility()
-		}
-		def retryClosure = { RetryUtility ru ->
-			def currentAttempt = ru.getCurrentAttempt()
-			def maxAttempts = ru.getMaxAttempts()
-			log.debug("retryableUpdateVm attempt: ${currentAttempt}, maxAttempts: ${maxAttempts - 1}")
-			if(currentAttempt > 1 && refreshVmBody) {
-				//need to refresh the vmBody
-				vmBody = refreshVmBody()
-				log.debug("New vm body: {}", vmBody)
-			}
-			vmBody?.remove('status')
-			vmBody?.metadata?.remove('spec_hash')
-			def rtn = callApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'PUT', ['Content-Type':'application/json'], vmBody, [:])
-			if(isApiRetryRequired(rtn) && (currentAttempt < (maxAttempts - 1))) { //if reaching max attempts then just return the original results of API
-				throw retryException
-			}
-			return rtn
-		}
-
-		RetryableFunction rf = new RetryableFunction(retryClosure, retryUtility)
-		try {
-			def results = retryUtility.execute(rf)
-			if (results instanceof ServiceResponse) {
-				if(results?.success) {
-					return ServiceResponse.success(results.data)
-				} else {
-					return ServiceResponse.error("Error updating vm ${uuid}", null, results.data)
-				}
-			} else {
-				return ServiceResponse.error("Unable to obtains results from retryable update VM")
-			}
-		} catch (RetryException e) {
-			return ServiceResponse.error("Unable to obtain results from retryable update VM")
-		}
-	}
-
-	static ServiceResponse destroyVm(HttpApiClient client, Map authConfig, String uuid) {
-		log.debug("destroyVm")
-		def results = callRetryableApi("${authConfig.basePath}/vms/${uuid}", client, authConfig, 'DELETE', ['Content-Type':'application/json'])
-//		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/vms/${uuid}", authConfig.username, authConfig.password,
-//				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'DELETE')
-		if(results?.success) {
-			return ServiceResponse.success(results.data)
-		} else {
-			return ServiceResponse.error("Error deleting vm ${uuid}", null, results.data)
-		}
-	}
-
 	static Map getNutanixSession(Map authConfig) {
 		URIBuilder uriBuilder = new URIBuilder(authConfig.apiUrl)
 		uriBuilder.setPath("api/nutanix/v3/users/info")
@@ -1101,73 +778,6 @@ class NutanixPrismComputeUtility {
 			outboundClient.close()
 		}
 		return ServiceResponse.error("Error getting console for vm ${vmUuid}", null,null )
-	}
-
-	static ServiceResponse listSnapshots(HttpApiClient client, Map authConfig, String clusterUuid) {
-		log.debug("listSnapshots")
-
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], ignoreSSL: true), 'GET')
-
-		if(results?.success) {
-			return ServiceResponse.success(results?.data?.entities)
-		} else {
-			return ServiceResponse.error("Error listing snapshots for cluster ${clusterUuid}", null, results.data)
-		}
-	}
-
-
-	static ServiceResponse getSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String snapshotUuid) {
-		log.debug("getSnapshot")
-
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots/${snapshotUuid}", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], ignoreSSL: true), 'GET')
-
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error getting snapshot ${snapshotUuid}", null, results.data)
-		}
-	}
-
-
-	static ServiceResponse createSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String vmUuid, String snapshotName) {
-		log.debug("createSnapshot")
-
-		def body = [snapshot_specs:[[vm_uuid:vmUuid, snapshot_name:snapshotName]]]
-
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], body: body, ignoreSSL: true), 'POST')
-
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error creating snapshot for vm ${vmUuid}", null, results.data)
-		}
-	}
-
-	static ServiceResponse deleteSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String snapshotUuid) {
-		log.debug("deleteSnapshot")
-
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/snapshots/${snapshotUuid}", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], ignoreSSL: true), 'DELETE')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error deleting snapshot ${snapshotUuid}", null, results.data)
-		}
-	}
-
-	static ServiceResponse restoreSnapshot(HttpApiClient client, Map authConfig, String clusterUuid, String vmUuid, String snapshotUuid) {
-		log.debug("restoreSnapshot")
-		def body = [restore_network_configuration: true, snapshot_uuid: snapshotUuid, uuid: vmUuid]
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.v2basePath}/vms/${vmUuid}/restore", authConfig.username, authConfig.password,
-				new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, queryParams: [proxyClusterUuid:clusterUuid], body: body, ignoreSSL: true), 'POST')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error restoring snapshot ${snapshotUuid}", null, results.data)
-		}
 	}
 
 	/**
@@ -1411,28 +1021,6 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse createCategoryKey(HttpApiClient client, Map authConfig, String keyName) {
-		def body = [name: keyName]
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/categories/${keyName}", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'PUT')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error creating category key ${keyName}", null, results.data)
-		}
-	}
-
-	static ServiceResponse createCategoryValue(HttpApiClient client, Map authConfig, String keyName, String valueName) {
-		def body = [value: valueName]
-		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/categories/${keyName}/${valueName}", authConfig.username, authConfig.password,
-			new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], contentType: ContentType.APPLICATION_JSON, body: body, ignoreSSL: true), 'PUT')
-		if(results?.success) {
-			return ServiceResponse.success(results?.data)
-		} else {
-			return ServiceResponse.error("Error creating category value ${valueName} in key, ${keyName}", null, results.data)
-		}
-	}
-
 	/**
 	 * Creates a category via the Prism Central V4 REST API. Unlike V3 (a separate "create key" PUT
 	 * followed by a "create value under key" PUT), V4's {@code Category} resource always combines
@@ -1522,11 +1110,6 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	static ServiceResponse listNetworks(HttpApiClient client, Map authConfig) {
-		log.debug("listNetworks")
-		return callListApi(client, 'subnet', 'subnets/list', authConfig)
-	}
-
 	/**
 	 * Lists subnets via the Networking V4 REST API (confirmed against Nutanix's published networking
 	 * v4.0.b1 OpenAPI spec - Subnet, IPConfig, IPv4Config schemas). Normalizes each V4 Subnet entity into
@@ -1570,11 +1153,6 @@ class NutanixPrismComputeUtility {
 		]
 	}
 
-	static ServiceResponse listImages(HttpApiClient client, Map authConfig) {
-		log.debug("listImages")
-		return callListApi(client, 'image', 'images/list', authConfig)
-	}
-
 	/**
 	 * Lists images via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.0.b1 OpenAPI
 	 * spec - Image, ImageType, UrlSource/VmDiskSource schemas). Normalizes each V4 Image entity into
@@ -1588,11 +1166,6 @@ class NutanixPrismComputeUtility {
 			listResult.data = listResult.data?.collect { image -> normalizeImageV4(image) }
 		}
 		return listResult
-	}
-
-	static ServiceResponse listDisksV2(HttpApiClient client, Map authConfig) {
-		log.debug("listDisksV2")
-		return callListApiV2(client, 'disks', authConfig)
 	}
 
 	/**
@@ -1651,12 +1224,6 @@ class NutanixPrismComputeUtility {
 		return NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildClusterMgmtStatsV4Path("disks/${diskExtId}"), authConfig, ['$statType': 'LAST'])
 	}
 
-	static ServiceResponse listDatastores(HttpApiClient client, Map authConfig) {
-		log.debug("listDatastores")
-		def groupMemberAttributes = ['container_name','serial','storage.capacity_bytes','cluster','storage.free_bytes','state','message','reason']
-		return callGroupApi(client, 'storage_container', 'serial', groupMemberAttributes, authConfig)
-	}
-
 	/**
 	 * Lists datastores via the alpha-only "storage" V4 REST namespace (confirmed against Nutanix's
 	 * published storage v4.0.a3 OpenAPI spec - {@code StorageContainer}/{@code DataStore} schemas).
@@ -1709,16 +1276,6 @@ class NutanixPrismComputeUtility {
 		return rtn
 	}
 
-	static ServiceResponse listCategories(HttpApiClient client, Map authConfig) {
-		log.debug("listCategories")
-		return callListApi(client, 'category', 'categories/list', authConfig)
-	}
-
-	static ServiceResponse listCategoryValues(HttpApiClient client, Map authConfig, String categoryName) {
-		log.debug("listCategoryValues")
-		return callListApi(client, 'category', "categories/${categoryName}/list", authConfig)
-	}
-
 	/**
 	 * Lists categories via the Prism Central V4 REST API. Unlike the V3 API (separate "list keys" and
 	 * "list values for key" calls), V4 categories are a flat resource where each entry already combines
@@ -1728,11 +1285,6 @@ class NutanixPrismComputeUtility {
 	static ServiceResponse listCategoriesV4(HttpApiClient client, Map authConfig) {
 		log.debug("listCategoriesV4")
 		return NutanixPrismV4Client.callListApiV4(client, NutanixPrismV4Client.buildPrismV4Path('categories'), authConfig)
-	}
-
-	static ServiceResponse listClusters(HttpApiClient client, Map authConfig) {
-		log.debug("listClusters")
-		return callListApi(client, 'cluster', 'clusters/list', authConfig)
 	}
 
 	/**
@@ -1775,11 +1327,6 @@ class NutanixPrismComputeUtility {
 						]
 				]
 		]
-	}
-
-	static ServiceResponse listVPCs(HttpApiClient client, Map authConfig) {
-		log.debug("listVPCs")
-		return callListApi(client, 'vpc', 'vpcs/list', authConfig)
 	}
 
 	/**
@@ -1877,11 +1424,6 @@ class NutanixPrismComputeUtility {
 		return NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildClusterMgmtStatsV4Path("clusters/${clusterExtId}/hosts/${hostExtId}"), authConfig, ['$statType': 'LAST'])
 	}
 
-	static ServiceResponse listVMs(HttpApiClient client, Map authConfig) {
-		log.debug("listVMs")
-		return callListApi(client, 'vm', 'vms/list', authConfig)
-	}
-
 	/**
 	 * Lists VMs via the VMM V4 REST API (confirmed against Nutanix's published vmm v4.0.b1 OpenAPI spec -
 	 * Vm, Nic, Disk, Ipv4Config, DiskAddress, VmDisk schemas) and normalizes each entity into the same
@@ -1960,24 +1502,6 @@ class NutanixPrismComputeUtility {
 		]
 	}
 
-	static ServiceResponse listHostMetrics(HttpApiClient client, Map authConfig, List<String> hostUUIDs) {
-		log.debug("listHostMetrics")
-		def groupMemberAttributes = ['hypervisor_memory_usage_ppm', 'hypervisor_cpu_usage_ppm']
-		def appendToBody = [
-				entity_ids: hostUUIDs
-		]
-		return callGroupApi(client, 'host', 'hypervisor_memory_usage_ppm', groupMemberAttributes, authConfig, appendToBody)
-	}
-
-	static ServiceResponse listVMMetrics(HttpApiClient client, Map authConfig, List<String> vmUUIDs) {
-		log.debug("listVMMetrics")
-		def groupMemberAttributes = ['memory_usage_ppm', 'hypervisor_cpu_usage_ppm', 'controller_user_bytes']
-		def appendToBody = [
-				entity_ids: vmUUIDs
-		]
-		return callGroupApi(client, 'mh_vm', 'memory_usage_ppm', groupMemberAttributes, authConfig, appendToBody)
-	}
-
 	/**
 	 * Lists per-VM stats via the VMM V4 REST API's batch list endpoint
 	 * ({@code GET /vmm/v4.3/ahv/stats/vms}, confirmed against Nutanix's published vmm v4.3 OpenAPI
@@ -2033,48 +1557,6 @@ class NutanixPrismComputeUtility {
 		} else {
 			return fullName
 		}
-	}
-
-	static ServiceResponse cloudInitViaCD(HttpApiClient client, Map authConfig, String vmUuid, String imageUuid, Map vmBody) {
-		log.debug("cloudInitViaCD")
-		def cdromDisk = vmBody?.spec?.resources?.disk_list?.find { it.device_properties?.device_type == 'CDROM' }
-		def nextSataIndex = (vmBody?.spec?.resources?.disk_list.findAll { it.device_properties?.disk_address?.adapter_type == 'SATA' }?.collect { it.device_properties?.disk_address?.device_index ?: 0 }?.max() ?: 0) + 1
-
-		if(cdromDisk) {
-			cdromDisk.data_source_reference = [kind: 'image', uuid: imageUuid]
-		} else {
-			vmBody?.spec?.resources?.disk_list?.add([
-					device_properties: [
-						device_type: 'CDROM',
-						disk_address: [
-							"device_index": nextSataIndex,
-							"adapter_type": "SATA"
-						],
-					],
-					data_source_reference: [kind: 'image', uuid: imageUuid]
-			])
-		}
-
-		return updateVm(client, authConfig, vmUuid, vmBody)
-	}
-
-	static ServiceResponse ejectCdrom(HttpApiClient client, Map authConfig, String vmUuid) {
-		log.debug("ejectCdrom")
-		def vmResults = waitForPowerState(client, authConfig, vmUuid) //get latest spec information
-		if(vmResults.success && vmResults.data) {
-			def vmBody = vmResults.data
-			def cdromDisks = vmBody?.spec?.resources?.disk_list?.findAll { it.device_properties?.device_type?.toLowerCase() == 'cdrom' }
-			if(cdromDisks) {
-				cdromDisks.each { disk ->
-					//disk['device_properties']['is_empty'] = true //does not work
-					disk?.remove('data_source_reference')
-					disk?.remove('disk_size_bytes')
-					disk?.remove('disk_size_mib')
-				}
-				return updateVm(client, authConfig, vmUuid, vmBody)
-			}
-		}
-		return ServiceResponse.success()
 	}
 
 	/**
@@ -2244,59 +1726,6 @@ class NutanixPrismComputeUtility {
 		return rtn
 	}
 
-	private static ServiceResponse callGroupApi(HttpApiClient client, String entityType, String sortAttribute, List<String> groupMemberAttributes, Map authConfig, Map appendToBody = [:]) {
-		log.debug("callGroupApi: ${entityType}")
-		def rtn = new ServiceResponse(success: false)
-		try {
-			def hasMore = true
-			def maxResults = 250
-			rtn.data = []
-			def offset = 0
-			def attempt = 0
-			def body = [
-					entity_type                : entityType,
-					group_offset               : 0,
-					group_count                : 1,
-					group_member_count         : maxResults,
-					group_member_offset        : 0,
-					group_member_sort_attribute: sortAttribute,
-					group_member_attributes    : groupMemberAttributes.collect { [attribute: it] }
-			] + appendToBody
-
-			while(hasMore && attempt < 100) {
-				body.group_member_offset = offset
-				body.group_member_count = maxResults
-				def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/groups", authConfig.username, authConfig.password,
-						new HttpApiClient.RequestOptions(headers:['Content-Type':'application/json'], body:body, contentType: ContentType.APPLICATION_JSON, ignoreSSL: true), 'POST')
-				log.debug("callGroupApi results: ${results.toMap()}")
-				if(results?.success && !results?.hasErrors()) {
-					rtn.success = true
-					def groupResults = results.data.group_results.getAt(0)
-
-					if(groupResults?.entity_results?.size() > 0) {
-						rtn.data += groupResults.entity_results
-						hasMore = body.group_member_offset + groupResults.entity_results.size() < groupResults.total_entity_count
-						if(hasMore)
-							offset += maxResults
-					} else {
-						hasMore = false
-					}
-				} else {
-					if(!rtn.success) {
-						rtn.msg = results.data.message_list?.collect { it.message }?.join(' ')
-					}
-					hasMore = false
-				}
-				attempt++
-			}
-
-			return rtn
-		} catch(e) {
-			log.error "Error in callGroupApi: ${e}", e
-		}
-		return rtn
-	}
-
 	private static ServiceResponse callListApiV2(HttpApiClient client, String path, Map authConfig) {
 		log.debug("callListApiV2: path: ${path}")
 		def rtn = new ServiceResponse(success: false)
@@ -2396,67 +1825,6 @@ class NutanixPrismComputeUtility {
 		[value].flatten()
 	}
 
-
-	static Map waitForPowerState(HttpApiClient client, Map authConfig, String vmId) {
-		def rtn = [success:false]
-		try {
-			def pending = true
-			def attempts = 0
-			while(pending) {
-				sleep(1000l * 20l)
-				def serverDetail = getVm(client, authConfig, vmId)
-				log.debug("serverDetail: ${serverDetail}")
-				if(!serverDetail.success && serverDetail.data.code == 404 ) {
-					pending = false
-				}
-				def serverResource = serverDetail?.data?.status?.resources
-				if(serverDetail.success == true && serverResource.power_state) {
-					rtn.success = true
-					rtn.data = serverDetail.data
-					rtn.powerState = serverResource.power_state
-					pending = false
-				}
-				attempts ++
-				if(attempts > 60)
-					pending = false
-			}
-		} catch(e) {
-			log.error("An Exception Has Occurred: ${e.message}",e)
-		}
-		return rtn
-	}
-
-	static checkServerReady(HttpApiClient client, Map authConfig, String vmId) {
-		def rtn = [success:false]
-		try {
-			def pending = true
-			def attempts = 0
-			while(pending) {
-				sleep(1000l * 20l)
-				def serverDetail = getVm(client, authConfig, vmId)
-				log.debug("serverDetail: ${serverDetail}")
-				def serverResource = serverDetail?.data?.status?.resources
-				if(serverDetail.success == true && serverResource.power_state == 'ON' && serverResource.nic_list?.size() > 0 && serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)} ) {
-					rtn.success = true
-					rtn.virtualMachine = serverDetail.data
-					rtn.ipAddress = serverResource.nic_list.collect { it.ip_endpoint_list }.collect {it.ip}.flatten().find{checkIpv4Ip(it)}
-					rtn.diskList = serverResource.disk_list
-					rtn.nicList = serverResource.nic_list ?: []
-					if(serverResource.nic_list_status && serverResource.nic_list_status instanceof List) {
-						rtn.nicList += serverResource.nic_list_status
-					}
-					rtn.name = serverDetail?.data?.spec?.name
-					pending = false
-				}
-				attempts ++
-				if(attempts > 60)
-					pending = false
-			}
-		} catch(e) {
-			log.error("An Exception Has Occurred: ${e.message}",e)
-		}
-		return rtn
-	}
 
 	/**
 	 * V4 equivalent of {@code checkServerReady} - polls a VM via {@link #getVmV4} (V4's flat Vm shape,
@@ -2582,132 +1950,5 @@ class NutanixPrismComputeUtility {
 		}
 	}
 
-	private static ServiceResponse callApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:]) {
-		def contentType = opts.contentType ?: ContentType.APPLICATION_JSON
-		def ignoreSsl = opts.ignoreSSL ?: true
-
-		HttpApiClient.RequestOptions requestOptions = new HttpApiClient.RequestOptions()
-		if(headers) {
-			requestOptions.headers = headers
-		}
-		if(body) {
-			requestOptions.body = body
-		}
-		requestOptions.contentType = contentType
-		requestOptions.ignoreSSL = ignoreSsl
-
-		return client.callJsonApi(authConfig.apiUrl?.toString(), path, authConfig.username?.toString(), authConfig.password?.toString(), requestOptions, method)
-	}
-
-	private static ServiceResponse callRetryableApi(String path, HttpApiClient client, Map authConfig, String method, Map headers = null, Map body = null, Map opts = [:], RetryUtility retryUtility = null) {
-		if(!retryUtility) {
-			retryUtility = getLinearRetryUtility()
-		}
-		def retryClosure = { RetryUtility ru ->
-			def currentAttempt = ru.getCurrentAttempt()
-			def maxAttempts = ru.getMaxAttempts()
-			log.debug("callRetryableApi attempt: ${currentAttempt}, maxAttempts: ${maxAttempts - 1}")
-			def rtn = callApi(path, client, authConfig, method, headers, body, opts)
-			if(isApiRetryRequired(rtn) && (currentAttempt < maxAttempts - 1)) { //if reaching max attempts then just return the original results of API
-				throw retryException
-			}
-			return rtn
-		}
-		RetryableFunction rf = new RetryableFunction(retryClosure, retryUtility)
-		try {
-			def results = retryUtility.execute(rf)
-			if (results instanceof ServiceResponse) {
-				return results
-			} else {
-				return ServiceResponse.error("Unable to obtains results from retryable API")
-			}
-		} catch (RetryException e) {
-			return ServiceResponse.error("Unable to obtain results from retryable API")
-		}
-	}
-
-	private static Map refreshVmBody(HttpApiClient client, Map authConfig, String uuid, Map vmBody) {
-		log.debug("refreshVmBody: {}, {}, {}, {}", client, authConfig, uuid, vmBody)
-		Map vmResults = waitForPowerState(client, authConfig, uuid) //get latest spec information
-		log.debug("refresh results: {}", vmResults)
-		Map vmResource = vmBody
-		if (vmResults.success) {
-			if(vmResults instanceof Map) {
-				vmResource = vmResults.data as Map
-				log.debug("Obtained new vm body: {}", vmResource)
-			}
-		}
-		return vmResource
-	}
-
-	private static Boolean isApiRetryRequired(ServiceResponse results) {
-		def rtn = false
-		log.debug("isApiRetryRequired: {}", results)
-		log.debug("Error code: {}", results.getErrorCode())
-		log.debug("results.data: {}", results.data)
-		if (results.getErrorCode() == "409" || results?.data?.code == 409) {
-			if (results?.data?.message_list && results?.data?.message_list?.find { it?.reason?.equals("CONCURRENT_REQUESTS_NOT_ALLOWED") || it.message?.equals("Edit conflict: please retry change.") }) {
-				//we should retry this option
-				rtn = true
-				log.debug("retry required")
-			}
-		}
-		return rtn
-	}
-
-	private static RetryUtility getExponentialRetryUtility(Long initialSleepTime = 500l, Long maxAttempts = 5l) {
-		RetryUtility retryUtility
-		AbstractRetryDelayPolicy delayPolicy = new ExponentialRetryDelayPolicy()
-		delayPolicy.setInitialSleepTime(initialSleepTime)
-		delayPolicy.setMaxSleepTime(15000l)
-		delayPolicy.setMultiplier(2)
-		retryUtility = new RetryUtility(delayPolicy)
-		retryUtility.setMaxAttempts(maxAttempts)
-		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
-
-		return retryUtility
-	}
-
-	private static RetryUtility getSimpleRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 5l) {
-		RetryUtility retryUtility
-		AbstractRetryDelayPolicy delayPolicy = new SimpleRetryDelayPolicy()
-		retryUtility = new RetryUtility(delayPolicy)
-		delayPolicy.setInitialSleepTime(initialSleepTime)
-		retryUtility.setMaxAttempts(maxAttempts)
-		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
-
-		return retryUtility
-	}
-
-	private static RetryUtility getLinearRetryUtility(Long initialSleepTime = 1000l, Long maxAttempts = 30l) {
-		RetryUtility retryUtility
-		AbstractRetryDelayPolicy delayPolicy = new LinearRetryDelayPolicy()
-		delayPolicy.setInitialSleepTime(initialSleepTime)
-		retryUtility = new RetryUtility(delayPolicy)
-		retryUtility.setMaxAttempts(maxAttempts)
-		retryUtility.setRetryableErrors([(getRetryExceptionClass()): []])
-
-		return retryUtility
-	}
-
-	private static Exception getRetryException() {
-		return new PrismRetryException()
-	}
-
-	private static getRetryExceptionClass() {
-		return getRetryException().getClass()
-	}
-
 }
 
-class PrismRetryException extends Exception {
-	public PrismRetryException() {
-		super()
-	}
-	public PrismRetryException(String message) {
-		super(message)
-	}
-	public PrismRetryException(String message, Throwable cause) {
-		super(message, cause)
-	}
-}
