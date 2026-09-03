@@ -1168,7 +1168,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			HttpApiClient client = new HttpApiClient()
 			client.networkProxy = cloud.apiProxy
 			def authConfig = plugin.getAuthConfig(cloud)
-			Map serverDetails = NutanixPrismComputeUtility.checkServerReady(client, authConfig, serverUuid)
+			Map serverDetails = NutanixPrismComputeUtility.checkServerReadyV4(client, authConfig, serverUuid)
 			if(serverDetails.success && serverDetails.virtualMachine) {
 				rtn.externalId = serverUuid
 				rtn.success = serverDetails.success
@@ -1496,7 +1496,7 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		def serverUuid = server.externalId
 		HttpApiClient client = new HttpApiClient()
 		client.networkProxy = cloud.apiProxy
-		Map serverDetails = NutanixPrismComputeUtility.checkServerReady(client, authConfig, serverUuid)
+		Map serverDetails = NutanixPrismComputeUtility.checkServerReadyV4(client, authConfig, serverUuid)
 		if(serverDetails.success && serverDetails.virtualMachine) {
 			NutanixPrismSyncUtils.updateServerContainersAndInstances(server, null, morpheusContext)
 			return ServiceResponse.success()

@@ -2121,6 +2121,45 @@ class NutanixPrismComputeUtility {
 		return rtn
 	}
 
+	/**
+	 * V4 equivalent of {@code checkServerReady} - polls a VM via {@link #getVmV4} (V4's flat Vm shape,
+	 * confirmed against the vmm v4.3 OpenAPI spec) instead of V3's {@code getVm}/{@code status.resources}
+	 * nesting. Same polling contract (20s interval, 60 attempts) and same result shape callers already
+	 * expect ({@code success}, {@code virtualMachine}, {@code ipAddress}, {@code diskList}, {@code nicList},
+	 * {@code name}) so existing call sites need only a method-name swap. V4's IP address lives at
+	 * {@code nics[].networkInfo.ipv4Config.ipAddress.value} (a single assigned address, unlike V3's
+	 * {@code ip_endpoint_list} array) - same {@link #checkIpv4Ip} filter reused to skip non-IPv4 values.
+	 */
+	static Map checkServerReadyV4(HttpApiClient client, Map authConfig, String vmId) {
+		def rtn = [success: false]
+		try {
+			def pending = true
+			def attempts = 0
+			while (pending) {
+				sleep(1000l * 20l)
+				def serverDetail = getVmV4(client, authConfig, vmId)
+				log.debug("serverDetail: ${serverDetail}")
+				def vm = serverDetail?.data
+				def ipAddress = (vm?.nics ?: []).collect { it.networkInfo?.ipv4Config?.ipAddress?.value }.find { checkIpv4Ip(it) }
+				if (serverDetail.success == true && vm?.powerState == 'ON' && vm?.nics?.size() > 0 && ipAddress) {
+					rtn.success = true
+					rtn.virtualMachine = vm
+					rtn.ipAddress = ipAddress
+					rtn.diskList = vm.disks
+					rtn.nicList = vm.nics ?: []
+					rtn.name = vm.name
+					pending = false
+				}
+				attempts++
+				if (attempts > 60)
+					pending = false
+			}
+		} catch (e) {
+			log.error("An Exception Has Occurred: ${e.message}", e)
+		}
+		return rtn
+	}
+
 	static checkTaskReady(HttpApiClient client, Map authConfig, String taskId) {
 		def rtn = [success:false]
 		try {
