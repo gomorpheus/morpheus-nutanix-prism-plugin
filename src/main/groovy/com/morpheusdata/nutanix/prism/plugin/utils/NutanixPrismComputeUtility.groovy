@@ -90,6 +90,28 @@ class NutanixPrismComputeUtility {
 		return rtn
 	}
 
+	/**
+	 * Probes the VMM V4 REST API (hardcoded to {@link NutanixPrismV4Client#VMM_VM_API_VERSION},
+	 * v4.3) to confirm the target Prism Central is new enough to support this plugin's VM
+	 * lifecycle/CD-ROM/resize migration (requires AOS 7.6 / pc.7.6 or later). Issues a single,
+	 * minimal GET against the vms list endpoint ($limit=1) rather than a full paginated list, since
+	 * this is only a reachability/version check, not a data fetch.
+	 */
+	static ServiceResponse testConnectionV4(HttpApiClient client, Map authConfig) {
+		def rtn = new ServiceResponse(success: false)
+		try {
+			def results = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path('vms'), authConfig, ['$limit': '1'])
+			rtn.success = results.success
+			if(!results.success) {
+				rtn.data = [invalidLogin: results.data?.invalidLogin]
+				rtn.msg = results.msg
+			}
+		} catch(e) {
+			log.error("testConnectionV4 to ${authConfig.apiUrl}: ${e}")
+		}
+		return rtn
+	}
+
 	static ServiceResponse getImage(HttpApiClient client, Map authConfig, String imageId) {
 		log.debug("checkImageId")
 		def results = client.callJsonApi(authConfig.apiUrl, "${authConfig.basePath}/images/${imageId}", authConfig.username, authConfig.password,

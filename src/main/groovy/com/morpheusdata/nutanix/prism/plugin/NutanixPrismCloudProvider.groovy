@@ -466,7 +466,12 @@ class NutanixPrismCloudProvider implements CloudProvider {
 					HttpApiClient apiClient = new HttpApiClient()
 					def clusterList = NutanixPrismComputeUtility.listHostsV2(apiClient, authConfig)
 					if(clusterList.success == true) {
-						return ServiceResponse.success()
+						def vmmV4Test = NutanixPrismComputeUtility.testConnectionV4(apiClient, authConfig)
+						if(vmmV4Test.success == true) {
+							return ServiceResponse.success()
+						} else {
+							return new ServiceResponse(success: false, msg: 'Unable to reach the Nutanix VMM v4.3 API - this plugin requires AOS 7.6 / pc.7.6 or later')
+						}
 					} else {
 						return new ServiceResponse(success: false, msg: 'Invalid credentials')
 					}

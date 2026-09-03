@@ -970,4 +970,30 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.success
 		result.data.task_uuid == 'task-1'
 	}
+
+	void "testConnectionV4 succeeds when a minimal vmm V4 vms list call succeeds"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.testConnectionV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms', authConfig.username, authConfig.password, {
+			it.queryParams == ['$limit': '1']
+		}, 'GET') >> ServiceResponse.success([data: [data: []]])
+		result.success
+	}
+
+	void "testConnectionV4 fails when the vmm V4 endpoint is unreachable"() {
+		given:
+		def client = Mock(HttpApiClient)
+
+		when:
+		def result = NutanixPrismComputeUtility.testConnectionV4(client, authConfig)
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms', authConfig.username, authConfig.password, _, 'GET') >> new ServiceResponse(success: false, data: [error: [[message: 'Not Found']]])
+		!result.success
+	}
 }
