@@ -765,6 +765,60 @@ class NutanixPrismComputeUtility {
 	}
 
 	/**
+	 * Possible V4 REST replacement for {@link #getVMConsoleUrl} - NOT wired into any call site yet,
+	 * candidate only (WI-14, unverified against a live Prism Central - see the console-token JSON
+	 * field names caveat below before relying on this).
+	 * <p>
+	 * Nutanix publishes a documented, versioned (vmm v4.2+, so already covered by this plugin's v4.3
+	 * minimum), RBAC-gated ({@code Generate_VM_Console_Token} permission) console API that replaces
+	 * {@link #getNutanixSession}/{@link #getVMConsoleUrl}'s undocumented cookie-scraping approach:
+	 * <ol>
+	 *   <li>{@code POST vmm/v4.3/ahv/config/vms/{vmUuid}/$actions/generate-console-token} - async task,
+	 *       same {@code {task_uuid}} shape as other V4 mutation actions.</li>
+	 *   <li>Task completion details include {@code console_websocket_uri} ("WsUri", e.g.
+	 *       {@code "console/launch/{vmUuid}"}) and {@code console_token} ("VmConsoleToken", a JWT good
+	 *       for 1 hour).</li>
+	 *   <li>Client connects to {@code wss://<PC-IP>:9440/console/launch/{vmUuid}?VmConsoleToken=<jwt>}.</li>
+	 * </ol>
+	 * Source: https://www.nutanix.dev/2026/05/01/vm-console-external-access/
+	 * <p>
+	 * <b>Open question, not yet resolved:</b> the docs also state the WebSocket handshake "must also
+	 * include your session cookie" for identity validation, alongside the JWT. It's unconfirmed
+	 * whether this means the {@link #getNutanixSession} cookie-scraping call is still required
+	 * alongside this token flow, or whether the JWT alone is sufficient and the docs are describing
+	 * the legacy model. Likewise, the exact completion-detail {@code name} values ("WsUri"/
+	 * "VmConsoleToken" per the docs' example payload) have not been confirmed against this plugin's
+	 * {@code entitiesAffected}/{@code completionDetails} normalization ({@link #normalizeTaskV4}) on a
+	 * live instance. Needs verification against a live Prism Central before replacing the existing
+	 * method.
+	 */
+	static ServiceResponse getVMConsoleUrlV4(HttpApiClient client, Map authConfig, String vmUuid) {
+		log.debug("getVMConsoleUrlV4")
+		ServiceResponse result = NutanixPrismV4Client.callApiV4(client, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}/\$actions/generate-console-token"), authConfig, [:], 'POST', [:])
+		if (!result.success) {
+			return ServiceResponse.error("Error generating console token for vm ${vmUuid}", null, result.data)
+		}
+		def taskId = result.data?.extId
+		def taskResult = checkTaskReadyV4(client, authConfig, taskId)
+		if (!taskResult.success) {
+			return ServiceResponse.error("Error generating console token for vm ${vmUuid}", null, taskResult.data)
+		}
+
+		List completionDetails = taskResult.data?.completion_details ?: []
+		String wsUri = completionDetails.find { it.name == 'WsUri' }?.value
+		String consoleToken = completionDetails.find { it.name == 'VmConsoleToken' }?.value
+		if (!wsUri || !consoleToken) {
+			return ServiceResponse.error("Console token task for vm ${vmUuid} completed without a websocket URI/token", null, taskResult.data)
+		}
+
+		URIBuilder socketURI = new URIBuilder(authConfig.apiUrl)
+		socketURI.setScheme("wss")
+		socketURI.setPath(wsUri.startsWith('/') ? wsUri : "/${wsUri}")
+		socketURI.setParameter("VmConsoleToken", consoleToken)
+		return ServiceResponse.success([url: socketURI.build().toString()])
+	}
+
+	/**
 	 * Reverts a VM in-place to a prior recovery point via the VMM V4 REST API (confirmed against
 	 * Nutanix's published vmm v4.3 OpenAPI spec - {@code ahv.config.RevertParams} schema, also present
 	 * at v4.0.b1). Unlike Data Protection's {@code recovery-points/{extId}/$actions/restore} (which
