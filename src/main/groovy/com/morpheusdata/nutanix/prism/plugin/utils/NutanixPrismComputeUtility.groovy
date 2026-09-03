@@ -501,11 +501,13 @@ class NutanixPrismComputeUtility {
 	 * {@code disks[]} shape ({@code diskAddress}/{@code backingInfo}), confirmed against Nutanix's
 	 * published vmm v4.3 OpenAPI spec ({@code Disk}/{@code VmDisk}/{@code DataSource}/
 	 * {@code ImageReference} schemas - {@code backingInfo} and {@code dataSource.reference} are both
-	 * {@code $objectType}-discriminated unions requiring the explicit type string). Only used by
-	 * {@link #createVmV4} - clone (via {@link #cloneVmV4}) inherits the source VM's disks as-is and
-	 * only overrides CPU/memory/nics.
+	 * {@code $objectType}-discriminated unions requiring the explicit type string). Used by
+	 * {@link #createVmV4} for the initial disk set, and reused by
+	 * {@code NutanixPrismProvisionProvider.internalResizeDisks} (stage 4, disk add) to reshape a single
+	 * new V3-shaped disk entry before appending it to a V4 VM's {@code disks[]} - clone (via
+	 * {@link #cloneVmV4}) inherits the source VM's disks as-is and only overrides CPU/memory/nics.
 	 */
-	private static List convertDiskListTov4(List diskList) {
+	static List convertDiskListTov4(List diskList) {
 		return (diskList ?: []).collect { disk ->
 			def backingInfo = [
 					"\$objectType"  : "vmm.v4.ahv.config.VmDisk",
@@ -644,6 +646,33 @@ class NutanixPrismComputeUtility {
 			return ServiceResponse.success(results.data?.data)
 		} else {
 			return ServiceResponse.error("Error updating vm ${vmUuid} cpu/memory", null, results.data)
+		}
+	}
+
+	/**
+	 * Generic VM update via the VMM V4 REST API's {@code PUT vms/{extId}} (confirmed against Nutanix's
+	 * published vmm v4.3 OpenAPI spec - same operation {@link #updateVmCpuMemoryV4} uses, which is
+	 * single-purpose (cpu/memory only)). This variant accepts an already-mutated V4 {@code vmBody} as-is
+	 * (e.g. {@code disks[]}/{@code nics[]}/{@code categories} mutated by the caller), making it reusable
+	 * for the disk/network-resize and metadata-tag flows (see
+	 * {@code NutanixPrismProvisionProvider.internalResizeServer}/{@code internalResizeDisks}/
+	 * {@code updateMetadataTags}, stage 4). Requires the ETag from a prior {@link #getVmV4} as the
+	 * mandatory {@code If-Match} header, same as {@link #updateVmCpuMemoryV4}. Async, normalized to the
+	 * same flat {@code {task_uuid}} shape as the other V4 mutations (unlike
+	 * {@link #updateVmCpuMemoryV4}, which returns the raw response body) so callers can poll via
+	 * {@link #checkTaskReadyV4} before relying on the mutation having taken effect - important here since
+	 * each subsequent disk/nic mutation needs a fresh ETag from a completed prior update.
+	 */
+	static ServiceResponse updateVmV4(HttpApiClient client, Map authConfig, String vmUuid, Map vmBody, String etag) {
+		log.debug("updateVmV4")
+		vmBody.remove('etag')
+		def headers = NutanixPrismV4Client.buildV4Headers() + ['If-Match': etag]
+		def results = client.callJsonApi(authConfig.apiUrl, NutanixPrismV4Client.buildVmmV4Path("vms/${vmUuid}"), authConfig.username, authConfig.password,
+				new HttpApiClient.RequestOptions(headers: headers, contentType: ContentType.APPLICATION_JSON, body: vmBody, ignoreSSL: true), 'PUT')
+		if (results?.success) {
+			return ServiceResponse.success([task_uuid: results.data?.data?.extId])
+		} else {
+			return ServiceResponse.error("Error updating vm ${vmUuid}", null, results.data)
 		}
 	}
 
@@ -2366,7 +2395,15 @@ class NutanixPrismComputeUtility {
 		return rtn
 	}
 
-	private static convertNicListTov4(List nicList) {
+	/**
+	 * Reshapes V3-shaped {@code nicList} entries ({@code is_connected}/{@code subnet_reference}/
+	 * {@code ip_endpoint_list}) into V4's {@code nics[]} shape ({@code backingInfo}/{@code networkInfo}),
+	 * confirmed against Nutanix's published vmm v4.3 OpenAPI spec. Used by {@link #createVmV4}/
+	 * {@link #cloneVmV4} for the initial nic set, and reused by
+	 * {@code NutanixPrismProvisionProvider.internalResizeServer} (stage 4, network add) to reshape a
+	 * single new V3-shaped nic entry before appending it to a V4 VM's {@code nics[]}.
+	 */
+	static convertNicListTov4(List nicList) {
 		def newNicList = nicList.collect { nic ->
 			def nicMap = [
 				backingInfo: [

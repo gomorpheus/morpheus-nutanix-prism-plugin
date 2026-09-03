@@ -851,6 +851,24 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		result.success
 	}
 
+	void "updateVmV4 sends the If-Match header with the ETag and the caller-mutated body, normalizing the task reference"() {
+		given:
+		def client = Mock(HttpApiClient)
+		def vmBody = [extId: 'vm-1', disks: [[extId: 'disk-1']], etag: 'etag-value']
+
+		when:
+		def result = NutanixPrismComputeUtility.updateVmV4(client, authConfig, 'vm-1', vmBody, 'etag-value')
+
+		then:
+		1 * client.callJsonApi(authConfig.apiUrl, 'api/vmm/v4.3/ahv/config/vms/vm-1', authConfig.username, authConfig.password, {
+			it.headers['If-Match'] == 'etag-value' &&
+			it.body.disks == [[extId: 'disk-1']] &&
+			!it.body.containsKey('etag')
+		}, 'PUT') >> ServiceResponse.success([data: [extId: 'task-1']])
+		result.success
+		result.data.task_uuid == 'task-1'
+	}
+
 	void "startVmV4 posts to the vmm V4 power-on action with no request body and normalizes the task reference"() {
 		given:
 		def client = Mock(HttpApiClient)

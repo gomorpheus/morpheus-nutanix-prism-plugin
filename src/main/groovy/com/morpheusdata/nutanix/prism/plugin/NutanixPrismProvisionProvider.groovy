@@ -1192,7 +1192,6 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		HttpApiClient client = new HttpApiClient()
 		client.networkProxy = cloud.apiProxy
 		def authConfig = plugin.getAuthConfig(cloud)
-		def cloudItem = opts.cloudVm ?: NutanixPrismComputeUtility.getVm(client, authConfig, server.externalId)?.data
 
 		def currentTags = []
 
@@ -1202,8 +1201,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				// V4's categories API always creates key+value together in one call - no separate
 				// "create key" step exists (see createCategoryV4 doc comment).
 				def categoryResults = NutanixPrismComputeUtility.createCategoryV4(client, authConfig, tag.name, tag.value)
-				if(categoryResults.success) {
-					tag.externalId = "${tag.name}:${tag.value}"
+				if(categoryResults.success && categoryResults.data?.extId) {
+					// V4 categories are referenced by extId, not the "name:value" composite string V3's
+					// categories_mapping matched on - tag.externalId is only ever read as a "has this
+					// category been created yet" flag elsewhere in this method, so storing the real V4
+					// extId here (instead of the old synthetic string) is safe and is what the V4
+					// categories[] update below needs.
+					tag.externalId = categoryResults.data.extId
 					tag.refType = 'ComputeZone'
 					tag.refId = cloud.id
 					morpheusContext.async.metadataTag.save(tag).blockingGet()
@@ -1214,9 +1218,19 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 				currentTags += tag
 			}
 		}
-		cloudItem.metadata.categories = currentTags.collectEntries {[it.name, it.value]}
-		cloudItem.metadata.categories_mapping = currentTags.collectEntries {[it.name, [it.value]]}
-		NutanixPrismComputeUtility.updateVm(client, authConfig, server.externalId, cloudItem)
+
+		def vmDetailV4 = NutanixPrismComputeUtility.getVmV4(client, authConfig, server.externalId)
+		if(vmDetailV4.success) {
+			vmDetailV4.data.categories = currentTags.collect { [extId: it.externalId] }
+			def result = NutanixPrismComputeUtility.updateVmV4(client, authConfig, server.externalId, vmDetailV4.data, vmDetailV4.data?.etag as String)
+			if(result.success && result.data?.task_uuid) {
+				NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, result.data.task_uuid)
+			} else if(!result.success) {
+				log.warn("Error updating metadata tags for vm ${server.externalId}: ${result.msg}")
+			}
+		} else {
+			log.warn("Error fetching vm ${server.externalId} to update metadata tags: ${vmDetailV4.msg}")
+		}
 
 		return ServiceResponse.success()
 	}
@@ -1250,47 +1264,48 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 
 			deleteSnapshots(server, [:])
 
-			def serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-			def vmBody = serverDetails?.data
-
 			def maxCores = resizeRequest.maxCores ?: 1
 			def coresPerSocket = resizeRequest.coresPerSocket ?: 1
 			if(coresPerSocket == 0) {
 				coresPerSocket = 1
 			}
+			def numSockets = maxCores.toInteger() / coresPerSocket.toInteger()
 
-			def updatedResources = [
-				maxMemory: resizeRequest.maxMemory.div(ComputeUtility.ONE_MEGABYTE),
-				maxCores: maxCores,
-				coresPerSocket: coresPerSocket,
-				numSockets: maxCores.toInteger() / coresPerSocket.toInteger()
-
-			]
-			def updateResourcesResult = NutanixPrismComputeUtility.adjustVmResources(client, authConfig, vmId, updatedResources, vmBody)
-
-			if(updateResourcesResult.data?.status?.execution_context?.task_uuid) {
-				def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, updateResourcesResult.data?.status?.execution_context?.task_uuid)
+			// cpu/memory - reuses the existing V4 updateVmCpuMemoryV4 (see gap A3) which needs a fresh
+			// GET+ETag per call, same as the disk/network mutations below.
+			def vmDetailV4 = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+			if(vmDetailV4.success) {
+				def updateResourcesResult = NutanixPrismComputeUtility.updateVmCpuMemoryV4(client, authConfig, vmId, vmDetailV4.data,
+						vmDetailV4.data?.etag as String, numSockets as Integer, coresPerSocket as Integer, resizeRequest.maxMemory as Long)
+				if(updateResourcesResult.success && updateResourcesResult.data?.extId) {
+					NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, updateResourcesResult.data.extId)
+				} else if(!updateResourcesResult.success) {
+					rtn.setError("Error resizing cpu/memory: ${updateResourcesResult.msg}")
+					log.warn("Error resizing cpu/memory: ${updateResourcesResult.msg}")
+				}
+			} else {
+				rtn.setError("Error fetching vm to resize cpu/memory: ${vmDetailV4.msg}")
+				log.warn("Error fetching vm ${vmId} to resize cpu/memory: ${vmDetailV4.msg}")
 			}
 
-			internalResizeDisks(resizeRequest, client, authConfig, vmId, server, rtn, serverDetails, vmBody)
+			internalResizeDisks(resizeRequest, client, authConfig, vmId, server, rtn)
 
 
 			//networks
 
 			def networksToDelete = resizeRequest.interfacesDelete?.collect {it.externalId}
 			if(networksToDelete.size() > 0) {
-				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-				vmBody = serverDetails?.data
-				def newNicList = vmBody.spec?.resources?.nic_list?.findAll { !networksToDelete.contains(it.uuid) }
-				vmBody.spec?.resources?.nic_list = newNicList
-				def deleteResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-				if(deleteResults.success == true) {
-					if(deleteResults.data?.status?.execution_context?.task_uuid) {
-						def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, deleteResults.data?.status?.execution_context?.task_uuid)
-					}
-					log.info("resize network delete complete: ${deleteResults.success}")
-					resizeRequest.interfacesDelete?.each { ComputeServerInterface networkDelete ->
-						morpheusContext.async.computeServer.computeServerInterface.remove([networkDelete], server).blockingGet()
+				def vmDetail = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+				if(vmDetail.success) {
+					def vmBody = vmDetail.data
+					vmBody.nics = vmBody.nics?.findAll { !networksToDelete.contains(it.extId) }
+					def deleteResults = NutanixPrismComputeUtility.updateVmV4(client, authConfig, vmId, vmBody, vmBody.etag as String)
+					if(deleteResults.success == true && deleteResults.data?.task_uuid) {
+						NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, deleteResults.data.task_uuid)
+						log.info("resize network delete complete: ${deleteResults.success}")
+						resizeRequest.interfacesDelete?.each { ComputeServerInterface networkDelete ->
+							morpheusContext.async.computeServer.computeServerInterface.remove([networkDelete], server).blockingGet()
+						}
 					}
 				}
 			}
@@ -1300,8 +1315,13 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 //			}
 //
 			resizeRequest.interfacesAdd?.each{ Map networkAdd ->
-				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-				vmBody = serverDetails?.data
+				def vmDetail = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+				if(!vmDetail.success) {
+					rtn.setError("error adding network: ${vmDetail.msg}")
+					log.warn("error adding network: ${vmDetail.msg}")
+					return
+				}
+				def vmBody = vmDetail.data
 				def newIndex = networkAdd?.network?.isPrimary ? 0 : server.interfaces?.size()
 
 				Network newNetwork = morpheusContext.async.network.listById([networkAdd.network.id.toLong()]).firstOrError().blockingGet()
@@ -1322,38 +1342,37 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 						]
 					]
 				}
-				def newNicList = vmBody.status?.resources?.nic_list
-				def oldNicList = newNicList.collect {it.uuid}
-				newNicList << networkConfig
+				def oldNicExtIds = (vmBody.nics ?: []).collect {it.extId}
+				vmBody.nics = (vmBody.nics ?: []) + NutanixPrismComputeUtility.convertNicListTov4([networkConfig])
 
-
-				vmBody.status.resources.nic_list = newNicList
-				def networkResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-				if(networkResults.success) {
+				def networkResults = NutanixPrismComputeUtility.updateVmV4(client, authConfig, vmId, vmBody, vmBody.etag as String)
+				if(networkResults.success && networkResults.data?.task_uuid) {
 					//wait for operation to complete
-					if(networkResults.data?.status?.execution_context?.task_uuid) {
-						def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, networkResults.data?.status?.execution_context?.task_uuid)
+					def taskResult = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, networkResults.data.task_uuid)
+					if(taskResult.success) {
+						def refreshedVm = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+						def newNic = refreshedVm.data?.nics?.find {!oldNicExtIds.contains(it.extId)}
+						def newInterface = new ComputeServerInterface([
+							externalId      : newNic?.extId,
+							type            : new ComputeServerInterfaceType(code: 'nutanix-prism-normal-nic'),
+							macAddress      : newNic?.backingInfo?.macAddress,
+							name            : "eth${newIndex}",
+							ipAddress       : newNic?.networkInfo?.ipv4Config?.ipAddress?.value,
+							network         : newNetwork ? new Network(id: newNetwork.id) : null,
+							displayOrder    : newIndex,
+							primaryInterface: networkAdd?.network?.isPrimary ? true : false
+						])
+						morpheusContext.async.computeServer.computeServerInterface.create([newInterface], server).blockingGet()
+						// Need to refetch the server
+						server = morpheusContext.async.computeServer.get(server.id).blockingGet()
+					} else {
+						rtn.setError("error adding network: task failed")
+						log.warn("error adding network: task failed")
 					}
-					serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-					vmBody = serverDetails?.data
-					def newNic = vmBody.status.resources.nic_list.find {!oldNicList.contains(it.uuid)}
-					def newInterface = new ComputeServerInterface([
-						externalId      : newNic.uuid,
-						type            : new ComputeServerInterfaceType(code: 'nutanix-prism-normal-nic'),
-						macAddress      : newNic.mac_address,
-						name            : "eth${newIndex}",
-						ipAddress       : newNic.ip_endpoint_list?.getAt(0)?.ip,
-						network         : newNetwork ? new Network(id: newNetwork.id) : null,
-						displayOrder    : newIndex,
-						primaryInterface: networkAdd?.network?.isPrimary ? true : false
-					])
-					morpheusContext.async.computeServer.computeServerInterface.create([newInterface], server).blockingGet()
-					// Need to refetch the server
-					server = morpheusContext.async.computeServer.get(server.id).blockingGet()
 				} else {
 					//do stuff here to bubble up results
-					rtn.setError("error adding disk: ${addDiskResults?.msg}")
-					log.warn("error adding disk: ${addDiskResults}")
+					rtn.setError("error adding network: ${networkResults?.msg}")
+					log.warn("error adding network: ${networkResults}")
 				}
 
 			}
@@ -1365,24 +1384,23 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		return rtn
 	}
 
-	private void internalResizeDisks(ResizeRequest resizeRequest, HttpApiClient client, authConfig, vmId, ComputeServer server, rtn, serverDetails, vmBody) {
+	private void internalResizeDisks(ResizeRequest resizeRequest, HttpApiClient client, authConfig, vmId, ComputeServer server, rtn) {
 		//disks
 		//skip controllers for now
 		//remove disks to delete
 		def volumesToDelete = resizeRequest.volumesDelete?.collect { it.externalId }
 		if (volumesToDelete.size() > 0) {
-			serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-			vmBody = serverDetails?.data
-			def newDiskList = vmBody.spec?.resources?.disk_list?.findAll { !volumesToDelete.contains(it.uuid) }
-			vmBody.spec?.resources?.disk_list = newDiskList
-			def deleteResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-			if (deleteResults.success == true) {
-				if (deleteResults.data?.status?.execution_context?.task_uuid) {
-					def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, deleteResults.data?.status?.execution_context?.task_uuid)
-				}
-				log.info("resize volume delete complete: ${deleteResults.success}")
-				resizeRequest.volumesDelete?.each { StorageVolume volume ->
-					morpheusContext.async.storageVolume.remove([volume], server, true).blockingGet()
+			def vmDetail = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+			if (vmDetail.success) {
+				def vmBody = vmDetail.data
+				vmBody.disks = vmBody.disks?.findAll { !volumesToDelete.contains(it.extId) }
+				def deleteResults = NutanixPrismComputeUtility.updateVmV4(client, authConfig, vmId, vmBody, vmBody.etag as String)
+				if (deleteResults.success == true && deleteResults.data?.task_uuid) {
+					NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, deleteResults.data.task_uuid)
+					log.info("resize volume delete complete: ${deleteResults.success}")
+					resizeRequest.volumesDelete?.each { StorageVolume volume ->
+						morpheusContext.async.storageVolume.remove([volume], server, true).blockingGet()
+					}
 				}
 			}
 		}
@@ -1393,19 +1411,27 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 			Map updateProps = volumeUpdate.updateProps
 			log.info("resizing vm storage: {}", volumeUpdate)
 			if (updateProps.maxStorage > existing.maxStorage) {
-				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-				vmBody = serverDetails?.data
-				def newDiskList = vmBody.spec?.resources?.disk_list
-				def diskMap = newDiskList.find { it.uuid == existing.externalId }
-				diskMap.disk_size_bytes = updateProps.maxStorage
-				diskMap.remove("disk_size_mib")
-				def result = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-				if (result.success) {
-					if (result.data?.status?.execution_context?.task_uuid) {
-						def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, result.data?.status?.execution_context?.task_uuid)
+				def vmDetail = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+				if (!vmDetail.success) {
+					rtn.setError(vmDetail.msg ?: "Failed to expand Disk: ${existing.name}")
+					log.warn("error resizing disk: ${vmDetail.msg}")
+					return
+				}
+				def vmBody = vmDetail.data
+				def diskMap = vmBody.disks?.find { it.extId == existing.externalId }
+				if (diskMap?.backingInfo != null) {
+					diskMap.backingInfo.diskSizeBytes = updateProps.maxStorage
+				}
+				def result = NutanixPrismComputeUtility.updateVmV4(client, authConfig, vmId, vmBody, vmBody.etag as String)
+				if (result.success && result.data?.task_uuid) {
+					def taskResult = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, result.data.task_uuid)
+					if (taskResult.success) {
+						existing.maxStorage = updateProps.maxStorage
+						morpheusContext.async.storageVolume.save([existing]).blockingGet()
+					} else {
+						rtn.setError("Failed to expand Disk: ${existing.name}")
+						log.warn("error resizing disk: task failed")
 					}
-					existing.maxStorage = updateProps.maxStorage
-					morpheusContext.async.storageVolume.save([existing]).blockingGet()
 				} else {
 					rtn.setError(result.msg ?: "Failed to expand Disk: ${existing.name}")
 					log.warn("error resizing disk: ${result.msg}")
@@ -1427,22 +1453,26 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 		datastoreIds = datastoreIds.unique()
 		def datastores = morpheusContext.async.cloud.datastore.listById(datastoreIds).toMap { it.id.toLong() }.blockingGet()
 		resizeRequest.volumesAdd?.each { Map volumeAdd ->
-			serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-			vmBody = serverDetails?.data
+			def vmDetail = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+			if (!vmDetail.success) {
+				rtn.setError("error adding disk: ${vmDetail.msg}")
+				log.warn("error adding disk: ${vmDetail.msg}")
+				return
+			}
+			def vmBody = vmDetail.data
 			log.info("resizing vm adding storage: {}", volumeAdd)
 			if (!volumeAdd.maxStorage) {
 				volumeAdd.maxStorage = volumeAdd.size ? (volumeAdd.size.toDouble() * ComputeUtility.ONE_GIGABYTE).toLong() : 0
 			}
 			def storageVolumeType = storageVolumeTypes[volumeAdd.storageType.toLong()]
 			def datastore = datastores[volumeAdd.datastoreId.toLong()]
-			def targetIndex = vmBody.spec?.resources?.disk_list?.size()
+			def targetIndex = vmBody.disks?.size()
 			if (targetIndex != null) {
 				//account for ide.0
 				targetIndex--
 			} else {
 				targetIndex = 0
 			}
-			def newDiskList = vmBody.spec?.resources?.disk_list
 
 			def diskConfig = [
 				device_properties: [
@@ -1461,23 +1491,24 @@ class NutanixPrismProvisionProvider extends AbstractProvisionProvider implements
 					]
 				]
 			]
-			newDiskList << diskConfig
-			vmBody.spec.resources.disk_list = newDiskList
-			def addDiskResults = NutanixPrismComputeUtility.retryableUpdateVm(client, authConfig, vmId, vmBody)
-			if (addDiskResults.success) {
+			vmBody.disks = (vmBody.disks ?: []) + NutanixPrismComputeUtility.convertDiskListTov4([diskConfig])
+			def addDiskResults = NutanixPrismComputeUtility.updateVmV4(client, authConfig, vmId, vmBody, vmBody.etag as String)
+			if (addDiskResults.success && addDiskResults.data?.task_uuid) {
 				//wait for operation to complete
-				if (addDiskResults.data?.status?.execution_context?.task_uuid) {
-					def taskResult = NutanixPrismComputeUtility.checkTaskReady(client, authConfig, addDiskResults.data?.status?.execution_context?.task_uuid)
+				def taskResult = NutanixPrismComputeUtility.checkTaskReadyV4(client, authConfig, addDiskResults.data.task_uuid)
+				if (taskResult.success) {
+					def refreshedVm = NutanixPrismComputeUtility.getVmV4(client, authConfig, vmId)
+					def newDisk = refreshedVm.data?.disks?.find { it.diskAddress?.busType == storageVolumeType.name.toUpperCase() && it.diskAddress?.index == targetIndex }
+					def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
+					newVolume.externalId = newDisk?.extId
+					newVolume.type = new StorageVolumeType(id: volumeAdd.storageType.toLong())
+					morpheusContext.async.storageVolume.create([newVolume], server).blockingGet()
+					// Need to refetch the server
+					server = morpheusContext.async.computeServer.get(server.id).blockingGet()
+				} else {
+					rtn.setError("error adding disk: task failed")
+					log.warn("error adding disk: task failed")
 				}
-				serverDetails = NutanixPrismComputeUtility.waitForPowerState(client, authConfig, vmId)
-				vmBody = serverDetails?.data
-				def newDisk = vmBody.spec.resources.disk_list.find { it.device_properties.disk_address.adapter_type == storageVolumeType.name.toUpperCase() && it.device_properties.disk_address.device_index == targetIndex }
-				def newVolume = NutanixPrismSyncUtils.buildStorageVolume(server.account, server, volumeAdd, targetIndex)
-				newVolume.externalId = newDisk.uuid
-				newVolume.type = new StorageVolumeType(id: volumeAdd.storageType.toLong())
-				morpheusContext.async.storageVolume.create([newVolume], server).blockingGet()
-				// Need to refetch the server
-				server = morpheusContext.async.computeServer.get(server.id).blockingGet()
 			} else {
 				//do stuff here to bubble up results
 				rtn.setError("error adding disk: ${addDiskResults?.msg}")
