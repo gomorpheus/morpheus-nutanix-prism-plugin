@@ -199,7 +199,7 @@ class NutanixPrismComputeUtilitySpec extends Specification {
 		def vm = result.data[0]
 		vm.metadata.uuid == 'vm-1'
 		vm.metadata.project_reference.uuid == 'project-1'
-		vm.metadata.categories == [[key: 'Environment', value: 'Production']]
+		vm.metadata.categories == [[key: 'Environment', value: 'Production', extId: 'cat-1']]
 		vm.status.name == 'VM One'
 		vm.status.cluster_reference.uuid == 'cluster-1'
 		vm.status.resources.power_state == 'ON'

@@ -415,7 +415,7 @@ class VirtualMachinesSync {
 		}
 
 		//tags
-		def vmTags = cloudItem.metadata?.categories?.collect {"${it.key}:${it.value}"}
+		def vmTags = cloudItem.metadata?.categories?.collect { it.extId }
 		def existingTags = server.metadata
 		def matchFunction = {existingTag, masterTag -> {
 			masterTag == existingTag.externalId

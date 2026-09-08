@@ -25,7 +25,6 @@ import com.morpheusdata.core.util.HttpApiClient
 import com.morpheusdata.core.util.SyncTask
 import com.morpheusdata.model.Cloud
 import com.morpheusdata.model.MetadataTag
-import com.morpheusdata.model.ReferenceData
 import com.morpheusdata.model.projection.MetadataTagIdentityProjection
 import com.morpheusdata.model.projection.ReferenceDataSyncProjection
 import com.morpheusdata.nutanix.prism.plugin.NutanixPrismPlugin
@@ -60,12 +59,17 @@ class CategoriesSync {
 					new DataFilter("refId", cloud.id),
 				]))
 				SyncTask<MetadataTagIdentityProjection, Map, MetadataTag> syncTask = new SyncTask<>(domainRecords, masterData.data)
+				// Match on the V4 extId (current format) or the legacy V3 "key:value" composite string
+				// still stored on rows synced before this plugin version - the legacy match lets
+				// pre-existing rows be picked up as updates (see onUpdate below) rather than deleted
+				// and recreated, so their database id - and any existing server tag associations - is
+				// preserved while their externalId is migrated to the real V4 extId in place.
 				syncTask.addMatchFunction { MetadataTagIdentityProjection domainObject, Map data ->
-					domainObject.externalId == data.display
+					domainObject.externalId == data.extId || domainObject.externalId == data.display
 				}.onDelete { removeItems ->
 					removeMissingCategories(removeItems as List<MetadataTag>)
-				}.onUpdate { List<SyncTask.UpdateItem<ReferenceData, Map>> updateItems ->
-					// Nothing to do
+				}.onUpdate { List<SyncTask.UpdateItem<MetadataTag, Map>> updateItems ->
+					migrateLegacyCategories(updateItems)
 				}.onAdd { itemsToAdd ->
 					addMissingCategories(itemsToAdd as List<Map>)
 				}.withLoadObjectDetails { List<SyncTask.UpdateItemDto<ReferenceDataSyncProjection, Map>> updateItems ->
@@ -91,7 +95,7 @@ class CategoriesSync {
 			Map props = [
 				refType: 'ComputeZone',
 				refId: cloud.id,
-				externalId: data.display,
+				externalId: data.extId,
 				name: data.name,
 				value: data.value
 			]
@@ -102,6 +106,28 @@ class CategoriesSync {
 
 		if(adds) {
 			morpheusContext.async.metadataTag.bulkCreate(adds).blockingGet()
+		}
+	}
+
+	/**
+	 * Rewrites externalId in place for any matched row still carrying the legacy V3 "key:value"
+	 * composite string, so it holds the real V4 category extId going forward - this is the one-time
+	 * (per row) migration/translation step; every subsequent sync is a no-op since externalId will
+	 * already equal extId.
+	 */
+	private migrateLegacyCategories(List<SyncTask.UpdateItem<MetadataTag, Map>> updateItems) {
+		log.debug "migrateLegacyCategories ${cloud} ${updateItems.size()}"
+		def saves = []
+		updateItems.each { SyncTask.UpdateItem<MetadataTag, Map> updateItem ->
+			MetadataTag tag = updateItem.existingItem
+			Map data = updateItem.masterItem
+			if(tag.externalId != data.extId) {
+				tag.externalId = data.extId
+				saves << tag
+			}
+		}
+		if(saves) {
+			morpheusContext.async.metadataTag.bulkSave(saves).blockingGet()
 		}
 	}
 
@@ -117,7 +143,7 @@ class CategoriesSync {
 			ServiceResponse listResult = NutanixPrismComputeUtility.listCategoriesV4(apiClient, authConfig)
 			if (listResult.success) {
 				listResult.data?.each { category ->
-					rtn.data << [name: category.key, value: category.value, display: "${category.key}:${category.value}"]
+					rtn.data << [name: category.key, value: category.value, extId: category.extId, display: "${category.key}:${category.value}"]
 				}
 			} else {
 				rtn.success = false

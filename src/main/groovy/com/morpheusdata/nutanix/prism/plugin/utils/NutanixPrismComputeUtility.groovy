@@ -1458,9 +1458,10 @@ class NutanixPrismComputeUtility {
 	 *       cdRoms into their own array)</li>
 	 * </ul>
 	 * VM {@code categories} is a list of category *references* (just {@code extId}) - resolved to
-	 * {@code {key, value}} pairs (matching V3 {@code metadata.categories} shape) via a lookup built
-	 * from {@link #listCategoriesV4}, so downstream tag sync (which expects {@code key:value} pairs,
-	 * see {@code VirtualMachinesSync.performPostSaveSync}) keeps working unchanged.
+	 * {@code {key, value, extId}} entries (matching V3 {@code metadata.categories} shape, plus the
+	 * V4 {@code extId} the tag now uses as its {@code MetadataTag.externalId}) via a lookup built
+	 * from {@link #listCategoriesV4}, so downstream tag sync (which matches on {@code extId}, see
+	 * {@code VirtualMachinesSync.performPostSaveSync} and {@code CategoriesSync}) keeps working.
 	 */
 	static ServiceResponse listVMsV4(HttpApiClient client, Map authConfig) {
 		log.debug("listVMsV4")
@@ -1494,7 +1495,7 @@ class NutanixPrismComputeUtility {
 					]
 			]
 		}
-		def categories = (vm.categories ?: []).findResults { categoriesByExtId[it.extId] }.collect { [key: it.key, value: it.value] }
+		def categories = (vm.categories ?: []).findResults { categoriesByExtId[it.extId] }.collect { [key: it.key, value: it.value, extId: it.extId] }
 		return [
 				metadata: [
 						uuid              : vm.extId,

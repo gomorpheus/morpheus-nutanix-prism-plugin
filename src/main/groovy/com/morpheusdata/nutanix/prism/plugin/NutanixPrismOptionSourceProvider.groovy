@@ -160,10 +160,13 @@ class NutanixPrismOptionSourceProvider extends AbstractOptionSourceProvider {
 		def cloudId = getCloudId(args)
 		if(cloudId) {
 			Cloud tmpCloud = morpheusContext.async.cloud.get(cloudId).blockingGet()
-			def options = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
+			// externalId is the V4 category extId (not human-readable), so build the display label
+			// from name/value instead of reusing externalId for both, as the identity-projection-only
+			// version of this method used to.
+			def options = morpheusContext.async.metadataTag.list(new DataQuery().withFilters([
 				new DataFilter("refType", "ComputeZone"),
 				new DataFilter("refId", tmpCloud.id),
-			])).map { [name: it.externalId, value: it.externalId] }.toList().blockingGet().sort({ it.name })
+			])).map { [name: "${it.name}:${it.value}", value: it.externalId] }.toList().blockingGet().sort({ it.name })
 			return options
 		} else {
 			return []
