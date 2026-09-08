@@ -38,7 +38,9 @@ import com.morpheusdata.nutanix.prism.plugin.utils.NutanixPrismSyncUtils
 import com.morpheusdata.response.ServiceResponse
 import com.morpheusdata.response.WorkloadResourceMappingResponse
 import com.morpheusdata.response.InstanceResourceMappingResponse
+import groovy.util.logging.Slf4j
 
+@Slf4j
 class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvider {
 
 	NutanixPrismPlugin plugin
@@ -79,17 +81,19 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 		//only supports terraform at the moment
 		if (iacProvider == 'terraform') {
 			InstanceResourceMappingResponse response = new InstanceResourceMappingResponse()
-			def ip_address = resourceResult?.values?.nic_list?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
-			if(!ip_address) {
-				ip_address = resourceResult?.values?.nic_list_status?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
-			}
-			def externalId = resourceResult?.values?.metadata?.uuid
+			def values = resourceResult?.values
+			// nutanix_virtual_machine_v2 (v4-API-backed) has a top-level `ext_id`, which the legacy
+			// nutanix_virtual_machine (v1) schema never has - use its presence to distinguish the two
+			// incompatible Terraform state schemas.
+			def isV2Schema = values?.containsKey('ext_id')
+			def ip_address = extractIpAddress(values, isV2Schema)
+			def externalId = isV2Schema ? values?.ext_id : values?.metadata?.uuid
 			response.privateIp = ip_address
 			response.publicIp = ip_address
 			response.noAgent = true
 			response.installAgent = false
-			def serverName = resourceResult?.values?.name
-			def clusterId = resourceResult?.values?.cluster_uuid
+			def serverName = values?.name
+			def clusterId = isV2Schema ? values?.cluster?.ext_id : values?.cluster_uuid
 			def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId)).blockingGet()
 			def serverList = instance.containers?.collect{ it.server }
 			def server = externalId ? serverList?.find{ it.externalId == externalId } : null
@@ -105,9 +109,11 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 			if (server) {
 				response.serverId = server.id
 				server.externalId = externalId
-				server.maxMemory = resourceResult?.values?.memory_size_mib * ComputeUtility.ONE_MEGABYTE
-				server.maxCores = (resourceResult?.values?.num_vcpus_per_socket?.toLong() ?: 0) * (resourceResult?.values?.num_sockets?.toLong() ?: 0)
-				server.coresPerSocket = resourceResult?.values?.num_vcpus_per_socket?.toLong()
+				def coresPerSocket = (isV2Schema ? values?.num_cores_per_socket : values?.num_vcpus_per_socket)?.toLong() ?: 0
+				def memoryMib = isV2Schema ? ((values?.memory_size_bytes as Long ?: 0) / ComputeUtility.ONE_MEGABYTE) : (values?.memory_size_mib as Long ?: 0)
+				server.maxMemory = memoryMib * ComputeUtility.ONE_MEGABYTE
+				server.maxCores = coresPerSocket * (values?.num_sockets?.toLong() ?: 0)
+				server.coresPerSocket = coresPerSocket
 				server.resourcePool = cluster
 				if (serverName && server.name != serverName)
 					server.name = serverName
@@ -122,8 +128,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 				morpheusContext.async.workload.save(workloads).blockingGet()
 				//find the zone in case different than selected?
 				//find a matching image and configure agent etc...
-				def disk = resourceResult.values?.disk_list?.find { it?.data_source_reference?.kind == "image" }
-				def sourceImageId = disk?.data_source_reference?.uuid
+				def sourceImageId = extractSourceImageId(values, isV2Schema)
 
 				if (sourceImageId) {
 					def virtualImageLocation = morpheusContext.async.virtualImage.location.find(new DataQuery().withFilter("externalId", sourceImageId)).blockingGet()
@@ -141,7 +146,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 					}
 				}
 				def tags = getAllTags(server.cloud)
-				def vmTags = resourceResult?.values?.categories?.collect {"${it.name}:${it.value}"}
+				def vmTags = isV2Schema ? resolveV2CategoryTags(values?.categories) : values?.categories?.collect {"${it.name}:${it.value}"}
 				def existingTags = server.metadata
 				def matchFunction = {existingTag, masterTag -> {
 					masterTag == existingTag.externalId
@@ -167,24 +172,25 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 		//only supports terraform at the moment
 		if (iacProvider == 'terraform') {
 			WorkloadResourceMappingResponse response = new WorkloadResourceMappingResponse()
-			def ip_address = resourceResult?.values?.nic_list?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
-			if(!ip_address) {
-				ip_address = resourceResult?.values?.nic_list_status?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
-			}
-			def externalId = resourceResult?.values?.metadata?.uuid
+			def values = resourceResult?.values
+			def isV2Schema = values?.containsKey('ext_id')
+			def ip_address = extractIpAddress(values, isV2Schema)
+			def externalId = isV2Schema ? values?.ext_id : values?.metadata?.uuid
 			response.privateIp = ip_address
 			response.publicIp = ip_address
 			response.noAgent = true
 			response.installAgent = false
-			def serverName = resourceResult?.values?.name
-			def clusterId = resourceResult?.values?.cluster_uuid
+			def serverName = values?.name
+			def clusterId = isV2Schema ? values?.cluster?.ext_id : values?.cluster_uuid
 			def cluster = morpheusContext.async.cloud.pool.find(new DataQuery().withFilter("externalId", clusterId)).blockingGet()
 			def server = workload.server
 			if (server) {
 				server.externalId = externalId
-				server.maxMemory = resourceResult?.values?.memory_size_mib * ComputeUtility.ONE_MEGABYTE
-				server.maxCores = (resourceResult?.values?.num_vcpus_per_socket?.toLong() ?: 0) * (resourceResult?.values?.num_sockets?.toLong() ?: 0)
-				server.coresPerSocket = resourceResult?.values?.num_vcpus_per_socket?.toLong()
+				def coresPerSocket = (isV2Schema ? values?.num_cores_per_socket : values?.num_vcpus_per_socket)?.toLong() ?: 0
+				def memoryMib = isV2Schema ? ((values?.memory_size_bytes as Long ?: 0) / ComputeUtility.ONE_MEGABYTE) : (values?.memory_size_mib as Long ?: 0)
+				server.maxMemory = memoryMib * ComputeUtility.ONE_MEGABYTE
+				server.maxCores = coresPerSocket * (values?.num_sockets?.toLong() ?: 0)
+				server.coresPerSocket = coresPerSocket
 				server.resourcePool = cluster
 				if (serverName && server.name != serverName)
 					server.name = serverName
@@ -193,8 +199,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 				workload.workloadType = new WorkloadType(code: 'nutanix-prism-provision-provider-1.0"')
 				//find the zone in case different than selected?
 				//find a matching image and configure agent etc...
-				def disk = resourceResult.values?.disk_list?.find { it?.data_source_reference?.kind == "image" }
-				def sourceImageId = disk?.data_source_reference?.uuid
+				def sourceImageId = extractSourceImageId(values, isV2Schema)
 
 				if (sourceImageId) {
 					def virtualImageLocation = morpheusContext.async.virtualImage.location.find(new DataQuery().withFilter("externalId", sourceImageId)).blockingGet()
@@ -212,7 +217,7 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 					}
 				}
 				def tags = getAllTags(server.cloud)
-				def vmTags = resourceResult?.values?.categories?.collect {"${it.name}:${it.value}"}
+				def vmTags = isV2Schema ? resolveV2CategoryTags(values?.categories) : values?.categories?.collect {"${it.name}:${it.value}"}
 				def existingTags = server.metadata
 				def matchFunction = {existingTag, masterTag -> {
 					masterTag == existingTag.externalId
@@ -234,7 +239,58 @@ class NutanixPrismIacResourceMappingProvider implements IacResourceMappingProvid
 
 	}
 
-	private Map getAllTags(cloud) {
+	/**
+	 * Extracts the VM's private/public IP from a Terraform `nutanix_virtual_machine`(v1)/
+	 * `nutanix_virtual_machine_v2` state `values` map. v2's NIC block shape itself changed at
+	 * provider v2.4.1 (new `nic_network_info` nested shape vs. the deprecated top-level
+	 * `network_info`) - both are tried, new-style first, so this keeps working across the range of
+	 * v2 provider versions without needing a plugin release every time Nutanix bumps the provider.
+	 */
+	String extractIpAddress(Map values, boolean isV2Schema) {
+		if (isV2Schema) {
+			def nic = values?.nics?.getAt(0)
+			def ip = nic?.nic_network_info?.virtual_ethernet_nic_network_info?.ipv4_config?.ip_address?.value
+			if (!ip) {
+				ip = nic?.network_info?.ipv4_config?.ip_address?.value
+			}
+			return ip
+		} else {
+			def ip = values?.nic_list?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
+			if (!ip) {
+				ip = values?.nic_list_status?.getAt(0)?.ip_endpoint_list?.getAt(0)?.ip
+			}
+			return ip
+		}
+	}
+
+	/**
+	 * Resolves the source image's external ID from a Terraform `nutanix_virtual_machine`(v1)/
+	 * `nutanix_virtual_machine_v2` state `values` map's disk list. v1's `disk_list[].data_source_reference`
+	 * is a flat `{kind, uuid}` pair; v2's `disks[].backing_info.vm_disk.data_source.reference` is a
+	 * nested oneof (`image_reference` vs `vm_disk_reference`).
+	 */
+	String extractSourceImageId(Map values, boolean isV2Schema) {
+		if (isV2Schema) {
+			def disk = values?.disks?.find { it?.backing_info?.vm_disk?.data_source?.reference?.image_reference?.image_ext_id }
+			return disk?.backing_info?.vm_disk?.data_source?.reference?.image_reference?.image_ext_id
+		} else {
+			def disk = values?.disk_list?.find { it?.data_source_reference?.kind == "image" }
+			return disk?.data_source_reference?.uuid
+		}
+	}
+
+	/**
+	 * v2 `categories` state entries are category-entity references (`ext_id` only), unlike v1's
+	 * inline `name`/`value` string pairs. Now that CategoriesSync stores each synced category's
+	 * real V4 `extId` as `MetadataTag.externalId` (see CategoriesSync.migrateLegacyCategories),
+	 * matching v2 tags is as simple as collecting the `ext_id` values directly - no separate Prism
+	 * Central lookup is needed, since `getAllTags`'s map is already keyed the same way.
+	 */
+	List<String> resolveV2CategoryTags(List categories) {
+		return categories?.findResults { it?.ext_id } ?: []
+	}
+
+	Map getAllTags(cloud) {
 		def tags = morpheusContext.async.metadataTag.listIdentityProjections(new DataQuery().withFilters([
 			new DataFilter("refType", "ComputeZone"),
 			new DataFilter("refId", cloud.id),
